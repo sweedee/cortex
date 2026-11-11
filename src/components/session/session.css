@@ -1,0 +1,246 @@
+/*
+ * Styles for the Claude session UI (transcript, session list, launchers).
+ * Colours come in as --cx-* custom properties set from Strato design tokens
+ * (see cxVars in meta.tsx), so everything follows the active theme.
+ */
+
+.cx-root {
+  color: var(--cx-text);
+  box-sizing: border-box;
+}
+.cx-root *,
+.cx-root *::before,
+.cx-root *::after {
+  box-sizing: border-box;
+}
+
+.cx-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cx-border-strong) transparent;
+}
+
+/* ---- unstyled, focusable button base ---- */
+.cx-btn {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cx-btn:focus-visible {
+  outline: 2px solid var(--cx-focus);
+  outline-offset: -2px;
+}
+.cx-btn:disabled {
+  cursor: default;
+}
+
+/* ---- session list ---- */
+.cx-session {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--cx-radius);
+}
+.cx-session:hover {
+  background: var(--cx-hover);
+}
+.cx-session[aria-current='true'] {
+  background: var(--cx-selected);
+}
+
+/* ---- status dot ---- */
+.cx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  justify-self: center;
+  flex: none;
+}
+.cx-dot[data-pulse='true'] {
+  animation: cx-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+/* ---- tool call log ---- */
+.cx-tools {
+  border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius);
+  background: var(--cx-surface);
+  overflow: hidden;
+}
+.cx-tool + .cx-tool {
+  border-top: 1px solid var(--cx-border-subdued);
+}
+.cx-tool-row {
+  display: grid;
+  grid-template-columns: 16px 16px 44px minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 3px 10px 3px 6px;
+}
+.cx-tool-row:not(:disabled):hover {
+  background: var(--cx-hover);
+}
+.cx-tool-row svg {
+  display: block;
+}
+.cx-tool-detail {
+  margin: 0;
+  padding: 8px 12px 10px 38px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre;
+  tab-size: 2;
+  background: var(--cx-subdued);
+  border-top: 1px solid var(--cx-border-subdued);
+  scrollbar-width: thin;
+  scrollbar-color: var(--cx-border-strong) transparent;
+}
+.cx-tool-detail span {
+  display: block;
+  min-height: 1.5em;
+}
+
+.cx-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--cx-border-strong);
+  border-top-color: var(--cx-primary);
+  animation: cx-spin 0.8s linear infinite;
+  justify-self: center;
+}
+@keyframes cx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- messages ---- */
+.cx-user {
+  max-width: min(640px, 85%);
+  padding: 8px 12px;
+  border-radius: var(--cx-radius-lg);
+  background: var(--cx-container);
+  overflow-wrap: anywhere;
+}
+.cx-md {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.cx-md > div > :first-child,
+.cx-md > :first-child {
+  margin-top: 0;
+}
+.cx-md > div > :last-child,
+.cx-md > :last-child {
+  margin-bottom: 0;
+}
+
+/* ---- launcher / digest cards ---- */
+.cx-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius-lg);
+  background: var(--cx-surface);
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+button.cx-card:hover {
+  border-color: var(--cx-primary);
+  background: var(--cx-hover);
+}
+
+.cx-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  column-gap: 6px;
+  width: calc(100% + 12px);
+  margin: 0 -6px;
+  padding: 4px 6px;
+  border-radius: var(--cx-radius-sm);
+}
+button.cx-entry:hover {
+  background: var(--cx-hover);
+}
+.cx-entry .cx-entry-arrow {
+  opacity: 0;
+}
+button.cx-entry:hover .cx-entry-arrow,
+button.cx-entry:focus-visible .cx-entry-arrow {
+  opacity: 1;
+}
+
+.cx-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-dot[data-pulse='true'],
+  .cx-spinner {
+    animation-duration: 0s;
+    animation-iteration-count: 1;
+  }
+}
+
+/* ---- composer ---- */
+.cx-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius-lg);
+  background: var(--cx-surface);
+}
+.cx-composer:focus-within {
+  border-color: var(--cx-primary);
+}
+.cx-composer textarea {
+  appearance: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  width: 100%;
+  padding: 0;
+  max-height: 200px;
+}
+.cx-composer textarea::placeholder {
+  color: var(--dt-colors-text-neutral-subdued);
+}
+.cx-tool-row[aria-expanded='true'] {
+  background: var(--cx-hover);
+}

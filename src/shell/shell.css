@@ -1,0 +1,137 @@
+/* Shell-level styles that cannot be expressed with Strato props. Colours come from Strato tokens only. */
+
+.cx-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dt-spacings-size-8);
+  position: relative;
+  outline: none;
+  transition: box-shadow 120ms ease;
+}
+.cx-card:focus-visible {
+  box-shadow: 0 0 0 2px var(--dt-colors-border-primary-accent);
+}
+.cx-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cx-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* one status line on a card: icon · text · meta */
+.cx-row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  width: 100%;
+  min-height: 24px;
+  padding: 0 var(--dt-spacings-size-4);
+  margin: 0 calc(-1 * var(--dt-spacings-size-4));
+  border-radius: var(--dt-borders-radius-field-default, 4px);
+  cursor: pointer;
+  font-family: var(--dt-typography-text-small-default-family);
+  font-size: var(--dt-typography-text-small-default-size);
+  line-height: var(--dt-typography-text-small-default-line-height);
+  color: var(--dt-colors-text-neutral-default);
+}
+.cx-row:hover {
+  background: var(--dt-colors-background-container-neutral-default);
+}
+.cx-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--dt-colors-border-primary-accent);
+}
+.cx-row > svg,
+.cx-row-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.cx-row-meta {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  color: var(--dt-colors-text-neutral-subdued);
+  font-variant-numeric: tabular-nums;
+}
+.cx-mono {
+  font-family: var(--dt-typography-code-small-default-family, ui-monospace, monospace);
+  font-size: var(--dt-typography-code-small-default-size, 12px);
+}
+
+.cx-tone-neutral { color: var(--dt-colors-text-neutral-subdued); }
+.cx-tone-primary { color: var(--dt-colors-text-primary-default); }
+.cx-tone-success { color: var(--dt-colors-text-success-default); }
+.cx-tone-warning { color: var(--dt-colors-text-warning-default); }
+.cx-tone-critical { color: var(--dt-colors-text-critical-default); }
+
+/* CI stages as a row of small segments */
+.cx-stages {
+  display: flex;
+  gap: 2px;
+}
+.cx-stage {
+  width: 10px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--dt-colors-border-neutral-default);
+}
+.cx-stage[data-status='passed'] { background: var(--dt-colors-icon-success-default); }
+.cx-stage[data-status='failed'] { background: var(--dt-colors-icon-critical-default); }
+.cx-stage[data-status='running'] {
+  background: var(--dt-colors-icon-primary-default);
+  animation: cx-pulse 1s ease-in-out infinite;
+}
+@keyframes cx-pulse {
+  50% { opacity: 0.35; }
+}
+
+.cx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+.cx-dot[data-pulse='true'] { animation: cx-pulse 1.2s ease-in-out infinite; }
+
+.cx-group-label {
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  padding: var(--dt-spacings-size-4) var(--dt-spacings-size-4) 0;
+  color: var(--dt-colors-text-neutral-subdued);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cx-home {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  width: 100%;
+  padding: var(--dt-spacings-size-8) var(--dt-spacings-size-12);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cx-home:hover,
+.cx-home[aria-current='page'] {
+  background: var(--dt-colors-background-container-neutral-default);
+}
+.cx-home[aria-current='page'] {
+  background: var(--dt-colors-background-container-primary-default);
+}

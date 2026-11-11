@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observe - Services</title>
+<style>
+  :root {
+    --bg: #f4f5f8; --surface: #fff; --text: #1d2233; --muted: #697089; --border: #e0e3ec;
+    --accent: #5b4fe0; --accent-soft: #eceafd; --good: #1a8f5b; --bad: #d03a4c; --warn: #b87500;
+    --grid: #e9ebf2; --series: #5b4fe0; --series-fill: rgba(91,79,224,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141c; --surface: #1b1e29; --text: #e6e8f0; --muted: #98a0b8; --border: #2b3040;
+      --accent: #8b82ff; --accent-soft: #28264a; --good: #4cc790; --bad: #ff6b7d; --warn: #e8b04a;
+      --grid: #272b39; --series: #8b82ff; --series-fill: rgba(139,130,255,.16);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 16px; padding: 0 20px; height: 52px; background: var(--surface); border-bottom: 1px solid var(--border); flex: none; }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 650; letter-spacing: .2px; }
+  .logo i { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), #2cb5c9); display: block; }
+  .badge { margin-left: auto; font-size: 12px; color: var(--muted); background: var(--accent-soft); border-radius: 999px; padding: 3px 10px; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge b { color: var(--accent); font-weight: 600; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 650; flex: none; }
+  .layout { flex: 1; min-height: 0; display: flex; }
+  nav { width: 188px; flex: none; padding: 12px 8px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+  nav a { padding: 7px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+  nav a::before { content: ''; width: 6px; height: 6px; border-radius: 2px; background: currentColor; opacity: .5; }
+  nav a:hover { background: var(--bg); color: var(--text); }
+  nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  nav a.active::before { opacity: 1; }
+  main { flex: 1; min-width: 0; overflow: auto; padding: 20px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 20px; font-weight: 650; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+  .seg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px 10px; min-width: 0; }
+  .tile.wide { grid-column: span 2; }
+  .tile h2 { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .val { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 6px; }
+  .val strong { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .delta { font-size: 12px; font-weight: 600; }
+  .delta.good { color: var(--good); } .delta.bad { color: var(--bad); }
+  svg { display: block; width: 100%; height: 64px; overflow: visible; }
+  .tile.wide svg { height: 92px; }
+  .bars { margin-top: 8px; display: grid; gap: 7px; }
+  .bar { display: grid; grid-template-columns: 110px 1fr 56px; align-items: center; gap: 8px; font-size: 12px; }
+  .bar .track { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+  .bar .fill { height: 100%; background: var(--accent); border-radius: 3px; }
+  .bar span:last-child { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  @media (max-width: 640px) { nav { display: none; } .tile.wide { grid-column: auto; } .badge { display: none; } main { padding: 14px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i></i>Observe</div>
+  <div class="badge" id="badge" hidden></div>
+  <div class="avatar" title="Signed in">SW</div>
+</header>
+<div class="layout">
+  <nav aria-label="Main">
+    <a href="#" class="active">Services</a><a href="#">Dashboards</a><a href="#">Logs</a><a href="#">Traces</a><a href="#">Problems</a><a href="#">Settings</a>
+  </nav>
+  <main>
+    <div class="top">
+      <div><h1 id="title">Services overview</h1><div class="sub" id="sub"></div></div>
+      <div class="seg" role="group" aria-label="Timeframe" id="seg"></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+  </main>
+</div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var work = q.get('work'), title = q.get('title');
+  if (work) {
+    var b = document.getElementById('badge');
+    b.hidden = false;
+    b.innerHTML = 'running from worktree <b></b>' + (title ? ' - <span></span>' : '');
+    b.querySelector('b').textContent = work;
+    if (title) b.querySelector('span').textContent = title;
+    b.title = b.textContent;
+  }
+
+  var RANGES = { '1h': { n: 30, label: 'Last 1 hour', k: 1 }, '6h': { n: 36, label: 'Last 6 hours', k: 6 }, '24h': { n: 48, label: 'Last 24 hours', k: 24 }, '7d': { n: 56, label: 'Last 7 days', k: 168 } };
+  var current = '24h';
+
+  // deterministic pseudo random so tiles are stable per timeframe
+  function rng(seed) { var s = seed >>> 0 || 1; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  function series(seed, n, base, amp) {
+    var r = rng(seed), out = [];
+    for (var i = 0; i < n; i++) out.push(Math.max(0, base + Math.sin(i / 5 + seed) * amp * .7 + (r() - .5) * amp));
+    return out;
+  }
+  function path(data, w, h, area) {
+    var min = Math.min.apply(null, data), max = Math.max.apply(null, data), span = max - min || 1;
+    var pts = data.map(function (d, i) { return [(i / (data.length - 1)) * w, h - 4 - ((d - min) / span) * (h - 8)]; });
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('');
+    return area ? d + 'L' + w + ' ' + h + 'L0 ' + h + 'Z' : d;
+  }
+  function chart(data, w, h) {
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" role="img" aria-label="trend">' +
+      '<path d="' + path(data, w, h, true) + '" fill="var(--series-fill)"/>' +
+      '<path d="' + path(data, w, h) + '" fill="none" stroke="var(--series)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>';
+  }
+  function fmt(n, d) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n.toFixed(d || 0); }
+  function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
+
+  var METRICS = [
+    { name: 'Request rate', unit: ' req/s', seed: 3, base: 820, amp: 90, d: 0, good: true },
+    { name: 'Error rate', unit: '%', seed: 11, base: 1.2, amp: .5, d: 2, good: false },
+    { name: 'p95 latency', unit: ' ms', seed: 7, base: 240, amp: 40, d: 0, good: false },
+    { name: 'Apdex', unit: '', seed: 19, base: .94, amp: .02, d: 2, good: true },
+    { name: 'CPU usage', unit: '%', seed: 23, base: 46, amp: 7, d: 0, good: false },
+    { name: 'Memory', unit: ' GB', seed: 29, base: 6.4, amp: .5, d: 1, good: false }
+  ];
+
+  function render() {
+    var R = RANGES[current];
+    document.getElementById('sub').textContent = R.label + ' - 14 services - updated just now';
+    var html = '';
+    METRICS.forEach(function (m, i) {
+      var data = series(m.seed + R.k, R.n, m.base, m.amp);
+      var last = avg(data.slice(-5)), first = avg(data.slice(0, 5));
+      var pct = ((last - first) / first) * 100;
+      var up = pct >= 0, good = (up === m.good) || Math.abs(pct) < 1;
+      html += '<section class="tile' + (i === 0 ? ' wide' : '') + '"><h2>' + m.name + '</h2><div class="val"><strong>' + fmt(last, m.d) + m.unit +
+        '</strong><span class="delta ' + (good ? 'good' : 'bad') + '">' + (up ? '+' : '') + pct.toFixed(1) + '%</span></div>' + chart(data, 300, i === 0 ? 92 : 64) + '</section>';
+    });
+    var svcs = [['checkout-api', 0], ['ingest-gateway', 0], ['query-service', 1], ['billing-worker', 0], ['notify-svc', 2]];
+    html += '<section class="tile wide"><h2>Top services by load</h2><div class="bars">';
+    svcs.forEach(function (s, i) {
+      var r = rng(s[0].length * 7 + R.k + i), v = 90 - i * 14 + r() * 8;
+      html += '<div class="bar"><span><i class="status" style="background:' + (s[1] === 0 ? 'var(--good)' : s[1] === 1 ? 'var(--warn)' : 'var(--bad)') + '"></i>' + s[0] + '</span><div class="track"><div class="fill" style="width:' + v.toFixed(0) + '%"></div></div><span>' + fmt(v * R.k * 6 + 400) + '</span></div>';
+    });
+    html += '</div></section>';
+    document.getElementById('tiles').innerHTML = html;
+    Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.r === current)); });
+  }
+
+  var seg = document.getElementById('seg');
+  Object.keys(RANGES).forEach(function (k) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = k; b.dataset.r = k;
+    b.addEventListener('click', function () { current = k; render(); });
+    seg.appendChild(b);
+  });
+  render();
+})();
+</script>
+</body>
+</html>
