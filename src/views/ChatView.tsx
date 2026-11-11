@@ -5,7 +5,7 @@ import { ArrowRightIcon } from '@dynatrace/strato-icons';
 import { Composer } from '../components/session/Composer';
 import { Transcript } from '../components/session/Transcript';
 import { cxVars, plural, subduedText } from '../components/session/meta';
-import { GLOBAL_SESSION_ID } from '../mock/seed/sessions';
+import { GLOBAL_SESSION_ID } from '../services/config';
 import type { WorkTab } from '../model/types';
 import { selectWork, sendMessage, stopSession } from '../state/actions';
 import { awaitsMyReview } from '../state/derive';

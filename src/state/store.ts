@@ -1,12 +1,21 @@
 import { useSyncExternalStore } from 'react';
-import { initialState } from '../mock/data';
 import type { AgentSession, CortexState, WorkItem } from '../model/types';
 
 /**
- * Minimal external store. Lives outside React so the mock simulator
- * (timers that advance agents, pipelines, …) can update it freely.
+ * Minimal external store. Lives outside React so the sync layer
+ * (state/sync.ts: polling, Claude events) can update it freely.
+ * Empty until boot() in state/sync.ts has loaded everything from the services.
  */
-let state: CortexState = initialState;
+let state: CortexState = {
+  ready: false,
+  me: '',
+  work: [],
+  sessions: [],
+  backlog: [],
+  todos: [],
+  view: { workId: null, tab: 'ticket' },
+  busy: {},
+};
 const listeners = new Set<() => void>();
 
 export const getState = () => state;

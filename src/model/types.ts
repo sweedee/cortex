@@ -1,5 +1,5 @@
 /**
- * Cortex domain model. Everything here is backed by mocks (see src/mock).
+ * Cortex domain model. The UI only knows these types; src/services maps tool output onto them.
  * A WorkItem is the unit the sidebar shows as a card; most of the time it
  * wraps a Jira ticket, but it can also be an ad-hoc task or a PR to review.
  */
@@ -153,6 +153,8 @@ export interface PipelineStage {
 
 export interface Pipeline {
   job: string; // jenkins job name
+  /** link to the build in Jenkins */
+  url?: string;
   buildNumber: number;
   status: 'queued' | 'running' | 'passed' | 'failed';
   branch: string;
@@ -204,7 +206,7 @@ export interface Todo {
 }
 
 export interface ViewState {
-  /** null = no work selected → main view is the global Cortex chat (or the todo list, see page) */
+  /** null = no work selected → main view is the global Cortex chat (or the todo list, see 'page') */
   workId: string | null;
   /** which global page to show while no work is selected; default is the chat */
   page?: 'todos';
@@ -214,6 +216,8 @@ export interface ViewState {
 }
 
 export interface CortexState {
+  /** false until the initial load from the services has finished */
+  ready: boolean;
   me: string;
   work: WorkItem[];
   sessions: AgentSession[];

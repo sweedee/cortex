@@ -6,6 +6,7 @@ import { Tooltip } from '@dynatrace/strato-components/overlays';
 import { Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import type { TicketComment } from '../../model/types';
+import { addTicketComment } from '../../state/actions';
 import { absoluteTime, initials, relativeTime } from './time';
 
 function Comment({ comment, me, now }: { comment: TicketComment; me: string; now: number }) {
@@ -34,20 +35,22 @@ function Comment({ comment, me, now }: { comment: TicketComment; me: string; now
   );
 }
 
-/**
- * Ticket comments plus a composer. New comments are kept in local state only —
- * nothing is written back to the (mocked) ticket.
- */
-export function Comments({ comments, me, now }: { comments: TicketComment[]; me: string; now: number }) {
-  const [local, setLocal] = useState<TicketComment[]>([]);
+/** Ticket comments plus a composer that posts to Jira (through the Jira service). */
+export function Comments({ workId, comments, me, now }: { workId: string; comments: TicketComment[]; me: string; now: number }) {
   const [draft, setDraft] = useState('');
-  const all = [...comments, ...local];
+  const [sending, setSending] = useState(false);
+  const all = comments;
 
-  const submit = () => {
+  const submit = async () => {
     const body = draft.trim();
-    if (!body) return;
-    setLocal((l) => [...l, { id: `local-${l.length + 1}`, author: me, at: new Date().toISOString(), bodyMd: body }]);
-    setDraft('');
+    if (!body || sending) return;
+    setSending(true);
+    try {
+      await addTicketComment(workId, body);
+      setDraft('');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -80,16 +83,16 @@ export function Comments({ comments, me, now }: { comments: TicketComment[]; me:
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                submit();
+                void submit();
               }
             }}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
-            <Button variant="emphasized" color="primary" size="condensed" disabled={!draft.trim()} onClick={submit}>
+            <Button variant="emphasized" color="primary" size="condensed" disabled={!draft.trim()} loading={sending} onClick={() => void submit()}>
               Comment
             </Button>
             <Text textStyle="small" style={{ color: Colors.Text.Neutral.Subdued }}>
-              Ctrl+Enter to send · stays local in this prototype
+              Ctrl+Enter to send
             </Text>
           </div>
         </div>

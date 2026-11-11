@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
-import { Text } from '@dynatrace/strato-components/typography';
+import { ExternalLink, Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import { AiIcon, PlayIcon, RefreshIcon, WorkflowIcon } from '@dynatrace/strato-icons';
 import type { Pipeline, PipelineStage } from '../model/types';
@@ -106,7 +106,7 @@ function PipelinePage({ workId }: { workId: string }) {
   }
 
   const sel = Math.min(picked ?? defaultStage(pipeline), pipeline.stages.length - 1);
-  const stage = pipeline.stages[sel];
+  const stage = pipeline.stages[sel] as (typeof pipeline.stages)[number] | undefined;
   const running = pipeline.status === 'running' || pipeline.status === 'queued';
   const failed = pipeline.status === 'failed';
   const total = totalDuration(pipeline, now);
@@ -150,12 +150,26 @@ function PipelinePage({ workId }: { workId: string }) {
           <span>
             Started <b>{relativeTime(pipeline.startedAt, now)}</b>
           </span>
+          {pipeline.url && (
+            <span>
+              <ExternalLink href={pipeline.url}>Jenkins</ExternalLink>
+            </span>
+          )}
           <span>
             Duration <b>{running ? `${formatDuration(total)} so far` : formatDuration(total)}</b>
           </span>
         </div>
       </div>
 
+      {pipeline.stages.length === 0 && (
+        // "checks only" level: the CI service knows the status (e.g. from gh pr checks) but not the stages
+        <div className="ctx-pl__detail" style={{ padding: 16 }}>
+          <Text>Stage details and logs are not available for this build.</Text>{' '}
+          {pipeline.url && <ExternalLink href={pipeline.url}>Open it in Jenkins</ExternalLink>}
+        </div>
+      )}
+
+      {stage && (<>
       <div className="ctx-pl__flow" role="group" aria-label="Pipeline stages">
         {pipeline.stages.map((s, i) => (
           <Fragment key={s.name}>
@@ -204,6 +218,7 @@ function PipelinePage({ workId }: { workId: string }) {
         </div>
         <StageLog stage={stage} />
       </div>
+      </>)}
 
       {pipeline.history.length > 0 && (
         <div className="ctx-pl__hist" aria-label="Build history">

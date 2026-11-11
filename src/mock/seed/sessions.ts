@@ -1,9 +1,10 @@
+import { GLOBAL_SESSION_ID } from '../../services/config';
 import type { AgentKind, AgentSession, SessionMessage, WorkItem } from '../../model/types';
 
 export const MODEL = 'claude-opus-5-5';
 
 /** Id of the global, work-independent chat shown when no work is selected. */
-export const GLOBAL_SESSION_ID = 'global';
+export { GLOBAL_SESSION_ID };
 
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
 type Draft = DistributiveOmit<SessionMessage, 'id' | 'at'>;

@@ -155,7 +155,7 @@ function TicketPage({ workId }: { workId: string }) {
                     </section>
                     <AcceptanceCriteria ticket={ticket} />
                     <LinkedIssues ticket={ticket} />
-                    <Comments comments={ticket.comments} me={me} now={now} />
+                    <Comments workId={workId} comments={ticket.comments} me={me} now={now} />
                   </>
                 ) : (
                   <NoTicket work={work} />
