@@ -5,10 +5,14 @@ import { App } from './shell/App';
 import { initRouter, syncHash } from './state/router';
 import { subscribe } from './state/store';
 import { boot } from './state/sync';
+import { initProjects } from './state/projects';
 import { initTodos } from './state/todos';
+import { initToolbox } from './state/toolbox';
 import './index.css';
 
 initTodos();
+initToolbox();
+initProjects();
 
 // Load everything from the services, then let the URL decide what to show.
 // (The router needs the work items to exist before it can resolve a deep link.)

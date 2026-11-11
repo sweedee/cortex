@@ -13,6 +13,9 @@ let state: CortexState = {
   sessions: [],
   backlog: [],
   todos: [],
+  toolbox: [],
+  projects: [],
+  skills: [],
   view: { workId: null, tab: 'ticket' },
   busy: {},
 };
