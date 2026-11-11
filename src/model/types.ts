@@ -205,11 +205,95 @@ export interface Todo {
   doneAt?: string;
 }
 
+// ---- Toolbox, projects, skills (Cortex's own data, persisted in localStorage) ----
+
+/** A bookmark in the toolbox. */
+export interface ToolboxLink {
+  id: string;
+  label: string;
+  url: string;
+  /** key into the icon registry (src/components/linkIcons.tsx); unknown key → generic link icon */
+  icon: string;
+  /** free-text section heading, e.g. "Observability" */
+  group?: string;
+  /** set → the link also shows on that project's overview */
+  projectId?: string;
+}
+
+export type MilestoneStatus = 'planned' | 'active' | 'done';
+
+export interface RoadmapItem {
+  id: string;
+  text: string;
+  done: boolean;
+  /** linked Jira ticket, e.g. CTX-1423 */
+  ticketKey?: string;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  /** free text: "Q1 2027", "2026-12-01", "Next" */
+  target?: string;
+  status: MilestoneStatus;
+  items: RoadmapItem[];
+}
+
+export interface Diagram {
+  id: string;
+  title: string;
+  /** Mermaid source */
+  source: string;
+  updatedAt: string;
+}
+
+/**
+ * Where a repository lives and how to work with it. `id` is the short repo name that
+ * WorkItem.repo / WorkRef.repo refer to.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  github: { owner: string; repo: string };
+  baseBranch: string;
+  /** main checkout on this machine */
+  localPath: string;
+  /** new worktrees are created below this folder */
+  worktreeRoot: string;
+  /** how to start the app locally, e.g. "npm run dev" */
+  startCommand: string;
+  port?: number;
+  jira: {
+    projectKey: string;
+    /** tickets carrying one of these labels belong to this project */
+    labels: string[];
+    /** tickets linked by hand (epics, long-running tickets) */
+    ticketKeys: string[];
+  };
+  roadmap: Milestone[];
+  diagrams: Diagram[];
+}
+
+export type ProjectTab = 'overview' | 'work' | 'roadmap' | 'architecture';
+
+/** A Claude Code skill / slash command offered by the composer's "/" autocomplete. */
+export interface Skill {
+  name: string;
+  description: string;
+  source: 'project' | 'user' | 'builtin';
+}
+
+export type GlobalPage = 'todos' | 'toolbox' | 'projects';
+
 export interface ViewState {
-  /** null = no work selected → main view is the global Cortex chat (or the todo list, see 'page') */
+  /** null = no work selected → main view is the global Cortex chat (or a global page, see 'page') */
   workId: string | null;
   /** which global page to show while no work is selected; default is the chat */
-  page?: 'todos';
+  page?: GlobalPage;
+  /** page 'projects': the open project and its tab */
+  projectId?: string;
+  projectTab?: ProjectTab;
   tab: WorkTab;
   /** which session is open in the agents tab */
   sessionId?: string;
@@ -224,6 +308,10 @@ export interface CortexState {
   /** assigned tickets that have not been turned into work yet */
   backlog: Ticket[];
   todos: Todo[];
+  toolbox: ToolboxLink[];
+  projects: Project[];
+  /** skills / slash commands for the composer autocomplete */
+  skills: Skill[];
   view: ViewState;
   /** in-flight quick actions, keyed `${workId}:${action}` (see isBusy in the store) */
   busy: Record<string, boolean>;

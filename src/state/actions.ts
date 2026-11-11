@@ -8,6 +8,7 @@ import { services } from '../services';
 import { config } from '../services/config';
 import { AGENT_TITLES, promptFor } from '../services/prompts';
 import type { SessionRef, WorkRef } from '../services/types';
+import { projectForLabels } from './projects';
 import { getState, patchSession, patchWork, setBusy, setState } from './store';
 import { blankSession, refreshWork, startedSessions, updateWorkspace } from './sync';
 
@@ -69,7 +70,7 @@ export function startWorkOnTicket(ticketKey: string) {
   const ticket = getState().backlog.find((t) => t.key === ticketKey);
   if (!ticket) return;
   // which repository a ticket belongs to: by label, else the first configured one
-  const repo = config.repos.find((r) => ticket.labels.includes(r)) ?? config.repos[0];
+  const repo = projectForLabels(ticket.labels);
   addWork({ id: ticket.key, kind: 'ticket', title: ticket.summary, repo, ticketKey: ticket.key, createdAt: now() }, ticket, 'ticket');
 }
 
@@ -126,9 +127,10 @@ export function createWorktree(workId: string) {
     if (!w || w.worktree) return;
     const prefix = w.ticket?.type === 'Bug' ? 'bugfix' : w.ticket ? 'feature' : 'chore';
     const name = w.ticket ? `${w.ticket.key}-${slug(w.ticket.summary)}` : slug(w.title);
-    const path = `${config.worktreeRoot}/${w.repo}/${w.ticket?.key ?? slug(w.title)}`;
+    const project = getState().projects.find((p) => p.id === w.repo);
+    const path = `${project?.worktreeRoot ?? `${config.worktreeRoot}/${w.repo}`}/${w.ticket?.key ?? slug(w.title)}`;
 
-    await services.git.addWorktree(w.repo, { path, branch: `${prefix}/${name}`, base: config.baseBranch });
+    await services.git.addWorktree(w.repo, { path, branch: `${prefix}/${name}`, base: project?.baseBranch ?? config.baseBranch });
     updateWorkspace((ws) => ({ ...ws, work: ws.work.map((r) => (r.id === workId ? { ...r, worktreePath: path } : r)) }));
     // starting to work on a ticket moves it along
     if (w.ticket?.status === 'To Do') await services.jira.transition(w.ticket.key, 'In Progress');

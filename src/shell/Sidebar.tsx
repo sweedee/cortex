@@ -5,12 +5,14 @@ import { TextInput } from '@dynatrace/strato-components/forms';
 import { Divider, Flex } from '@dynatrace/strato-components/layouts';
 import { Modal } from '@dynatrace/strato-components/overlays';
 import { Heading, Text } from '@dynatrace/strato-components/typography';
-import { AiIcon, CheckmarkIcon, PlusIcon } from '@dynatrace/strato-icons';
+import { AiIcon, CheckmarkIcon, BookmarkIcon, FolderOpenIcon, PlusIcon } from '@dynatrace/strato-icons';
 import type { WorkItem } from '../model/types';
 import { selectWork, startAdhocWork, startWorkOnTicket } from '../state/actions';
 import { attentionOf, type AttentionGroup } from '../state/derive';
 import { useCortex } from '../state/store';
+import { openProjects } from '../state/projects';
 import { openTodos } from '../state/todos';
+import { openToolbox } from '../state/toolbox';
 import { WorkCard } from './WorkCard';
 import './shell.css';
 
@@ -20,15 +22,16 @@ const GROUPS: { id: AttentionGroup; label: string }[] = [
   { id: 'idle', label: 'Up next' },
 ];
 
-const REPOS = ['console-ui', 'ingest-gateway', 'query-service'];
-
 function NewWorkModal({ show, onDismiss }: { show: boolean; onDismiss: () => void }) {
   const backlog = useCortex((s) => s.backlog);
   const [title, setTitle] = useState('');
-  const [repo, setRepo] = useState(REPOS[0]);
+  const projects = useCortex((s) => s.projects);
+  const REPOS = projects.map((p) => p.id);
+  const [picked, setRepo] = useState<string>();
+  const repo = picked && REPOS.includes(picked) ? picked : (REPOS[0] ?? '');
 
   const startAdhoc = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !repo) return;
     startAdhocWork(title.trim(), repo);
     setTitle('');
     onDismiss();
@@ -85,7 +88,7 @@ function NewWorkModal({ show, onDismiss }: { show: boolean; onDismiss: () => voi
               </Button>
             ))}
             <span style={{ marginLeft: 'auto' }} />
-            <Button variant="accent" color="primary" disabled={!title.trim()} onClick={startAdhoc}>
+            <Button variant="accent" color="primary" disabled={!title.trim() || !repo} onClick={startAdhoc}>
               Start
             </Button>
           </Flex>
@@ -102,6 +105,8 @@ export function Sidebar() {
   const selectedId = useCortex((s) => s.view.workId);
   const [showNew, setShowNew] = useState(false);
   const page = useCortex((s) => s.view.page);
+  const projectCount = useCortex((s) => s.projects).length;
+  const linkCount = useCortex((s) => s.toolbox).length;
   const openTodoCount = useCortex((s) => s.todos).filter((t) => !t.done).length;
 
   const grouped = new Map<AttentionGroup, WorkItem[]>();
@@ -129,7 +134,7 @@ export function Sidebar() {
       </Flex>
 
       <div style={{ padding: '0 8px 8px' }}>
-        <button className="cx-home" aria-current={selectedId === null && page !== 'todos' ? 'page' : undefined} onClick={() => selectWork(null)}>
+        <button className="cx-home" aria-current={selectedId === null && !page ? 'page' : undefined} onClick={() => selectWork(null)}>
           <AiIcon />
           <Text textStyle="base-emphasized">Ask Cortex</Text>
           <Text textStyle="small" className="cx-tone-neutral" style={{ marginLeft: 'auto' }}>
@@ -141,6 +146,20 @@ export function Sidebar() {
           <Text textStyle="base-emphasized">Todos</Text>
           <Text textStyle="small" className="cx-tone-neutral" style={{ marginLeft: 'auto' }}>
             {openTodoCount} open
+          </Text>
+        </button>
+        <button className="cx-home" aria-current={page === 'projects' ? 'page' : undefined} onClick={() => openProjects()}>
+          <FolderOpenIcon />
+          <Text textStyle="base-emphasized">Projects</Text>
+          <Text textStyle="small" className="cx-tone-neutral" style={{ marginLeft: 'auto' }}>
+            {projectCount} repos
+          </Text>
+        </button>
+        <button className="cx-home" aria-current={page === 'toolbox' ? 'page' : undefined} onClick={openToolbox}>
+          <BookmarkIcon />
+          <Text textStyle="base-emphasized">Toolbox</Text>
+          <Text textStyle="small" className="cx-tone-neutral" style={{ marginLeft: 'auto' }}>
+            {linkCount} links
           </Text>
         </button>
       </div>

@@ -3,7 +3,8 @@
  * these are real: they are persisted in localStorage and survive a reload.
  */
 import type { Todo } from '../model/types';
-import { getState, setState, subscribe } from './store';
+import { persistSlice } from './persist';
+import { setState } from './store';
 
 const STORAGE_KEY = 'cortex.todos.v1';
 
@@ -14,31 +15,8 @@ const SEED: Todo[] = [
   { id: 'todo-seed-4', text: 'Renew the VPN certificate', done: true, createdAt: new Date(Date.now() - 50 * 3600_000).toISOString(), doneAt: new Date(Date.now() - 20 * 3600_000).toISOString() },
 ];
 
-function load(): Todo[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as Todo[];
-  } catch {
-    // storage unavailable or corrupt — fall back to the seed
-  }
-  return SEED;
-}
-
 /** Loads persisted todos into the store and keeps storage in sync from then on. */
-export function initTodos() {
-  setState((s) => ({ ...s, todos: load() }));
-  let last = getState().todos;
-  subscribe(() => {
-    const { todos } = getState();
-    if (todos === last) return;
-    last = todos;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
-    } catch {
-      // ignore: the todos still work for this session
-    }
-  });
-}
+export const initTodos = () => persistSlice('todos', STORAGE_KEY, SEED);
 
 const patchTodos = (fn: (todos: Todo[]) => Todo[]) => setState((s) => ({ ...s, todos: fn(s.todos) }));
 

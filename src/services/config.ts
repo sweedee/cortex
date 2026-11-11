@@ -7,8 +7,7 @@
 export const GLOBAL_SESSION_ID = 'global';
 
 export const config = {
-  /** Repositories Cortex knows. Short names; the GitHub owner is prefixed by the real GitHubService. */
-  repos: ['console-ui', 'ingest-gateway', 'query-service'],
+  /** Defaults for new projects. The repositories themselves are user data: see state/projects.ts. */
   githubOwner: 'ctx-observability',
   baseBranch: 'main',
   /** New worktrees are created at `<worktreeRoot>/<repo>/<ticket key or slug>`. */
