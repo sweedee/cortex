@@ -16,6 +16,7 @@ import { PipelineView } from '../views/PipelineView';
 import { PreviewView } from '../views/PreviewView';
 import { ReviewView } from '../views/ReviewView';
 import { TicketView } from '../views/TicketView';
+import { TodosView } from '../views/TodosView';
 import './shell.css';
 
 const VIEWS: Record<WorkTab, (p: { workId: string }) => ReactNode> = {
@@ -125,7 +126,7 @@ export function MainView() {
   if (!work) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <ChatView />
+        {view.page === 'todos' ? <TodosView /> : <ChatView />}
       </div>
     );
   }

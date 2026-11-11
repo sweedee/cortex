@@ -135,3 +135,34 @@
 .cx-home[aria-current='page'] {
   background: var(--dt-colors-background-container-primary-default);
 }
+
+/* todos */
+.cx-todo {
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  min-height: 36px;
+  padding: 0 var(--dt-spacings-size-8);
+  border-radius: 6px;
+}
+.cx-todo:hover {
+  background: var(--dt-colors-background-container-neutral-default);
+}
+.cx-todo .cx-todo-delete {
+  opacity: 0;
+}
+.cx-todo:hover .cx-todo-delete,
+.cx-todo:focus-within .cx-todo-delete {
+  opacity: 1;
+}
+.cx-todo[data-compact] {
+  min-height: 24px;
+  padding: 0 var(--dt-spacings-size-4);
+  margin: 0 calc(-1 * var(--dt-spacings-size-4));
+  cursor: default;
+}
+.cx-card-todos {
+  margin-top: var(--dt-spacings-size-4);
+  padding-top: var(--dt-spacings-size-4);
+  border-top: 1px solid var(--dt-colors-border-neutral-default);
+}

@@ -131,6 +131,7 @@ export const initialState: CortexState = rebase({
   work,
   sessions: seedSessions,
   backlog: backlogTickets,
+  todos: [], // loaded from localStorage by initTodos()
   view: { workId: null, tab: 'ticket' },
   busy: {},
 });

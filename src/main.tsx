@@ -4,8 +4,10 @@ import { AppRoot } from '@dynatrace/strato-components/core';
 import { App } from './shell/App';
 import { initRouter, syncHash } from './state/router';
 import { subscribe } from './state/store';
+import { initTodos } from './state/todos';
 import './index.css';
 
+initTodos();
 initRouter();
 subscribe(syncHash);
 

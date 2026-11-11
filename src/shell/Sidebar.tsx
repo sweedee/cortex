@@ -5,11 +5,12 @@ import { TextInput } from '@dynatrace/strato-components/forms';
 import { Divider, Flex } from '@dynatrace/strato-components/layouts';
 import { Modal } from '@dynatrace/strato-components/overlays';
 import { Heading, Text } from '@dynatrace/strato-components/typography';
-import { AiIcon, PlusIcon } from '@dynatrace/strato-icons';
+import { AiIcon, CheckmarkIcon, PlusIcon } from '@dynatrace/strato-icons';
 import type { WorkItem } from '../model/types';
 import { selectWork, startAdhocWork, startWorkOnTicket } from '../state/actions';
 import { attentionOf, type AttentionGroup } from '../state/derive';
 import { useCortex } from '../state/store';
+import { openTodos } from '../state/todos';
 import { WorkCard } from './WorkCard';
 import './shell.css';
 
@@ -100,6 +101,8 @@ export function Sidebar() {
   const me = useCortex((s) => s.me);
   const selectedId = useCortex((s) => s.view.workId);
   const [showNew, setShowNew] = useState(false);
+  const page = useCortex((s) => s.view.page);
+  const openTodoCount = useCortex((s) => s.todos).filter((t) => !t.done).length;
 
   const grouped = new Map<AttentionGroup, WorkItem[]>();
   for (const w of work) {
@@ -126,11 +129,18 @@ export function Sidebar() {
       </Flex>
 
       <div style={{ padding: '0 8px 8px' }}>
-        <button className="cx-home" aria-current={selectedId === null ? 'page' : undefined} onClick={() => selectWork(null)}>
+        <button className="cx-home" aria-current={selectedId === null && page !== 'todos' ? 'page' : undefined} onClick={() => selectWork(null)}>
           <AiIcon />
           <Text textStyle="base-emphasized">Ask Cortex</Text>
           <Text textStyle="small" className="cx-tone-neutral" style={{ marginLeft: 'auto' }}>
             across all work
+          </Text>
+        </button>
+        <button className="cx-home" aria-current={page === 'todos' ? 'page' : undefined} onClick={openTodos}>
+          <CheckmarkIcon />
+          <Text textStyle="base-emphasized">Todos</Text>
+          <Text textStyle="small" className="cx-tone-neutral" style={{ marginLeft: 'auto' }}>
+            {openTodoCount} open
           </Text>
         </button>
       </div>

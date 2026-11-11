@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { Chip } from '@dynatrace/strato-components/content';
 import { Flex, Surface } from '@dynatrace/strato-components/layouts';
@@ -43,6 +43,10 @@ import {
 } from '../state/actions';
 import { attentionOf, nextActionOf, pendingComments, relativeTime, unresolvedThreads, type Tone } from '../state/derive';
 import { useBusy, useCortex } from '../state/store';
+import { addTodo, openTodos } from '../state/todos';
+import { AutoFocus } from '../components/AutoFocus';
+import { TodoItem } from '../components/TodoItem';
+import { TextInput } from '@dynatrace/strato-components/forms';
 
 const TICKET_TONE: Record<TicketStatus, Tone> = {
   'To Do': 'neutral',
@@ -145,6 +149,52 @@ function AgentRows({ work, sessions }: { work: WorkItem; sessions: AgentSession[
   );
 }
 
+const MAX_CARD_TODOS = 3;
+
+/** Open todos attached to this work, tickable in place, plus the inline "add todo" input. */
+function CardTodos({ workId, adding, onDone }: { workId: string; adding: boolean; onDone: () => void }) {
+  const todos = useCortex((s) => s.todos);
+  const open = todos.filter((t) => t.workId === workId && !t.done);
+  const [text, setText] = useState('');
+  if (open.length === 0 && !adding) return null;
+
+  return (
+    <div className="cx-card-todos">
+      {open.slice(0, MAX_CARD_TODOS).map((t) => (
+        <TodoItem key={t.id} todo={t} compact />
+      ))}
+      {open.length > MAX_CARD_TODOS && (
+        <button className="cx-row" onClick={stop(openTodos)}>
+          <span className="cx-tone-neutral">+{open.length - MAX_CARD_TODOS} more todos</span>
+        </button>
+      )}
+      {adding && (
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} style={{ paddingTop: 4 }}>
+          <AutoFocus>
+          <TextInput
+            aria-label="New todo for this work"
+            placeholder="Todo… (Enter to add, Esc to close)"
+            value={text}
+            onChange={setText}
+            onBlur={() => !text.trim() && onDone()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && text.trim()) {
+                addTodo(text, workId);
+                setText('');
+              }
+              if (e.key === 'Escape') {
+                setText('');
+                onDone();
+              }
+            }}
+          />
+          </AutoFocus>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean }) {
   const allSessions = useCortex((s) => s.sessions);
   const me = useCortex((s) => s.me);
@@ -162,6 +212,7 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
   const ciStage = ci?.stages.find((s) => s.status === 'failed') ?? ci?.stages.find((s) => s.status === 'running');
   const ciTone: Tone = ci?.status === 'failed' ? 'critical' : ci?.status === 'passed' ? 'success' : 'primary';
   const agentRunning = sessions.some((s) => s.status === 'running');
+  const [addingTodo, setAddingTodo] = useState(false);
 
   return (
     <Surface
@@ -192,6 +243,8 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
             {ticket.status}
           </Chip>
         )}
+        {/* menu items render in a portal but still bubble through React — keep them from selecting the card */}
+        <span style={{ display: 'flex' }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <Menu>
           <Menu.Trigger>
             <Button size="condensed" aria-label="More actions" onClick={(e: MouseEvent) => e.stopPropagation()}>
@@ -235,12 +288,16 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
               </Menu.Item>
             </Menu.Group>
             <Menu.Group>
+              <Menu.Item onSelect={() => setAddingTodo(true)}>
+                <Menu.Prefix><CheckmarkIcon /></Menu.Prefix>Add todo
+              </Menu.Item>
               <Menu.Item onSelect={() => archiveWork(work.id)}>
                 <Menu.Prefix><DeleteIcon /></Menu.Prefix>Archive
               </Menu.Item>
             </Menu.Group>
           </Menu.Content>
         </Menu>
+        </span>
       </Flex>
 
       <Text textStyle="base-emphasized" className="cx-clamp2">
@@ -349,6 +406,8 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
             )}
           </Row>
         )}
+
+        <CardTodos workId={work.id} adding={addingTodo} onDone={() => setAddingTodo(false)} />
       </div>
 
       {/* actions */}

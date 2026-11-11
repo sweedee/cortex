@@ -4,6 +4,7 @@ import { getState, setState } from './store';
 /**
  * Tiny hash router so views are deep-linkable and survive a reload:
  *   #/                         → global chat
+ *   #/todos                    → todo list
  *   #/<workId>/<tab>           → a work item's tab
  *   #/<workId>/agents/<sid>    → a specific session
  */
@@ -11,12 +12,13 @@ const TABS: WorkTab[] = ['ticket', 'agents', 'review', 'pipeline', 'preview'];
 
 function parse(hash: string): ViewState {
   const [workId, tab, sessionId] = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+  if (workId === 'todos') return { workId: null, tab: 'ticket', page: 'todos' };
   if (!workId || !getState().work.some((w) => w.id === workId)) return { workId: null, tab: 'ticket' };
   return { workId, tab: TABS.includes(tab as WorkTab) ? (tab as WorkTab) : 'ticket', sessionId: sessionId || undefined };
 }
 
 function format(v: ViewState): string {
-  if (!v.workId) return '#/';
+  if (!v.workId) return v.page === 'todos' ? '#/todos' : '#/';
   return '#/' + [v.workId, v.tab, v.tab === 'agents' ? v.sessionId : undefined].filter(Boolean).map((p) => encodeURIComponent(p!)).join('/');
 }
 

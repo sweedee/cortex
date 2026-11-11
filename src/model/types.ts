@@ -193,9 +193,21 @@ export interface WorkItem {
 /** Tabs of the main view when a work item is selected. */
 export type WorkTab = 'ticket' | 'agents' | 'review' | 'pipeline' | 'preview';
 
+/** A note-to-self. Optionally attached to a work item. Persisted in localStorage. */
+export interface Todo {
+  id: string;
+  text: string;
+  done: boolean;
+  workId?: string;
+  createdAt: string;
+  doneAt?: string;
+}
+
 export interface ViewState {
-  /** null = no work selected → main view is the global Cortex chat */
+  /** null = no work selected → main view is the global Cortex chat (or the todo list, see page) */
   workId: string | null;
+  /** which global page to show while no work is selected; default is the chat */
+  page?: 'todos';
   tab: WorkTab;
   /** which session is open in the agents tab */
   sessionId?: string;
@@ -207,6 +219,7 @@ export interface CortexState {
   sessions: AgentSession[];
   /** assigned tickets that have not been turned into work yet */
   backlog: Ticket[];
+  todos: Todo[];
   view: ViewState;
   /** in-flight quick actions, keyed `${workId}:${action}` (see isBusy in the store) */
   busy: Record<string, boolean>;
