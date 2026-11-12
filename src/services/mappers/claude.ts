@@ -5,8 +5,10 @@
  * (stored transcript first, then live events) and it keeps the session's messages,
  * status and "what is it doing right now" line up to date.
  */
-import type { AgentSession, SessionMessage } from '../../model/types';
-import type { ClaudeContentBlock, ClaudeEvent } from '../types';
+import type { AgentSession, SessionMessage, Skill } from '../../model/types';
+import type { ClaudeContentBlock, ClaudeEvent, ClaudeSkill } from '../types';
+
+export const mapSkill = (s: ClaudeSkill): Skill => ({ name: s.name.replace(/^\//, ''), description: s.description, source: s.scope });
 
 const DRAFT = '-draft';
 

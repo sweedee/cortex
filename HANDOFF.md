@@ -199,6 +199,7 @@ The UI consumes **stream-json events**. `mappers/claude.ts` (`applyClaudeEvent`)
 | `interrupt` | kill the child process, then emit `{ type: 'result', subtype: 'interrupted', is_error: false, session_id }` yourself |
 | `getTranscript` | read `~/.claude/projects/<project folder>/<id>.jsonl`; return its `user` / `assistant` entries as events, plus `running` = whether a child process exists for the id |
 | `subscribe` | an `EventSource` on the events endpoint |
+| `listSkills` | read `name` / `description` from the front matter of `<cwd>/.claude/skills/*/SKILL.md` (project) and `~/.claude/skills/*/SKILL.md` (user), plus legacy `.claude/commands/*.md`, plus the built-in slash commands that work headless |
 
 Notes:
 
@@ -208,6 +209,7 @@ Notes:
 - **Event fields.** The reducer reads only what is typed in `ClaudeEvent`. Real events carry more fields; ignore them. With `--include-partial-messages`, real `stream_event`s include more event types than text deltas — filter to `content_block_delta` with `delta.type == 'text_delta'` in the bridge, or widen the type and ignore the rest in the reducer.
 - **"Needs your input" is a heuristic**: a turn whose last assistant text ends with `?` marks the session as waiting for me (`applyClaudeEvent`, case `result`).
 - **The plan** shown on the ticket tab is the `result` text of the latest plan session (`onClaudeEvent` in `sync.ts`).
+- **Skills** feed the `/` autocomplete in the chat composer (`components/session/Composer.tsx`); `boot()` loads them once into `state.skills`, and a failure just means no popup. The `system`/`init` event also carries `slash_commands` and `skills` names, which is worth verifying as a cross-check (written from memory). Skills are read without a `cwd` at boot, so project skills only show up once the bridge is given one; per-work-item lists would need a `listSkills(worktreePath)` call in the agents view.
 - **Which sessions exist** is Cortex's own knowledge (`SessionRef` in the workspace), not Claude's.
 - **Prompts** live in `services/prompts.ts`. The mock ignores their wording; real Claude will not. Review them with the user.
 

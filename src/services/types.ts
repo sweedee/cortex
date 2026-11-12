@@ -297,6 +297,26 @@ export interface ClaudeService {
   getTranscript(sessionId: string): Promise<{ events: ClaudeEvent[]; running: boolean }>;
   /** Live events of all sessions (WebSocket / SSE from the bridge). Returns an unsubscribe function. */
   subscribe(listener: (event: ClaudeEvent) => void): () => void;
+  /**
+   * Skills and slash commands for the composer autocomplete. The bridge reads `name` and `description`
+   * from the YAML front matter of `<cwd>/.claude/skills/*\/SKILL.md` (scope `project`) and
+   * `~/.claude/skills/*\/SKILL.md` (scope `user`), plus legacy commands `<cwd>/.claude/commands/*.md`
+   * and `~/.claude/commands/*.md` (name = file name, description = front matter or first line), plus the
+   * built-in slash commands that make sense headless (scope `builtin`). Verify against the installed version:
+   * the `system`/`init` stream-json event also lists `slash_commands` and `skills` (names only) and can be
+   * used to cross-check the result. Without `cwd`, only user and built-in entries are returned.
+   */
+  listSkills(cwd?: string): Promise<ClaudeSkill[]>;
+}
+
+/** A skill or slash command as the bridge finds it on disk. */
+export interface ClaudeSkill {
+  /** without the leading slash */
+  name: string;
+  description: string;
+  scope: 'project' | 'user' | 'builtin';
+  /** file the entry was read from; absent for built-ins */
+  path?: string;
 }
 
 // =============================================================================

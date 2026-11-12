@@ -9,7 +9,7 @@
 import type { AgentSession, AppInstance, Pipeline, PullRequest, Ticket, WorkItem, Worktree } from '../model/types';
 import { config } from '../services/config';
 import { services } from '../services';
-import { applyClaudeEvent, planFromEvents, replayTranscript } from '../services/mappers/claude';
+import { applyClaudeEvent, mapSkill, planFromEvents, replayTranscript } from '../services/mappers/claude';
 import { mapBuild } from '../services/mappers/ci';
 import { displayName, mapPullRequest } from '../services/mappers/github';
 import { mapJiraIssue } from '../services/mappers/jira';
@@ -159,6 +159,12 @@ export async function boot(): Promise<void> {
   const [user, ws] = await Promise.all([services.github.whoami(), services.workspace.load()]);
   workspace = ws;
   setState((s) => ({ ...s, me: displayName(user) }));
+  // skills for the composer autocomplete: not needed to render anything, so don't wait for them
+  void services.claude
+    .listSkills()
+    .then((list) => list.map(mapSkill))
+    .catch(() => [])
+    .then((skills) => setState((s) => ({ ...s, skills })));
 
   const [work, sessions, issues] = await Promise.all([
     Promise.all(ws.work.map(fetchWork)),
