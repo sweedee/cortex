@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { Chip } from '@dynatrace/strato-components/content';
-import { FormField, Label, NumberInput, TextInput } from '@dynatrace/strato-components/forms';
+import { FormField, Label, TextInput } from '@dynatrace/strato-components/forms';
 import { Flex } from '@dynatrace/strato-components/layouts';
 import { Modal } from '@dynatrace/strato-components/overlays';
 import { Heading, Text } from '@dynatrace/strato-components/typography';
@@ -153,7 +153,13 @@ export function ProjectOverview({ project }: { project: Project }) {
               <TextInput {...text('startCommand')} />
             </Field>
             <Field label="Port (optional)">
-              <NumberInput value={draft.port} onChange={(v) => set('port', v ?? null)} />
+              <TextInput
+                value={draft.port == null ? '' : String(draft.port)}
+                onChange={(v) => {
+                  const n = parseInt(v.replace(/\D/g, '').slice(0, 5), 10);
+                  set('port', Number.isNaN(n) ? null : n);
+                }}
+              />
             </Field>
           </div>
         </section>

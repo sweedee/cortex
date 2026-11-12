@@ -41,7 +41,9 @@ function renderDiagram(source: string, theme: 'dark' | 'default'): Promise<Resul
   const run = async (): Promise<Result> => {
     const mermaid = await loadMermaid();
     if (initializedFor !== theme) {
-      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme, suppressErrorRendering: true });
+      // natural size + horizontal scroll: scaled to fit, wide diagrams become unreadable
+      const size = { useMaxWidth: false };
+      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme, suppressErrorRendering: true, flowchart: size, sequence: size, er: size, class: size, state: size, gantt: size });
       initializedFor = theme;
     }
     const id = `cx-mermaid-${++counter}`;

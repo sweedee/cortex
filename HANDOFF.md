@@ -10,6 +10,9 @@ You are picking up **Cortex**, a single-page developer cockpit. Read this file t
 - A **service layer** (`src/services`) that hides every external tool behind an interface. Today every interface is implemented by a **mock**.
 - The mocks answer in the **same formats the real tools print** (`gh` JSON, unified diff text, Jira issue JSON, Jenkins build JSON, Claude stream-json events). Mappers turn those formats into what the UI shows.
 - Todos are real already: they are stored in the browser's `localStorage`.
+- So are the **toolbox** (bookmarks, `#/toolbox`) and **projects** (`#/projects`): per repository its GitHub location, local checkout, start command, Jira links, a roadmap and Mermaid architecture diagrams. See section 6.8.
+- Markdown everywhere goes through `src/components/Md.tsx`, which renders ```` ```mermaid ```` blocks as diagrams (`src/components/Mermaid.tsx`, mermaid is lazy-loaded).
+- The composer autocompletes skills / slash commands after `/` (`ClaudeService.listSkills`, mocked).
 
 **Not done — this is your job**
 
@@ -27,7 +30,7 @@ npm run build      # production build — must succeed
 
 There are no automated tests. After a change, typecheck, then click through the affected flow in the browser. The flows worth checking are listed in section 8.
 
-Deep links help: `#/` (chat), `#/todos`, `#/<workId>/<tab>` with tab = `ticket | agents | review | pipeline | preview`, for example `#/CTX-1423/review`.
+Deep links help: `#/` (chat), `#/todos`, `#/toolbox`, `#/projects/<id>/<tab>` with tab = `overview | work | roadmap | architecture`, `#/<workId>/<tab>` with tab = `ticket | agents | review | pipeline | preview`, for example `#/CTX-1423/review`.
 
 ## 3. How the code is organised
 
@@ -39,6 +42,8 @@ state/store.ts         the one in-memory state object
 state/actions.ts       everything the UI can do
 state/sync.ts          loading, refreshing, polling, Claude events
 state/derive.ts        "what does this work need?" (card grouping, next action)
+state/persist.ts       keeps a store slice in localStorage (todos, toolbox, projects)
+state/toolbox.ts       bookmarks · state/projects.ts  projects, roadmap, diagrams
       │  call services, map the answers
       ▼
 services/index.ts      picks the implementation of each service   ← you change this
@@ -245,6 +250,16 @@ Note: many apps refuse to render inside an iframe (`X-Frame-Options`, CSP). If t
 
 Cortex's own state: which work is on the board (`WorkRef`) and which Claude sessions belong to it (`SessionRef`). The mock keeps it in memory, so **the board resets on reload**. Real: a JSON file (for example `~/.cortex/workspace.json`) read and written by the bridge. `load` and `save` are the whole interface.
 
+### 6.8 Projects and toolbox
+
+Both are Cortex's own data and live in `localStorage` (`cortex.projects.v1`, `cortex.toolbox.v1`; first run is seeded from `src/mock/seed/projects.ts`). No service is involved, so views call `state/projects.ts` and `state/toolbox.ts` directly.
+
+- `Project.id` is the repo name that `WorkItem.repo` / `WorkRef.repo` carry. The list of repos is no longer in `config.ts`; `config` only holds the defaults for new projects.
+- Already used by the app: the repo picker in "New work", ticket → repo matching (`projectForLabels`: Jira label), and worktree root + base branch in `createWorktree`.
+- **Not used yet — wire these when the bridge exists:** `github.owner/repo` (real GitHubService), `localPath` (the bridge's repo → checkout table, section 5; the bridge must still validate paths), `startCommand` and `port` (DevServerService.start), `jira.projectKey` / `jira.ticketKeys`. `sync.ts` still reads `config.baseBranch` for status and PRs. Because the bridge needs this data server-side, move projects from localStorage to the workspace file at that point (`persistSlice` is the only place to change).
+- The mocks only know the three seeded repos; a project you add in the UI can be configured but has no fake tool data behind it.
+- Project "Work" tab: derived from the board and backlog, no extra service calls. Project-wide Jira / PR / CI lists need new service methods (`gh pr list`, a JQL search per project) once tools are real.
+
 ## 7. Suggested order of work
 
 Do these in order. Each step ends with something you can see working.
@@ -278,6 +293,9 @@ Flows to click through after any change to state or services:
 5. Chat: send a message in "Ask Cortex"; send one in a work session; Stop a running agent.
 6. Preview: Launch app → Stop.
 7. Todos: add from the card menu, tick on the card, reload — they persist.
+8. Toolbox: add a link, edit, delete, reload.
+9. Projects: edit a field and Save; Roadmap: add a milestone and items; Architecture: new diagram, edit source, preview updates.
+10. Chat: type `/` in the composer, pick a skill with the arrow keys and Enter. CTX-1431 → Ticket → Plan shows a Mermaid diagram.
 
 ## 9. Practical notes
 
