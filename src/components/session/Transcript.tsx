@@ -8,7 +8,7 @@ import type { AgentSession, SessionMessage } from '../../model/types';
 import { isQuestion, openQuestion } from '../../model/session';
 import { QuestionCard } from './QuestionCard';
 import { ToolCallRow } from './ToolCallRow';
-import { cxVars, subduedText } from './meta';
+import { cxVars, isFresh, subduedText } from './meta';
 
 type ToolMsg = Extract<SessionMessage, { role: 'tool' }>;
 type Block = { kind: 'msg'; msg: SessionMessage } | { kind: 'tools'; msgs: ToolMsg[] } | { kind: 'ask'; msg: ToolMsg };
@@ -66,7 +66,7 @@ export function Transcript({ session, empty }: { session: AgentSession; empty?: 
           const prev = blocks[i - 1];
           const gap = i === 0 ? 0 : prev?.kind === 'tools' || b.kind === 'tools' ? 10 : 18;          if (b.kind === 'ask')
             return (
-              <div key={b.msg.id} style={{ marginTop: gap }}>
+              <div key={b.msg.id} style={{ marginTop: gap }} data-fresh={isFresh(b.msg.at)}>
                 <QuestionCard sessionId={session.id} msg={b.msg} />
               </div>
             );
@@ -82,14 +82,14 @@ export function Transcript({ session, empty }: { session: AgentSession; empty?: 
           if (m.role === 'tool') return null;
           if (m.role === 'user')
             return (
-              <div key={m.id} style={{ marginTop: gap, display: 'flex', justifyContent: 'flex-end' }}>
+              <div key={m.id} style={{ marginTop: gap, display: 'flex', justifyContent: 'flex-end' }} data-fresh={isFresh(m.at)}>
                 <div className="cx-user">
                   <Text style={{ whiteSpace: 'pre-wrap' }}>{m.text}</Text>
                 </div>
               </div>
             );
           return (
-            <div key={m.id} className="cx-md" style={{ marginTop: gap }}>
+            <div key={m.id} className="cx-md" style={{ marginTop: gap }} data-fresh={isFresh(m.at)}>
               {m.text ? <Md>{m.text}</Md> : null}
             </div>
           );

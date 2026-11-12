@@ -346,6 +346,7 @@ Flows to click through after any change to state or services:
 
 ## 9. Practical notes
 
+- **Animations live in one file, `src/animations.css`**, imported by one line in `src/main.tsx`. Rules: short ease-out entrances and colour transitions only, `opacity`/`transform` (plus the two tiny progress bars' width), everything inside `prefers-reduced-motion: no-preference`. To turn them off, delete that import; the only other trace is a `data-fresh` attribute (via `isFresh` in `session/meta.tsx`) on the newest transcript entries, which does nothing without the stylesheet.
 - **TypeScript is pinned to 5.9** and React to 18: Strato's `react-intl` peer dependency rejects TypeScript 7. Do not upgrade either without checking `npm install` still resolves.
 - **Strato inputs have no `autoFocus`.** Use `src/components/AutoFocus.tsx`.
 - **Menus and modals render in portals but their clicks still bubble through React.** A menu inside a clickable card needs a wrapper that stops propagation (see the `<span>` around `<Menu>` in `WorkCard.tsx`).

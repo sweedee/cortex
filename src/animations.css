@@ -1,0 +1,162 @@
+/*
+ * Cortex animations. ALL motion lives in this file; it is imported once in src/main.tsx.
+ * To turn animations off, delete that import line (the `data-fresh` attributes in the transcript
+ * components then do nothing and can stay or go).
+ *
+ * Rules: short (120-240 ms), ease-out, 2-8 px, opacity and transform only (plus colour changes on hover
+ * and one tiny progress bar). Entrances use `animation-fill-mode: backwards` and a `from` keyframe only,
+ * so nothing is left behind once they finish: the resting state is exactly the unstyled one.
+ * Everything sits inside `prefers-reduced-motion: no-preference`; with reduce nothing here applies.
+ * Strato's own Modal / Menu / Overlay / Toast animation is left alone.
+ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---- 1. hover / press / state feedback: colours that used to snap ----------------------------------- */
+
+  .cx-row,
+  .cx-home,
+  .cx-todo,
+  .cx-nt-row,
+  .cx-session,
+  .cx-tool-row,
+  .cx-entry,
+  .cx-picker,
+  .cx-icon-pick,
+  .cx-pj-cell,
+  .cx-ar-row,
+  .cx-ar-title,
+  .cx-rm-seg button,
+  .cx-skill-row,
+  .rv-file-item,
+  .rv-icon-btn,
+  .rv-thread-collapsed,
+  .rv-stack-link,
+  .rv-desc-toggle {
+    transition:
+      background-color 140ms ease-out,
+      color 140ms ease-out,
+      border-color 140ms ease-out;
+  }
+  .cx-ask-opt,
+  .cx-ask {
+    transition:
+      background-color 140ms ease-out,
+      border-color 140ms ease-out;
+  }
+  .cx-ask-mark {
+    transition: border-color 140ms ease-out;
+  }
+  .cx-composer,
+  .cx-ask-other {
+    transition: border-color 140ms ease-out;
+  }
+  .rv-reply-stub {
+    transition: box-shadow 140ms ease-out;
+  }
+  /* cards: keep the existing focus / hover properties and add the border */
+  .cx-card,
+  .cx-pj-card {
+    transition:
+      box-shadow 140ms ease-out,
+      border-color 140ms ease-out,
+      background-color 140ms ease-out;
+  }
+  .cx-tile-link {
+    transition:
+      box-shadow 140ms ease-out,
+      border-color 140ms ease-out,
+      background-color 140ms ease-out;
+  }
+  /* show-on-hover affordances fade instead of popping */
+  .cx-todo .cx-todo-delete,
+  .cx-entry .cx-entry-arrow {
+    transition: opacity 140ms ease-out;
+  }
+  /* state changes: unread dot / unread row, todo done colour, CI segment changing status */
+  .cx-nt-dot,
+  .cx-stage {
+    transition: background-color 200ms ease-out;
+  }
+  .cx-todo > [data-dt-component='Text'] {
+    transition: color 160ms ease-out;
+  }
+
+  /* ---- 2. things that appear ---------------------------------------------------------------------------- */
+
+  @keyframes cxa-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--cxa-dy, 6px));
+    }
+  }
+  @keyframes cxa-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+  }
+
+  /* a work card added to the sidebar (cards that merely re-render keep their element and do not replay) */
+  .cx-group-label ~ .cx-card {
+    --cxa-dy: 4px;
+    animation: cxa-in 180ms ease-out backwards;
+  }
+
+  /*
+   * Newest transcript entries only. Transcript.tsx / ToolCallRow.tsx mark an entry `data-fresh` while it is
+   * under 3 s old, so replaying a stored transcript or switching sessions animates nothing, and streaming
+   * text (which re-renders the same element) never restarts the animation.
+   */
+  .cx-root [data-fresh] {
+    --cxa-dy: 6px;
+    animation: cxa-in 180ms ease-out backwards;
+  }
+  .cx-tool[data-fresh] {
+    --cxa-dy: 4px;
+    animation-duration: 160ms;
+  }
+  /* an expanded tool call's output */
+  .cx-tool-detail {
+    animation: cxa-in 140ms ease-out backwards;
+    --cxa-dy: -4px;
+  }
+  /* the "Other…" answer box in a question card */
+  .cx-ask-other {
+    animation: cxa-in 140ms ease-out backwards;
+    --cxa-dy: -4px;
+  }
+
+  /* skills autocomplete (opens above the composer, or below it with .below) */
+  .cx-skill-popup {
+    --cxa-dy: 4px;
+    animation: cxa-in 120ms ease-out backwards;
+  }
+  .cx-skill-popup.below {
+    --cxa-dy: -4px;
+  }
+
+  /* notification panel and the unread badge (the badge pops in when the first unread arrives) */
+  .cx-nt-panel {
+    --cxa-dy: -4px;
+    animation: cxa-in 150ms ease-out backwards;
+  }
+  .cx-nt-badge {
+    animation: cxa-pop 180ms ease-out backwards;
+  }
+
+  /* comment composer opening in the diff */
+  .rv-composer {
+    --cxa-dy: -4px;
+    animation: cxa-in 150ms ease-out backwards;
+  }
+
+  /* ---- 4. progress that changes value ------------------------------------------------------------------ */
+
+  /* session context bar and roadmap progress: one tiny bar each, so width is fine here */
+  .cx-ctx-bar > span,
+  .cx-rm-bar > span {
+    transition:
+      width 240ms ease-out,
+      background-color 200ms ease-out;
+  }
+}

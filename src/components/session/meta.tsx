@@ -155,3 +155,6 @@ export function formatStarted(iso: string): string {
 }
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** True for a message created in the last few seconds. Only a styling hook (`data-fresh`) for src/animations.css; delete with it. */
+export const isFresh = (at: string): true | undefined => (Date.now() - Date.parse(at) < 3000 ? true : undefined);

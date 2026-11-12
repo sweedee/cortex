@@ -10,6 +10,7 @@ import { initProjects } from './state/projects';
 import { initTodos } from './state/todos';
 import { initToolbox } from './state/toolbox';
 import './index.css';
+import './animations.css';
 
 initTodos();
 initNotifications();
