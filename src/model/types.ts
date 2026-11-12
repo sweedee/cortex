@@ -61,7 +61,36 @@ export type SessionMessage =
       summary: string; // one-liner, e.g. "src/dispatcher/retry.ts"
       detail?: string; // optional output / diff snippet (plain text)
       status: 'running' | 'ok' | 'error';
+      /** AskUserQuestion only: the questions asked, and (once answered) question → answer text */
+      questions?: AskQuestion[];
+      answers?: Record<string, string>;
     };
+
+/** One question of Claude's AskUserQuestion tool. */
+export interface AskQuestion {
+  question: string;
+  header: string;
+  multiSelect: boolean;
+  options: { label: string; description?: string }[];
+}
+
+/** Token / cost figures of a session, accumulated from stream-json usage fields. */
+export interface SessionUsage {
+  /** context window in use: input + cache read + cache creation tokens of the latest assistant message */
+  contextTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** total over all finished turns; 0 until the first turn ends */
+  costUsd: number;
+  /** finished turns (sum of `num_turns` of the results) */
+  turns: number;
+  /** wall time of the last finished turn */
+  lastTurnMs?: number;
+  /** id of the last assistant message counted: repeated events of one message are not added twice */
+  lastMessageId?: string;
+}
 
 export interface AgentSession {
   id: string;
@@ -71,6 +100,10 @@ export interface AgentSession {
   title: string;
   status: SessionStatus;
   model: string;
+  /** reasoning effort chosen for the next turn; undefined = the default */
+  effort?: string;
+  /** undefined until the first usage figures arrive */
+  usage?: SessionUsage;
   startedAt: string;
   /** short "what it is doing right now" line shown on the work card */
   activity?: string;

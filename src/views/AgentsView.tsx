@@ -4,10 +4,10 @@ import { Menu } from '@dynatrace/strato-components/navigation';
 import { Heading, Text } from '@dynatrace/strato-components/typography';
 import { PlusIcon } from '@dynatrace/strato-icons';
 import { AGENT_KINDS, StatusChip, StatusDot, cxVars, formatStarted, kindLabel, plural, subduedText } from '../components/session/meta';
-import { Composer } from '../components/session/Composer';
+import { SessionComposer } from '../components/session/SessionComposer';
 import { Transcript } from '../components/session/Transcript';
 import type { AgentSession } from '../model/types';
-import { launchAgent, openSession, sendMessage, stopSession } from '../state/actions';
+import { launchAgent, openSession } from '../state/actions';
 import { useCortex, useWorkSessions } from '../state/store';
 
 const RANK = { running: 0, waiting: 1, failed: 2, done: 3 } as const;
@@ -94,7 +94,6 @@ function EmptyState({ workId }: { workId: string }) {
 function SessionPane({ session }: { session: AgentSession }) {
   const tools = session.messages.filter((m) => m.role === 'tool').length;
   const msgs = session.messages.length - tools;
-  const running = session.status === 'running';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
       <div
@@ -115,13 +114,7 @@ function SessionPane({ session }: { session: AgentSession }) {
       <Transcript session={session} />
       <div className="cx-root" style={{ ...cxVars, padding: '8px 16px 14px' }}>
         <div style={{ maxWidth: 820, margin: '0 auto' }}>
-          <Composer
-            key={session.id}
-            running={running}
-            onStop={() => stopSession(session.id)}
-            onSend={(t) => void sendMessage(session.id, t)}
-            placeholder={running ? 'Claude is working — send a message to steer it…' : 'Reply to Claude…'}
-          />
+          <SessionComposer session={session} />
         </div>
       </div>
     </div>

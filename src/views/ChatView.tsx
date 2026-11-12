@@ -3,11 +3,12 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { Heading, Text } from '@dynatrace/strato-components/typography';
 import { ArrowRightIcon } from '@dynatrace/strato-icons';
 import { Composer } from '../components/session/Composer';
+import { SessionComposer } from '../components/session/SessionComposer';
 import { Transcript } from '../components/session/Transcript';
 import { cxVars, plural, subduedText } from '../components/session/meta';
 import { GLOBAL_SESSION_ID } from '../services/config';
-import type { WorkTab } from '../model/types';
-import { selectWork, sendMessage, stopSession } from '../state/actions';
+import type { AgentSession, WorkTab } from '../model/types';
+import { selectWork, sendMessage, setSessionOptions } from '../state/actions';
 import { awaitsMyReview } from '../state/derive';
 import { useCortex, useSession } from '../state/store';
 
@@ -110,7 +111,7 @@ function Digest() {
   );
 }
 
-function Home({ onSend, children }: { onSend: (t: string) => void; children?: ReactNode }) {
+function Home({ onSend, session, children }: { onSend: (t: string) => void; session: AgentSession; children?: ReactNode }) {
   const me = useCortex((s) => s.me);
   const first = me.split(/[\s.@]/)[0] || me;
   const name = first.charAt(0).toUpperCase() + first.slice(1);
@@ -118,7 +119,13 @@ function Home({ onSend, children }: { onSend: (t: string) => void; children?: Re
     <div style={{ padding: '8vh 0 0' }}>
       <Heading level={2}>{greeting(name)}</Heading>
       <Text style={{ ...subduedText, display: 'block', margin: '4px 0 20px' }}>What are we working on?</Text>
-      <Composer onSend={onSend} rows={3} autoFocus placeholder="Ask Claude anything about your work…" />
+      <Composer
+        onSend={onSend}
+        rows={3}
+        autoFocus
+        placeholder="Ask Claude anything about your work…"
+        options={{ model: session.model, effort: session.effort, onChange: (patch) => setSessionOptions(session.id, patch) }}
+      />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '14px 0 32px' }}>
         {SUGGESTIONS.map((s) => (
           <Button key={s} size="condensed" onClick={() => onSend(s)}>
@@ -144,7 +151,7 @@ export function ChatView() {
     return (
       <div className="cx-scroll cx-root" style={{ ...cxVars, height: '100%' }}>
         <div style={{ maxWidth: 820, margin: '0 auto', padding: '0 24px 32px' }}>
-          <Home onSend={send} />
+          <Home onSend={send} session={session} />
         </div>
       </div>
     );
@@ -154,12 +161,7 @@ export function ChatView() {
       <Transcript session={session} />
       <div style={{ padding: '8px 16px 14px' }}>
         <div style={{ maxWidth: 820, margin: '0 auto' }}>
-          <Composer
-            running={session.status === 'running'}
-            onStop={() => stopSession(session.id)}
-            onSend={send}
-            placeholder="Reply to Claude…"
-          />
+          <SessionComposer session={session} />
         </div>
       </div>
     </div>

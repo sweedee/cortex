@@ -6,6 +6,26 @@
 /** Id of the global, work-independent Claude session (the "Ask Cortex" chat). */
 export const GLOBAL_SESSION_ID = 'global';
 
+/** Claude models the composer offers. `id` is what `claude --model <id>` takes. */
+export const CLAUDE_MODELS = [
+  { id: 'claude-fable-5-2', label: 'Fable', contextWindow: 1_000_000 },
+  { id: 'claude-opus-5-5', label: 'Opus', contextWindow: 200_000 },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet', contextWindow: 200_000 },
+  { id: 'claude-haiku-5-5', label: 'Haiku', contextWindow: 200_000 },
+] as const;
+
+/** Reasoning effort levels, lowest first (`claude --effort <level>` — verify with `claude --help`). */
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
+
+/** Used for new sessions until the user picks something else (the last pick is remembered). */
+export const CLAUDE_DEFAULTS: { model: string; effort: EffortLevel } = { model: 'claude-opus-5-5', effort: 'medium' };
+
+const FALLBACK_MODEL = { id: '', label: '', contextWindow: 200_000 };
+/** Model info by id; unknown ids (older sessions, other tools) get a generic 200k window and the id as label. */
+export const modelInfo = (id: string): { id: string; label: string; contextWindow: number } =>
+  CLAUDE_MODELS.find((m) => m.id === id) ?? { ...FALLBACK_MODEL, id, label: id.replace(/^claude-/, '') };
+
 export const config = {
   /** Repositories Cortex knows. Short names; the GitHub owner is prefixed by the real GitHubService. */
   repos: ['console-ui', 'ingest-gateway', 'query-service'],

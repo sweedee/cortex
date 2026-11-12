@@ -158,6 +158,13 @@ function toolInput(tool: string, summary: string): Record<string, unknown> {
   }
 }
 
+/** The tool_result text Claude Code gives back for an answered AskUserQuestion (verify the wording against real output). */
+export function askResultContent(answers: Record<string, string | string[]>): string {
+  const q = (s: string) => s.replace(/"/g, '\\"');
+  const pairs = Object.entries(answers).map(([k, v]) => `"${q(k)}"="${q(Array.isArray(v) ? v.join(', ') : v)}"`);
+  return `User has answered your questions: ${pairs.join(', ')}. You can now continue with the user's answers in mind.`;
+}
+
 /** One domain message → the stream-json event(s) that would have produced it. */
 export function toClaudeEvents(sessionId: string, msg: SessionMessage, at?: string): ClaudeEvent[] {
   const base = { session_id: sessionId, timestamp: at };
@@ -166,14 +173,16 @@ export function toClaudeEvents(sessionId: string, msg: SessionMessage, at?: stri
       ? [{ ...base, type: 'user', message: { content: msg.text } }]
       : [{ ...base, type: 'assistant', message: { content: [{ type: 'text', text: msg.text }] } }];
   }
+  const input = msg.questions ? { questions: msg.questions } : toolInput(msg.tool, msg.summary);
   const events: ClaudeEvent[] = [
-    { ...base, type: 'assistant', message: { content: [{ type: 'tool_use', id: msg.id, name: msg.tool, input: toolInput(msg.tool, msg.summary) }] } },
+    { ...base, type: 'assistant', message: { content: [{ type: 'tool_use', id: msg.id, name: msg.tool, input }] } },
   ];
   if (msg.status !== 'running') {
+    const content = msg.questions ? (msg.answers ? askResultContent(msg.answers) : 'The user did not answer.') : (msg.detail ?? '');
     events.push({
       ...base,
       type: 'user',
-      message: { content: [{ type: 'tool_result', tool_use_id: msg.id, content: msg.detail ?? '', is_error: msg.status === 'error' || undefined }] },
+      message: { content: [{ type: 'tool_result', tool_use_id: msg.id, content, is_error: msg.status === 'error' || undefined }] },
     });
   }
   return events;
