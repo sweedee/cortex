@@ -1,0 +1,108 @@
+.cx-ar {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+}
+.cx-ar-list {
+  width: 240px;
+  flex: none;
+  border-right: 1px solid var(--dt-colors-border-neutral-default);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-ar-list-head {
+  padding: var(--dt-spacings-size-12);
+}
+.cx-ar-list-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--dt-spacings-size-8) var(--dt-spacings-size-8);
+}
+.cx-ar-row {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dt-colors-text-neutral-default);
+  font: inherit;
+  padding: var(--dt-spacings-size-8);
+  cursor: pointer;
+}
+.cx-ar-row:hover {
+  background: var(--dt-colors-background-container-neutral-default);
+}
+.cx-ar-row[aria-current='true'] {
+  background: var(--dt-colors-background-container-primary-default);
+}
+.cx-ar-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-ar-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  padding: var(--dt-spacings-size-12) var(--dt-spacings-size-16);
+  border-bottom: 1px solid var(--dt-colors-border-neutral-default);
+}
+.cx-ar-title {
+  flex: 1;
+  min-width: 0;
+  cursor: text;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+.cx-ar-title:hover {
+  background: var(--dt-colors-background-container-neutral-default);
+}
+.cx-ar-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.cx-ar-src {
+  width: 42%;
+  flex: none;
+  border: 0;
+  border-right: 1px solid var(--dt-colors-border-neutral-default);
+  resize: none;
+  outline: none;
+  padding: var(--dt-spacings-size-12) var(--dt-spacings-size-16);
+  background: var(--dt-colors-background-surface-default);
+  color: var(--dt-colors-text-neutral-default);
+  font-family: var(--dt-typography-code-small-default-family, ui-monospace, monospace);
+  font-size: var(--dt-typography-code-small-default-size, 12px);
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+.cx-ar-src:focus {
+  box-shadow: inset 2px 0 0 var(--dt-colors-border-primary-accent);
+}
+.cx-ar-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: var(--dt-spacings-size-16);
+}
+.cx-ar-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dt-spacings-size-12);
+  text-align: center;
+  padding: var(--dt-spacings-size-24);
+}
