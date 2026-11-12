@@ -14,3 +14,20 @@ export function openQuestion(messages: SessionMessage[]): ToolMessage | undefine
 }
 
 export const hasOpenQuestion = (s: AgentSession) => !!openQuestion(s.messages);
+
+/** Activity text of a turn that ended with a question (the heuristic in services/mappers/claude.ts). */
+export const NEEDS_INPUT_ACTIVITY = 'Needs your input';
+
+/** Claude is parked until I answer: an open question card, or a turn that ended with a question. */
+export const needsInput = (s: AgentSession) => hasOpenQuestion(s) || (s.status === 'waiting' && s.activity === NEEDS_INPUT_ACTIVITY);
+
+const RANK = { running: 0, waiting: 1, failed: 2, done: 3 } as const;
+
+/** The session to show first: running, then waiting for me, then failed, then the rest; ties keep the given order (newest first). */
+export function mostRelevantSession(sessions: AgentSession[]): AgentSession | undefined {
+  return [...sessions].sort((a, b) => {
+    const ra = RANK[a.status] - (a.status === 'waiting' && !a.activity ? -2 : 0);
+    const rb = RANK[b.status] - (b.status === 'waiting' && !b.activity ? -2 : 0);
+    return ra - rb;
+  })[0];
+}

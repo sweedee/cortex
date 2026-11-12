@@ -48,7 +48,8 @@ export interface Worktree {
 
 // ---- Claude sessions -------------------------------------------------------
 
-export type AgentKind = 'plan' | 'implement' | 'review' | 'fix-ci' | 'chat';
+/** `renovate` belongs to a project, not to a work item (see AgentSession.projectId). */
+export type AgentKind = 'plan' | 'implement' | 'review' | 'fix-ci' | 'chat' | 'renovate';
 export type SessionStatus = 'running' | 'waiting' | 'done' | 'failed';
 
 export type SessionMessage =
@@ -94,8 +95,10 @@ export interface SessionUsage {
 
 export interface AgentSession {
   id: string;
-  /** null = the global, work-independent Cortex chat */
+  /** null = the global Cortex chat, or a project-level session (then `projectId` is set) */
   workId: string | null;
+  /** set for sessions that belong to a project (e.g. the Renovate review), not to a work item */
+  projectId?: string;
   kind: AgentKind;
   title: string;
   status: SessionStatus;
@@ -237,6 +240,65 @@ export interface CreatePrInput {
   reviewers: string[];
 }
 
+// ---- Project-level data (not board work) -----------------------------------
+
+export type UpdateType = 'patch' | 'minor' | 'major' | 'unknown';
+export type CheckState = 'passed' | 'failed' | 'pending' | 'none';
+
+/** An open dependency-update PR of the Renovate bot, as the project page lists it. */
+export interface RenovatePr {
+  number: number;
+  title: string;
+  branch: string;
+  updateType: UpdateType;
+  /** rolled-up state of all checks */
+  ci: CheckState;
+  approved: boolean;
+  updatedAt: string;
+}
+
+// ---- Notifications ---------------------------------------------------------
+
+export type NotificationKind =
+  | 'build-failed'
+  | 'build-fixed'
+  | 'pr-approved'
+  | 'changes-requested'
+  | 'review-comments'
+  | 'pr-merged'
+  | 'review-requested'
+  | 'claude-asks'
+  | 'claude-done'
+  | 'claude-failed'
+  | 'renovate-done';
+
+export type NotificationTone = 'neutral' | 'primary' | 'success' | 'warning' | 'critical';
+
+/** Where a notification leads: a work item tab (+ session), or a project tab. */
+export interface NotificationTarget {
+  workId?: string;
+  tab?: WorkTab;
+  sessionId?: string;
+  projectId?: string;
+  projectTab?: ProjectTab;
+}
+
+/** What detection produces (see state/notify.ts); the store adds id, time and read flag. */
+export interface Notice extends NotificationTarget {
+  kind: NotificationKind;
+  tone: NotificationTone;
+  title: string;
+  detail?: string;
+  /** the work item or project it belongs to, e.g. "CTX-1423" */
+  subject?: string;
+}
+
+export interface CortexNotification extends Notice {
+  id: string;
+  at: string;
+  read: boolean;
+}
+
 /** Dialog that is open on top of the shell (kept in the store so any entry point can open it). */
 export type Dialog = { kind: 'create-pr'; workId: string };
 
@@ -360,6 +422,10 @@ export interface CortexState {
   projects: Project[];
   /** skills / slash commands for the composer autocomplete */
   skills: Skill[];
+  /** newest first, capped; persisted in localStorage */
+  notifications: CortexNotification[];
+  /** open Renovate PRs per project id; missing = not loaded yet */
+  renovate: Record<string, RenovatePr[]>;
   view: ViewState;
   dialog: Dialog | null;
   /** in-flight quick actions, keyed `${workId}:${action}` (see isBusy in the store) */

@@ -4,7 +4,8 @@
  */
 import type { DiffFile, Pipeline, PullRequest, SessionMessage, Ticket } from '../../model/types';
 import { config } from '../config';
-import type { ClaudeEvent, GhPullRequest, GhReviewThread, GhUser, JenkinsBuild, JenkinsStatus, JiraIssue } from '../types';
+import { renovateBranch, renovateTitle, type RenovateSeed } from '../../mock/seed/renovate';
+import type { ClaudeEvent, GhPrListItem, GhPullRequest, GhReviewThread, GhStatusCheck, GhUser, JenkinsBuild, JenkinsStatus, JiraIssue } from '../types';
 
 // ---- Jira ----------------------------------------------------------------------
 
@@ -66,6 +67,29 @@ export function toGhPullRequest(repo: string, pr: PullRequest): GhPullRequest {
     additions: pr.files.reduce((n, f) => n + f.additions, 0),
     deletions: pr.files.reduce((n, f) => n + f.deletions, 0),
     updatedAt: pr.updatedAt,
+  };
+}
+
+const CHECK_NAMES = ['Build / Jenkins', 'Lint', 'Unit tests'];
+
+/** An open Renovate PR as `gh pr list --json …` prints it (the checks as `statusCheckRollup` entries). */
+export function toGhPrListItem(p: RenovateSeed): GhPrListItem {
+  const done = (name: string, conclusion: 'SUCCESS' | 'FAILURE'): GhStatusCheck => ({ __typename: 'CheckRun', name, status: 'COMPLETED', conclusion });
+  const checks: GhStatusCheck[] =
+    p.ci === 'passed'
+      ? CHECK_NAMES.map((n) => done(n, 'SUCCESS'))
+      : p.ci === 'failed'
+        ? [done(CHECK_NAMES[0], 'FAILURE'), done(CHECK_NAMES[1], 'SUCCESS')]
+        : [{ __typename: 'CheckRun', name: CHECK_NAMES[0], status: 'IN_PROGRESS', conclusion: '' }, done(CHECK_NAMES[1], 'SUCCESS')];
+  return {
+    number: p.number,
+    title: renovateTitle(p),
+    headRefName: renovateBranch(p),
+    author: { login: config.renovate.author, name: 'Renovate', is_bot: true },
+    labels: [{ name: 'dependencies' }, { name: p.updateType }],
+    updatedAt: new Date(Date.now() - p.hoursAgo * 3600_000).toISOString(),
+    statusCheckRollup: checks,
+    reviewDecision: '',
   };
 }
 

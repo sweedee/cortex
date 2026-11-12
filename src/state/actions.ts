@@ -6,12 +6,13 @@
 import type { AgentKind, AgentSession, CreatePrInput, SessionMessage, Ticket, TicketStatus, WorkItem, WorkTab } from '../model/types';
 import { services } from '../services';
 import { config } from '../services/config';
-import { AGENT_TITLES, promptFor } from '../services/prompts';
+import { AGENT_TITLES, promptFor, renovatePrompt } from '../services/prompts';
 import type { SessionRef, WorkRef } from '../services/types';
-import { projectForLabels } from './projects';
+import { markNotificationRead, muteNotifications } from './notifications';
+import { openProjects, projectForLabels } from './projects';
 import { getState, patchSession, patchWork, setBusy, setState } from './store';
-import { blankSession, claudeChoice, projectBase, refreshWork, saveClaudeChoice, startedSessions, updateWorkspace } from './sync';
-import { openQuestion } from '../model/session';
+import { blankSession, claudeChoice, projectBase, refreshRenovate, refreshWork, saveClaudeChoice, startedSessions, updateWorkspace } from './sync';
+import { needsInput, openQuestion } from '../model/session';
 import type { ClaudeAnswers } from '../services/types';
 
 const now = () => new Date().toISOString();
@@ -162,8 +163,9 @@ function appendUserMessage(sessionId: string, text: string) {
 /** Starts the Claude process of a session with its first prompt. */
 function startClaude(session: AgentSession, prompt: string) {
   startedSessions.add(session.id);
-  const cwd = session.workId ? findWork(session.workId)?.worktree?.path : undefined;
-  void services.claude.start({ sessionId: session.id, cwd, prompt, kind: session.kind, workId: session.workId, model: session.model, effort: session.effort });
+  // a work session runs in its worktree, a project session in the project's main checkout, the global chat nowhere in particular
+  const cwd = session.workId ? findWork(session.workId)?.worktree?.path : session.projectId ? getState().projects.find((p) => p.id === session.projectId)?.localPath : undefined;
+  void services.claude.start({ sessionId: session.id, cwd, prompt, kind: session.kind, workId: session.workId, projectId: session.projectId, model: session.model, effort: session.effort });
 }
 
 /** Model / effort for the next turn of a session; also the default for sessions started later. */
@@ -287,6 +289,7 @@ export function mergePr(workId: string) {
   return busy(workId, 'merge', async () => {
     const t = prOf(workId);
     if (!t) return;
+    muteNotifications(workId, ['pr-merged']); // I merged it, no need to tell me
     await services.github.merge(t.repo, t.number);
     if (t.work.ticket) await services.jira.transition(t.work.ticket.key, 'Done');
     await refreshWork(workId, ['pr', 'ticket']);
@@ -332,6 +335,7 @@ export function submitReview(workId: string, verdict: 'approve' | 'request-chang
   return busy(workId, 'review', async () => {
     const t = prOf(workId);
     if (!t) return;
+    muteNotifications(workId, ['pr-approved', 'changes-requested', 'review-comments']);
     const event = verdict === 'approve' ? 'APPROVE' : verdict === 'request-changes' ? 'REQUEST_CHANGES' : 'COMMENT';
     await services.github.submitReview(t.repo, t.number, event);
     await refreshWork(workId, ['pr']);
@@ -364,4 +368,39 @@ export function launchApp(workId: string, navigate = true) {
 export async function stopApp(workId: string) {
   await services.devServer.stop(workId);
   await refreshWork(workId, ['app']);
+}
+
+// ---- Renovate review (project level) ---------------------------------------
+
+/** Loads the project's open Renovate PRs (call when the project page opens). */
+export const loadRenovatePrs = (projectId: string) => refreshRenovate(projectId).catch(() => undefined);
+
+/**
+ * Starts the Renovate review agent for a project and returns its session id. It lives on the project page,
+ * not on the board; when it ends, sync.ts refreshes the PR list and notifies.
+ */
+export function reviewRenovatePrs(projectId: string): string | undefined {
+  const project = getState().projects.find((p) => p.id === projectId);
+  if (!project || getState().sessions.some((s) => s.projectId === projectId && (s.status === 'running' || needsInput(s)))) return;
+  const ref: SessionRef = { id: newId(), workId: null, projectId, kind: 'renovate', title: `${AGENT_TITLES.renovate} · ${project.name}`, startedAt: now() };
+  const session: AgentSession = { ...blankSession(ref), status: 'running', activity: 'Starting…' };
+  updateWorkspace((w) => ({ ...w, sessions: [...w.sessions, ref] }));
+  setState((s) => ({ ...s, sessions: [...s.sessions, session] }));
+  // the transcript shows the gist of the prompt, not the whole briefing
+  const prompt = renovatePrompt(project);
+  appendUserMessage(session.id, prompt.split('\n\n')[0]);
+  startClaude(session, prompt);
+  return session.id;
+}
+
+// ---- notifications ----------------------------------------------------------
+
+/** Goes to what a notification is about and marks it read. */
+export function openNotification(id: string) {
+  const n = getState().notifications.find((x) => x.id === id);
+  if (!n) return;
+  markNotificationRead(id);
+  if (n.workId) selectWork(n.workId, n.tab, n.sessionId);
+  else if (n.projectId) openProjects(n.projectId, n.projectTab);
+  else selectWork(null); // the "Ask Cortex" chat
 }

@@ -5,7 +5,7 @@
  * (stored transcript first, then live events) and it keeps the session's messages,
  * status and "what is it doing right now" line up to date.
  */
-import { ASK_TOOL, hasOpenQuestion } from '../../model/session';
+import { ASK_TOOL, hasOpenQuestion, NEEDS_INPUT_ACTIVITY } from '../../model/session';
 import type { AgentSession, AskQuestion, SessionMessage, SessionUsage, Skill } from '../../model/types';
 import type { ClaudeContentBlock, ClaudeEvent, ClaudeSkill, ClaudeUsage } from '../types';
 
@@ -205,7 +205,7 @@ export function applyClaudeEvent(session: AgentSession, event: ClaudeEvent): Age
       // Heuristic: a turn that ends with a question is Claude asking me something.
       // (trailing markdown emphasis is ignored: "**…or fix?**")
       const asksMe = lastAssistantText(messages).replace(/[\s*_`]+$/, '').endsWith('?');
-      if (asksMe && session.workId) return { ...session, messages, status: 'waiting', activity: 'Needs your input' };
+      if (asksMe && (session.workId || session.projectId)) return { ...session, messages, status: 'waiting', activity: NEEDS_INPUT_ACTIVITY };
       return { ...session, messages, status: session.kind === 'chat' ? 'waiting' : 'done', activity: undefined };
     }
   }

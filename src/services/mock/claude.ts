@@ -12,13 +12,15 @@ import {
   focusReply,
   planFor,
   type Answers,
+  type ScriptStep,
 } from '../../mock/seed/sessions';
+import { renovateScript } from '../../mock/seed/renovate';
 import type { AskQuestion, SessionMessage, WorkItem } from '../../model/types';
-import { CLAUDE_DEFAULTS, GLOBAL_SESSION_ID } from '../config';
+import { CLAUDE_DEFAULTS, config, GLOBAL_SESSION_ID } from '../config';
 import type { ClaudeAnswers, ClaudeContentBlock, ClaudeEvent, ClaudeService, ClaudeSkill, ClaudeStartOptions, ClaudeUsage } from '../types';
 import { askResultContent, toClaudeEvents } from './serialize';
 import { startBuild } from './tools';
-import { delay, findWorktree, workItemById, world } from './world';
+import { delay, findWorktree, mergeRenovatePr, workItemById, world } from './world';
 
 type Emit = ClaudeEvent extends infer E ? (E extends { session_id: string } ? Omit<E, 'session_id' | 'timestamp'> : never) : never;
 
@@ -177,14 +179,12 @@ function sideEffects(options: ClaudeStartOptions, work: WorkItem) {
   }
 }
 
-/** Plays the scripted transcript of an agent, one step every second or so. */
-async function runAgent(options: ClaudeStartOptions, work: WorkItem) {
+/** Plays a scripted transcript, one step every second or so, then the end-of-turn result. */
+async function runAgent(options: ClaudeStartOptions, work: WorkItem | null, steps: ScriptStep[]) {
   const { sessionId } = options;
   const alive = begin(sessionId, options.model);
-  // step 0 of the script is the user's prompt, which the app shows itself
-  const steps = agentScript(options.kind, work).slice(1);
   const answers: Answers = {};
-  const planText = () => planFor(work) + decisionsMd(answers);
+  const planText = () => (work ? planFor(work) : '') + decisionsMd(answers);
   let finalText = '';
   for (const [i, step] of steps.entries()) {
     if (step.when && !step.when(answers)) continue;
@@ -199,6 +199,7 @@ async function runAgent(options: ClaudeStartOptions, work: WorkItem) {
     let draft = step.message;
     // the plan's last message is the plan itself, now with the user's decisions
     if (options.kind === 'plan' && i === steps.length - 1 && draft.role === 'assistant') draft = { ...draft, text: planText() };
+    if (step.text && draft.role === 'assistant') draft = { ...draft, text: step.text(answers) };
     const message = { ...draft, id: `toolu_${Date.now().toString(36)}${++seq}`, at: '' } as SessionMessage;
     const [call, result] = toClaudeEvents(sessionId, message);
     emit(sessionId, call as Emit);
@@ -209,9 +210,17 @@ async function runAgent(options: ClaudeStartOptions, work: WorkItem) {
       if (!alive()) return;
       emit(sessionId, result as Emit);
     }
+    step.effect?.();
   }
-  sideEffects(options, work);
+  if (work) sideEffects(options, work);
   emit(sessionId, { type: 'result', subtype: 'success', is_error: false, result: options.kind === 'plan' ? planText() : finalText });
+}
+
+/** The Renovate review of a project: plays over the repository's open Renovate PRs and merges the safe ones in the world. */
+function runRenovate(options: ClaudeStartOptions, repo: string) {
+  const prs = world.renovate[repo] ?? [];
+  const steps = renovateScript(config.githubOwner, repo, [...prs], (n) => mergeRenovatePr(repo, n)).slice(1); // step 0 is the user's prompt
+  return runAgent(options, null, steps);
 }
 
 const SKILLS: ClaudeSkill[] = [
@@ -238,8 +247,9 @@ export const claude: ClaudeService = {
     await delay();
     const work = workItemById(options.workId) ?? null;
     context.set(options.sessionId, work);
-    if (options.kind === 'chat' || !work) void reply(options.sessionId, options.prompt, options.model);
-    else void runAgent(options, work);
+    if (options.kind === 'renovate' && options.projectId) void runRenovate(options, options.projectId);
+    else if (options.kind === 'chat' || !work) void reply(options.sessionId, options.prompt, options.model);
+    else void runAgent(options, work, agentScript(options.kind, work).slice(1)); // step 0 is the user's prompt, which the app shows itself
   },
 
   async send(sessionId, text, options) {

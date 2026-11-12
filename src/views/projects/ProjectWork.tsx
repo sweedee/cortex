@@ -5,6 +5,7 @@ import type { PrState, Project, TicketStatus, WorkItem } from '../../model/types
 import { selectWork, startWorkOnTicket } from '../../state/actions';
 import type { Tone } from '../../state/derive';
 import { useCortex } from '../../state/store';
+import { ProjectDependencies } from './ProjectDependencies';
 import './projects.css';
 import '../../shell/shell.css';
 
@@ -90,6 +91,8 @@ export function ProjectWork({ project }: { project: Project }) {
             </div>
           )}
         </section>
+
+        <ProjectDependencies project={project} />
 
         <section className="cx-pj-section">
           <Heading level={5} as="h2">

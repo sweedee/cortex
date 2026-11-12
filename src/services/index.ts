@@ -7,8 +7,12 @@
  * Services are independent — replace them one at a time. See HANDOFF.md.
  */
 import { claude } from './mock/claude';
+import { startOutsideWorld } from './mock/outside';
 import { ci, devServer, git, github, jira, workspace } from './mock/tools';
 import type { Services } from './types';
+
+// The mock world also produces events on its own (reviews, review requests); drop this with the mocks.
+startOutsideWorld();
 
 export const services: Services = {
   jira,

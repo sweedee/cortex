@@ -8,6 +8,7 @@
  */
 import { pipelines } from '../../mock/seed/pipelines';
 import { prs } from '../../mock/seed/prs';
+import { seedRenovate, type RenovateSeed } from '../../mock/seed/renovate';
 import { seedSessions } from '../../mock/seed/sessions';
 import { backlogTickets, tickets } from '../../mock/seed/tickets';
 import type { AgentSession, Pipeline, PullRequest, Ticket, WorkItem, Worktree } from '../../model/types';
@@ -73,6 +74,8 @@ export const world = rebase({
     { repo: 'ingest-gateway', pipeline: pipelines['CTX-1450'] },
     { repo: 'query-service', pipeline: pipelines['review-482'] },
   ] as { repo: string; pipeline: Pipeline }[],
+  /** open Renovate PRs per repository (what `gh pr list --author app/renovate` would show) */
+  renovate: seedRenovate() as Record<string, RenovateSeed[]>,
   sessions: seedSessions.map((session) => ({ session, running: session.status === 'running' })) as WorldSession[],
   devServers: {
     'CTX-1431': {
@@ -101,6 +104,11 @@ export const world = rebase({
 
 export const findPr = (repo: string, number: number) => world.prs.find((p) => p.repo === repo && p.pr.number === number);
 export const findBuild = (repo: string, branch: string) => world.builds.find((b) => b.repo === repo && b.pipeline.branch === branch);
+/** Merging a Renovate PR takes it off the open list. */
+export function mergeRenovatePr(repo: string, number: number) {
+  world.renovate[repo] = (world.renovate[repo] ?? []).filter((p) => p.number !== number);
+}
+
 export const findWorktree = (path: string | undefined) => world.worktrees.find((w) => w.path === path);
 
 /**

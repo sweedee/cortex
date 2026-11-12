@@ -92,7 +92,7 @@
 }
 .cx-tool-row {
   display: grid;
-  grid-template-columns: 16px 16px 44px minmax(0, 1fr) auto;
+  grid-template-columns: 16px 16px 64px minmax(0, 1fr) auto; /* wide enough for "WebFetch" */
   column-gap: 8px;
   align-items: center;
   width: 100%;

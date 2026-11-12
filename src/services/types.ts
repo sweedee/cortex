@@ -82,6 +82,8 @@ export interface GhUser {
   login: string;
   /** present on `author` in `gh pr view`; often missing elsewhere */
   name?: string;
+  /** `gh` marks bot accounts (GitHub Apps such as Renovate: login `app/renovate`) */
+  is_bot?: boolean;
 }
 
 /** `gh pr view <n> --json <GH_PR_FIELDS>` */
@@ -108,6 +110,38 @@ export interface GhPullRequest {
 /** The `--json` field list that produces a GhPullRequest. */
 export const GH_PR_FIELDS =
   'number,title,state,isDraft,body,url,author,headRefName,baseRefName,reviewDecision,reviewRequests,latestReviews,additions,deletions,updatedAt';
+
+/**
+ * One entry of `statusCheckRollup`: a check run (GitHub Actions, Jenkins via the Checks API) or a
+ * commit status (older integrations). Fields as `gh ... --json statusCheckRollup` prints them (verify).
+ */
+export type GhStatusCheck =
+  | {
+      __typename: 'CheckRun';
+      name: string;
+      status: 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'WAITING' | 'PENDING';
+      /** empty until COMPLETED */
+      conclusion: 'SUCCESS' | 'FAILURE' | 'NEUTRAL' | 'CANCELLED' | 'SKIPPED' | 'TIMED_OUT' | 'ACTION_REQUIRED' | 'STALE' | 'STARTUP_FAILURE' | '';
+      detailsUrl?: string;
+      startedAt?: string;
+      completedAt?: string;
+    }
+  | { __typename: 'StatusContext'; context: string; state: 'SUCCESS' | 'FAILURE' | 'ERROR' | 'PENDING' | 'EXPECTED'; targetUrl?: string; startedAt?: string };
+
+/** One entry of `gh pr list --json <GH_PR_LIST_FIELDS>`. */
+export interface GhPrListItem {
+  number: number;
+  title: string;
+  headRefName: string;
+  author: GhUser;
+  labels: { name: string; color?: string }[];
+  updatedAt: string;
+  statusCheckRollup: GhStatusCheck[];
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | '';
+}
+
+/** The `--json` field list that produces a GhPrListItem. */
+export const GH_PR_LIST_FIELDS = 'number,title,headRefName,author,labels,updatedAt,statusCheckRollup,reviewDecision';
 
 /**
  * One review thread. Not available through `gh pr view`; use
@@ -141,6 +175,13 @@ export interface GitHubService {
   whoami(): Promise<GhUser>;
   /** `gh pr list --repo <repo> --head <branch> --state all --json number --limit 1` */
   findPullRequest(repo: string, branch: string): Promise<number | undefined>;
+  /**
+   * `gh pr list --repo <repo> [--author "<filter.author>"] --state <filter.state> --limit <filter.limit> --json <GH_PR_LIST_FIELDS>`.
+   * Cortex uses it for the Renovate list: `{ author: config.renovate.author, state: 'open' }`
+   * (the bot's login is `app/renovate`; `--author` accepts that form for GitHub Apps - verify).
+   * Merged or closed PRs are simply absent from an `open` listing, which is how the list shrinks.
+   */
+  listPullRequests(repo: string, filter: { author?: string; state: 'open' | 'closed' | 'merged' | 'all'; limit?: number }): Promise<GhPrListItem[]>;
   /** `gh pr view <n> --repo <repo> --json <GH_PR_FIELDS>` */
   getPullRequest(repo: string, number: number): Promise<GhPullRequest>;
   /** `gh pr diff <n> --repo <repo>` — raw unified diff text */
@@ -335,13 +376,15 @@ export type ClaudeEvent = { timestamp?: string } & (
 export interface ClaudeStartOptions {
   /** id to give the session (`--session-id <uuid>`), so the caller knows it before the first event */
   sessionId: string;
-  /** working directory: the worktree path, or undefined for the main checkout / global chat */
+  /** working directory: the worktree path, the project's main checkout (project sessions), or undefined for the global chat */
   cwd?: string;
   prompt: string;
   /** lets an implementation pick flags, e.g. `--permission-mode plan` for plan agents */
   kind: AgentKind;
   /** Cortex work item this session belongs to; null for the global chat. The CLI does not need it — the mock does. */
   workId: string | null;
+  /** Cortex project this session belongs to (kind `renovate`; `workId` is then null). Only the mock needs it. */
+  projectId?: string;
   /** `--model <id>` (an alias like `opus` also works, Cortex sends full ids from `CLAUDE_MODELS`). Omitted: the CLI's default. */
   model?: string;
   /** `--effort <level>`, one of `EFFORT_LEVELS`. Verify with `claude --help` - written from memory. Omitted: the CLI's default. */
@@ -446,6 +489,8 @@ export interface WorkRef {
 export interface SessionRef {
   id: string;
   workId: string | null;
+  /** set for project-level sessions (kind `renovate`); `workId` is null then, like the global chat */
+  projectId?: string;
   kind: AgentKind;
   title: string;
   startedAt: string;

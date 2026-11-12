@@ -6,20 +6,10 @@ import { PlusIcon } from '@dynatrace/strato-icons';
 import { AGENT_KINDS, StatusChip, StatusDot, cxVars, formatStarted, kindLabel, plural, subduedText } from '../components/session/meta';
 import { SessionComposer } from '../components/session/SessionComposer';
 import { Transcript } from '../components/session/Transcript';
+import { mostRelevantSession } from '../model/session';
 import type { AgentSession } from '../model/types';
 import { launchAgent, openSession } from '../state/actions';
 import { useCortex, useWorkSessions } from '../state/store';
-
-const RANK = { running: 0, waiting: 1, failed: 2, done: 3 } as const;
-
-function mostRelevant(sessions: AgentSession[]): AgentSession | undefined {
-  // sessions are newest first, sort is stable
-  return [...sessions].sort((a, b) => {
-    const ra = RANK[a.status] - (a.status === 'waiting' && !a.activity ? -2 : 0);
-    const rb = RANK[b.status] - (b.status === 'waiting' && !b.activity ? -2 : 0);
-    return ra - rb;
-  })[0];
-}
 
 function LaunchMenu({ workId }: { workId: string }) {
   return (
@@ -125,7 +115,7 @@ export function AgentsView({ workId }: { workId: string }) {
   const sessions = useWorkSessions(workId);
   const wanted = useCortex((s) => s.view.sessionId);
   if (sessions.length === 0) return <EmptyState workId={workId} />;
-  const selected = sessions.find((s) => s.id === wanted) ?? mostRelevant(sessions)!;
+  const selected = sessions.find((s) => s.id === wanted) ?? mostRelevantSession(sessions)!;
 
   return (
     <div className="cx-root" style={{ ...cxVars, height: '100%', display: 'flex', minHeight: 0 }}>

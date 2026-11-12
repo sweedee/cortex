@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Chip } from '@dynatrace/strato-components/content';
 import Borders from '@dynatrace/strato-design-tokens/borders';
 import Colors from '@dynatrace/strato-design-tokens/colors';
-import { ChatIcon, CodeIcon, CycleIcon, IdeaIcon, ViewIcon } from '@dynatrace/strato-icons';
+import { AiIcon, ChatIcon, CodeIcon, CycleIcon, IdeaIcon, ViewIcon } from '@dynatrace/strato-icons';
 import type { AgentKind, AgentSession, SessionStatus } from '../../model/types';
 import './session.css';
 
@@ -69,7 +69,17 @@ export const AGENT_KINDS: KindMeta[] = [
   },
 ];
 
-const KIND_BY_ID = Object.fromEntries(AGENT_KINDS.map((k) => [k.kind, k])) as Record<AgentKind, KindMeta>;
+/** Agents that belong to a project rather than a work item: not offered in a work item's "New agent" menu. */
+const PROJECT_KINDS: KindMeta[] = [
+  {
+    kind: 'renovate',
+    label: 'Renovate review',
+    description: 'Goes through the open Renovate PRs, reads the release notes and merges the safe ones.',
+    icon: <AiIcon />,
+  },
+];
+
+const KIND_BY_ID = Object.fromEntries([...AGENT_KINDS, ...PROJECT_KINDS].map((k) => [k.kind, k])) as Record<AgentKind, KindMeta>;
 export const kindMeta = (kind: AgentKind): KindMeta => KIND_BY_ID[kind];
 export const kindLabel = (kind: AgentKind) => (kind === 'chat' ? 'Chat' : KIND_BY_ID[kind].label);
 

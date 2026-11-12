@@ -635,6 +635,10 @@ export type ScriptStep = {
   ask?: AskQuestion[];
   /** step is only played if this holds for the answers given so far (question text → answer text) */
   when?: (answers: Record<string, string>) => boolean;
+  /** what the step changes in the mock world once it was played (e.g. a PR gets merged) */
+  effect?: () => void;
+  /** assistant message whose text depends on the answers given (replaces `message.text`) */
+  text?: (answers: Record<string, string>) => string;
 };
 
 export type Answers = Record<string, string>;

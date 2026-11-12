@@ -4,6 +4,7 @@ import { Text } from '@dynatrace/strato-components/typography';
 import { useCortex } from '../state/store';
 import { CreatePrDialog } from './CreatePrDialog';
 import { MainView } from './MainView';
+import { NotificationToasts } from './NotificationToasts';
 import { Sidebar } from './Sidebar';
 
 export function App() {
@@ -27,6 +28,7 @@ export function App() {
         </Page.Main>
       </Page>
       <CreatePrDialog />
+      <NotificationToasts />
     </>
   );
 }

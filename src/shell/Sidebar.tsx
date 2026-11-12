@@ -13,6 +13,7 @@ import { useCortex } from '../state/store';
 import { openProjects } from '../state/projects';
 import { openTodos } from '../state/todos';
 import { openToolbox } from '../state/toolbox';
+import { NotificationBell } from './NotificationBell';
 import { WorkCard } from './WorkCard';
 import './shell.css';
 
@@ -117,7 +118,7 @@ export function Sidebar() {
 
   return (
     <Flex flexDirection="column" gap={0} style={{ height: '100%', minHeight: 0 }}>
-      <Flex alignItems="center" gap={8} padding={12} paddingBottom={8}>
+      <Flex alignItems="center" gap={8} padding={12} paddingBottom={8} className="cx-sb-head">
         <Heading level={5} as="h1">
           Cortex
         </Heading>
@@ -125,6 +126,7 @@ export function Sidebar() {
           {work.length} in progress
         </Text>
         <span style={{ marginLeft: 'auto' }} />
+        <NotificationBell />
         <Button size="condensed" variant="emphasized" onClick={() => setShowNew(true)}>
           <Button.Prefix>
             <PlusIcon />

@@ -144,3 +144,57 @@
   padding: var(--dt-spacings-size-4) 0;
   border-bottom: 1px solid var(--dt-colors-border-neutral-default);
 }
+
+/* dependency updates (Renovate) */
+.cx-pj-deps {
+  border: 1px solid var(--dt-colors-border-neutral-default);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cx-pj-dep {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto 84px;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  min-height: 36px;
+  padding: var(--dt-spacings-size-4) var(--dt-spacings-size-12);
+}
+.cx-pj-dep + .cx-pj-dep {
+  border-top: 1px solid var(--dt-colors-border-neutral-default);
+}
+.cx-pj-dep-ci {
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-4);
+}
+.cx-pj-dep-ci .cx-dot {
+  width: 6px;
+  height: 6px;
+}
+.cx-pj-runs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dt-spacings-size-8);
+}
+.cx-pj-run {
+  display: flex;
+  flex-direction: column;
+  height: 560px;
+  min-height: 0;
+  border: 1px solid var(--dt-colors-border-neutral-default);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--dt-colors-background-surface-default);
+}
+.cx-pj-run-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  padding: var(--dt-spacings-size-8) var(--dt-spacings-size-12);
+  border-bottom: 1px solid var(--dt-colors-border-neutral-default);
+}
+.cx-pj-run-composer {
+  flex: none;
+  padding: var(--dt-spacings-size-8) var(--dt-spacings-size-12) var(--dt-spacings-size-12);
+}

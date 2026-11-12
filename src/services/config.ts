@@ -50,6 +50,11 @@ export const config = {
     botLogin: 'claude[bot]',
   },
 
+  /** Dependency-update bot (project page → "Review Renovate PRs"): `gh pr list --author <author>`. */
+  renovate: {
+    author: 'app/renovate',
+  },
+
   /** How often running things are re-fetched. Real tools are slower than the mocks — raise these (e.g. 10–15 s for CI). */
   poll: {
     ciMs: 1500,
@@ -57,5 +62,10 @@ export const config = {
     /** PR poll while the AI reviewer has not answered yet, and how long to keep waiting for it */
     prMs: 2000,
     aiReviewTimeoutMs: 180_000,
+    /**
+     * Background refresh of the whole board (PR + build of every work item), which is what lets Cortex notice
+     * things that happened elsewhere. Mock-sized: with real `gh` calls use 60 s or more (HANDOFF, notifications).
+     */
+    boardMs: 8000,
   },
 };

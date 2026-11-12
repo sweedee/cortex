@@ -7,8 +7,9 @@ import { makeDraftPr } from '../../mock/seed/prs';
 import type { PullRequest, ReviewThread, TicketStatus, WorkItem } from '../../model/types';
 import { config } from '../config';
 import type { CiService, DevServerService, GitHubService, GitService, JiraService, WorkspaceService } from '../types';
-import { toGhPullRequest, toGhReviewThreads, toJenkinsBuild, toJiraIssue, toUnifiedDiff } from './serialize';
-import { delay, findBuild, findPr, findWorktree, ME, workItemByBranch, workItemOf, world } from './world';
+import { toGhPrListItem, toGhPullRequest, toGhReviewThreads, toJenkinsBuild, toJiraIssue, toUnifiedDiff } from './serialize';
+import { reviewersLookAt } from './outside';
+import { delay, findBuild, findPr, findWorktree, ME, mergeRenovatePr, workItemByBranch, workItemOf, world } from './world';
 
 const now = () => new Date().toISOString();
 let seq = 0;
@@ -153,6 +154,12 @@ export const github: GitHubService = {
     await delay();
     return world.prs.find((p) => p.repo === repo && p.pr.sourceBranch === branch)?.pr.number;
   },
+  async listPullRequests(repo, { author, state }) {
+    await delay();
+    // only the Renovate bot's PRs exist in the mock; a merged one is gone from an open list
+    if (state !== 'open' && state !== 'all') return [];
+    return author && author !== config.renovate.author ? [] : (world.renovate[repo] ?? []).map(toGhPrListItem);
+  },
   async getPullRequest(repo, number) {
     await delay();
     return toGhPullRequest(repo, pull(repo, number));
@@ -200,9 +207,11 @@ export const github: GitHubService = {
     const pr = pull(repo, number);
     pr.state = 'open';
     touch(pr);
+    reviewersLookAt(repo, pr);
   },
   async merge(repo, number) {
     await delay(1400);
+    if (world.renovate[repo]?.some((p) => p.number === number)) return mergeRenovatePr(repo, number);
     const pr = pull(repo, number);
     pr.state = 'merged';
     touch(pr);

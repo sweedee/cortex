@@ -16,6 +16,8 @@ let state: CortexState = {
   toolbox: [],
   projects: [],
   skills: [],
+  notifications: [],
+  renovate: {},
   view: { workId: null, tab: 'ticket' },
   dialog: null,
   busy: {},

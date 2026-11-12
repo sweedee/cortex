@@ -3,6 +3,7 @@
  * it and every card offers the resulting next-best action as its main button.
  */
 import type { AgentSession, CreatePrInput, PullRequest, WorkItem } from '../model/types';
+import { awaitsMyReview } from '../model/work';
 import {
   archiveWork,
   createWorktree,
@@ -40,8 +41,7 @@ export const unresolvedThreads = (pr?: PullRequest) => pr?.threads.filter((t) =>
 export const pendingComments = (pr: PullRequest | undefined) =>
   pr?.threads.reduce((n, t) => n + t.comments.filter((c) => c.pending).length, 0) ?? 0;
 
-export const awaitsMyReview = (w: WorkItem, me: string) =>
-  !!w.pr?.reviewRequested && w.pr.reviewers.some((r) => r.name === me && r.state === 'pending');
+export { awaitsMyReview };
 
 // ---- stacked PRs -----------------------------------------------------------------
 // A PR is "stacked" when its base branch is the head branch of another PR (or worktree) on the board.
