@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
-import { Chip, Markdown } from '@dynatrace/strato-components/content';
+import { Chip } from '@dynatrace/strato-components/content';
 import { TextArea } from '@dynatrace/strato-components/forms';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
 import { CheckmarkIcon, ChevronDownIcon, ChevronRightIcon, DeleteIcon, UndoIcon } from '@dynatrace/strato-icons';
+import { Md } from '../../components/Md';
 import type { ReviewThread } from '../../model/types';
 import { addReviewComment, deleteReviewComment, resolveThread } from '../../state/actions';
 import { initials, plural, timeAgo } from './theme';
@@ -166,7 +167,7 @@ export function Thread({ workId, thread, me, readOnly, reviewMode, flash, outdat
                   )}
                 </div>
                 <div className="rv-comment-body">
-                  <Markdown>{c.body}</Markdown>
+                  <Md>{c.body}</Md>
                 </div>
               </div>
             </div>

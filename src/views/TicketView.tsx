@@ -1,10 +1,10 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { Checkbox } from '@dynatrace/strato-components/forms';
-import { Markdown } from '@dynatrace/strato-components/content';
 import { Tab, Tabs } from '@dynatrace/strato-components/navigation';
 import { Code, Heading, Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import { LinkBrokenIcon } from '@dynatrace/strato-icons';
+import { Md } from '../components/Md';
 import type { Ticket, WorkItem } from '../model/types';
 import { selectWork } from '../state/actions';
 import { useCortex, useWork, useWorkSessions } from '../state/store';
@@ -150,7 +150,7 @@ function TicketPage({ workId }: { workId: string }) {
                     <section className="ctx-ticket__section">
                       <SectionTitle>Description</SectionTitle>
                       <div className="ctx-ticket__md">
-                        <Markdown>{ticket.descriptionMd}</Markdown>
+                        <Md>{ticket.descriptionMd}</Md>
                       </div>
                     </section>
                     <AcceptanceCriteria ticket={ticket} />

@@ -1,0 +1,26 @@
+.cx-mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.cx-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+.cx-mermaid-error {
+  margin: 8px 0;
+  font-size: 12px;
+}
+.cx-mermaid-error-msg {
+  color: var(--dt-colors-text-critical-default);
+  margin-bottom: 4px;
+}
+.cx-mermaid-error pre {
+  margin: 0;
+  padding: 8px;
+  overflow-x: auto;
+  color: var(--dt-colors-text-neutral-default);
+  background: var(--dt-colors-background-container-neutral-default);
+  border: 1px solid var(--dt-colors-border-neutral-default);
+  border-radius: 6px;
+}

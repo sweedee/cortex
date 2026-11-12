@@ -1,8 +1,9 @@
 import { Button } from '@dynatrace/strato-components/buttons';
-import { Markdown, ProgressCircle } from '@dynatrace/strato-components/content';
+import { ProgressCircle } from '@dynatrace/strato-components/content';
 import { Heading, Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import { ChevronRightIcon, DavisCoPilotIcon, PlayIcon, RefreshIcon } from '@dynatrace/strato-icons';
+import { Md } from '../../components/Md';
 import type { AgentSession, WorkItem } from '../../model/types';
 import { launchAgent, openSession } from '../../state/actions';
 
@@ -161,7 +162,7 @@ export function PlanPanel({ workId, plan }: { workId: string; plan: PlanState })
         <ImplementButton workId={workId} plan={plan} />
       </div>
       <div className="ctx-ticket__card ctx-ticket__md" style={{ padding: '16px 20px' }}>
-        <Markdown>{plan.planMd}</Markdown>
+        <Md>{plan.planMd}</Md>
       </div>
     </div>
   );

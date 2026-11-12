@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { AiLoadingIndicator, Markdown } from '@dynatrace/strato-components/content';
+import { AiLoadingIndicator } from '@dynatrace/strato-components/content';
+import { Md } from '../Md';
 import { Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import { WarningIcon } from '@dynatrace/strato-icons';
@@ -80,7 +81,7 @@ export function Transcript({ session, empty }: { session: AgentSession; empty?: 
             );
           return (
             <div key={m.id} className="cx-md" style={{ marginTop: gap }}>
-              {m.text ? <Markdown>{m.text}</Markdown> : null}
+              {m.text ? <Md>{m.text}</Md> : null}
             </div>
           );
         })}
