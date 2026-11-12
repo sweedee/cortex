@@ -1,9 +1,13 @@
 /** `gh` output → domain PullRequest. */
 import type { DiffFile, DiffHunk, PrState, PullRequest, ReviewerState, ReviewThread } from '../../model/types';
+import { config } from '../config';
 import type { GhPullRequest, GhReviewThread, GhUser } from '../types';
 
 /** GitHub only reliably gives logins; use the display name when it is there. */
 export const displayName = (user: GhUser) => user.name || user.login;
+
+/** The AI review bot (see config.aiReview). */
+export const isAiBot = (user: GhUser) => user.login === config.aiReview.botLogin;
 
 const LANGUAGES: Record<string, string> = { yml: 'yaml', mjs: 'js', cjs: 'js', kt: 'kotlin', py: 'python' };
 
@@ -114,13 +118,14 @@ export function mapReviewThread(thread: GhReviewThread): ReviewThread {
 export function mapPullRequest(pr: GhPullRequest, diff: string, threads: GhReviewThread[], me: string): PullRequest {
   const author = displayName(pr.author);
   const requested = new Set(pr.reviewRequests.map(displayName));
+  const bots = new Set([...pr.reviewRequests, ...pr.latestReviews.map((r) => r.author)].filter(isAiBot).map(displayName));
   const reviewers = [
     // somebody who reviewed and was then re-requested counts as pending again
     ...pr.latestReviews
       .filter((r) => !requested.has(displayName(r.author)))
       .map((r) => ({ name: displayName(r.author), state: REVIEW_STATE[r.state] ?? ('pending' as ReviewerState) })),
     ...[...requested].map((name) => ({ name, state: 'pending' as ReviewerState })),
-  ];
+  ].map((r) => (bots.has(r.name) ? { ...r, isBot: true } : r));
   return {
     number: pr.number,
     title: pr.title,

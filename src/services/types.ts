@@ -147,11 +147,25 @@ export interface GitHubService {
   getDiff(repo: string, number: number): Promise<string>;
   /** `gh api graphql` → reviewThreads */
   getReviewThreads(repo: string, number: number): Promise<GhReviewThread[]>;
-  /** `gh pr create --repo <repo> --head <head> --base <base> --title … --body … [--draft]`, returns the PR number */
-  createPullRequest(repo: string, pr: { head: string; base: string; title: string; body: string; draft: boolean }): Promise<number>;
+  /**
+   * `gh pr create --repo <repo> --head <head> --base <base> --title … --body … [--draft] [--reviewer <login>]…`,
+   * returns the PR number. `base` may be another PR's head branch (stacked PR).
+   */
+  createPullRequest(
+    repo: string,
+    pr: { head: string; base: string; title: string; body: string; draft: boolean; reviewers?: string[] },
+  ): Promise<number>;
+  /** `gh pr edit <n> --repo <repo> --base <base>` — retargets the PR, e.g. onto the default branch once its parent PR is merged */
+  setBase(repo: string, number: number, base: string): Promise<void>;
+  /**
+   * Asks the AI reviewer bot for a review: `gh pr comment <n> --repo <repo> --body "<config.aiReview.triggerComment>"`.
+   * The bot (`config.aiReview.botLogin`) listens for that comment and posts a review some time later, so this
+   * returns right away; the review shows up in `getPullRequest` / `getReviewThreads` on a later poll.
+   */
+  requestAiReview(repo: string, number: number): Promise<void>;
   /** `gh pr ready <n>` */
   markReady(repo: string, number: number): Promise<void>;
-  /** `gh pr merge <n> --squash --delete-branch` */
+  /** `gh pr merge <n> --squash --delete-branch` (does not retarget PRs stacked on the deleted branch — see `setBase`) */
   merge(repo: string, number: number): Promise<void>;
   /**
    * Adds a review comment (new thread or reply). With `pending: true` it goes into my pending
@@ -241,7 +255,11 @@ export interface GitService {
   addWorktree(repo: string, worktree: { path: string; branch: string; base: string }): Promise<GitWorktree>;
   /** see GitStatus */
   status(path: string, base: string): Promise<GitStatus>;
-  /** `git -C <path> fetch origin && git -C <path> rebase origin/<base>` */
+  /**
+   * `git -C <path> fetch origin && git -C <path> rebase origin/<base> && git -C <path> push --force-with-lease`.
+   * `base` is the parent branch for stacked work. A rebase of a pushed branch rewrites history, so it is pushed
+   * again — which makes CI build the PR anew.
+   */
   rebase(path: string, base: string): Promise<void>;
 }
 
@@ -353,6 +371,8 @@ export interface WorkRef {
   worktreePath?: string;
   /** set for review work; for own work the PR is found by branch */
   prNumber?: number;
+  /** branch this work is based on when it is not the project's default — the parent branch of a stacked PR */
+  baseBranch?: string;
   createdAt: string;
 }
 

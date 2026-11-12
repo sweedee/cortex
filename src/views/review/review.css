@@ -898,3 +898,52 @@ td.rv-no:hover + td.rv-code > .rv-add-btn,
   font-size: 12px;
   color: var(--rv-text-subdued);
 }
+
+/* ---- stacked PRs ------------------------------------------------------------ */
+
+.rv-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.rv-stack-sep {
+  color: var(--rv-text-subdued);
+  font-size: 12px;
+}
+
+.rv-stack-node {
+  all: unset;
+  box-sizing: border-box;
+  font-family: var(--rv-mono);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 0 6px;
+  border-radius: var(--rv-radius-s);
+  background: var(--rv-neutral-bg);
+  color: var(--rv-text);
+  white-space: nowrap;
+}
+
+.rv-stack-node[data-current] {
+  font-weight: 600;
+  background: var(--rv-primary-bg);
+  color: var(--rv-primary);
+}
+
+.rv-stack-link {
+  cursor: pointer;
+  color: var(--rv-primary);
+}
+
+.rv-stack-link:hover {
+  background: var(--rv-hover);
+  text-decoration: underline;
+}
+
+.rv-stack-link:focus-visible {
+  outline: 2px solid var(--rv-primary);
+  outline-offset: 1px;
+}

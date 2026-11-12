@@ -2,6 +2,7 @@ import { ProgressCircle } from '@dynatrace/strato-components/content';
 import { Flex, Page } from '@dynatrace/strato-components/layouts';
 import { Text } from '@dynatrace/strato-components/typography';
 import { useCortex } from '../state/store';
+import { CreatePrDialog } from './CreatePrDialog';
 import { MainView } from './MainView';
 import { Sidebar } from './Sidebar';
 
@@ -16,13 +17,16 @@ export function App() {
     );
   }
   return (
-    <Page>
-      <Page.Sidebar preferredWidth={400} minWidth={320} resizable>
-        <Sidebar />
-      </Page.Sidebar>
-      <Page.Main>
-        <MainView />
-      </Page.Main>
-    </Page>
+    <>
+      <Page>
+        <Page.Sidebar preferredWidth={400} minWidth={320} resizable>
+          <Sidebar />
+        </Page.Sidebar>
+        <Page.Main>
+          <MainView />
+        </Page.Main>
+      </Page>
+      <CreatePrDialog />
+    </>
   );
 }

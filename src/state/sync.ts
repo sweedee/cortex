@@ -36,12 +36,17 @@ async function fetchTicket(ref: WorkRef): Promise<Ticket | undefined> {
   return ref.ticketKey ? mapJiraIssue(await services.jira.getIssue(ref.ticketKey)) : undefined;
 }
 
+/** The project's default branch. */
+export const projectBase = (repo: string) => getState().projects.find((p) => p.id === repo)?.baseBranch ?? config.baseBranch;
+
 async function fetchWorktree(ref: WorkRef): Promise<Worktree | undefined> {
   if (!ref.worktreePath) return undefined;
   const found = (await services.git.listWorktrees(ref.repo)).find((w) => w.path === ref.worktreePath);
   if (!found) return undefined;
-  const status = await services.git.status(found.path, config.baseBranch);
-  return { repo: ref.repo, path: found.path, branch: found.branch, baseBranch: config.baseBranch, ...status };
+  // stacked work is based on its parent's branch, everything else on the default branch
+  const baseBranch = ref.baseBranch ?? projectBase(ref.repo);
+  const status = await services.git.status(found.path, baseBranch);
+  return { repo: ref.repo, path: found.path, branch: found.branch, baseBranch, ...status };
 }
 
 async function fetchPr(ref: WorkRef, branch: string | undefined): Promise<PullRequest | undefined> {
@@ -96,8 +101,10 @@ export async function refreshWork(workId: string, parts: WorkPart[] = ALL_PARTS)
 // ---- polling -------------------------------------------------------------------
 
 const polling = new Set<string>();
+/** When each work item's wait for the AI reviewer began (bounds the PR poll). */
+const aiWaitSince = new Map<string, number>();
 
-/** While a build is running or an app is starting, keep re-fetching that part until it settles. */
+/** While a build is running, an app is starting or the AI reviewer has not answered, keep re-fetching that part until it settles. */
 function watch(workId: string) {
   const work = getState().work.find((w) => w.id === workId);
   if (!work) return;
@@ -113,6 +120,13 @@ function watch(workId: string) {
   };
   if (building) schedule('ci', config.poll.ciMs);
   if (work.app.status === 'starting') schedule('app', config.poll.devServerMs);
+
+  // the AI bot answers a trigger comment on its own time; give up after a while (the next action refreshes anyway)
+  if (work.pr?.reviewers.some((r) => r.isBot && r.state === 'pending')) {
+    const since = aiWaitSince.get(workId) ?? Date.now();
+    aiWaitSince.set(workId, since);
+    if (Date.now() - since < config.poll.aiReviewTimeoutMs) schedule('pr', config.poll.prMs);
+  } else aiWaitSince.delete(workId);
 }
 
 // ---- Claude sessions -----------------------------------------------------------

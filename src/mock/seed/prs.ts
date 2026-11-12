@@ -720,6 +720,53 @@ const applicationYaml = diff(
 `,
 );
 
+// ---- #493 · CTX-1450 · persisted retries, stacked on #491 ------------------------
+
+const retryStoreTs = added(
+  'src/dispatcher/retry-store.ts',
+  `
+import type { DeliveryStore } from './delivery-store';
+
+export interface PendingRetry {
+  deliveryId: string;
+  attempt: number;
+  /** epoch millis of the next attempt */
+  nextAttemptAt: number;
+}
+
+/** Writes pending retries through to the delivery store so a restart does not drop them. */
+export class RetryStore {
+  constructor(private readonly store: DeliveryStore) {}
+
+  async schedule(retry: PendingRetry): Promise<void> {
+    await this.store.upsertRetry(retry.deliveryId, retry.attempt, retry.nextAttemptAt);
+  }
+
+  async recover(now = Date.now()): Promise<PendingRetry[]> {
+    const rows = await this.store.listPendingRetries();
+    return rows.map((row) => ({ ...row, nextAttemptAt: Math.max(row.nextAttemptAt, now) }));
+  }
+}
+`,
+);
+
+const recoverTs = added(
+  'src/dispatcher/recover-on-start.ts',
+  `
+import type { RetryStore } from './retry-store';
+import type { WebhookDispatcher } from './webhook-dispatcher';
+
+/** Re-queues retries that were pending when the process stopped. Returns how many were picked up. */
+export async function recoverRetries(retries: RetryStore, dispatcher: WebhookDispatcher): Promise<number> {
+  const pending = await retries.recover();
+  for (const retry of pending) {
+    dispatcher.scheduleRetry(retry.deliveryId, retry.attempt, retry.nextAttemptAt);
+  }
+  return pending.length;
+}
+`,
+);
+
 // ---- seed PRs ----------------------------------------------------------------
 
 /** Seed PRs keyed by work id. */
@@ -779,6 +826,27 @@ Persisting retry state across restarts — tracked in CTX-1450.`,
       ]),
     ],
     updatedAt: '2026-11-11T08:40:00Z',
+  },
+
+  'CTX-1450': {
+    number: 493,
+    title: 'CTX-1450 Persist webhook retry state across restarts',
+    state: 'approved',
+    author: 'Sven Weber',
+    sourceBranch: 'feature/CTX-1450-persist-retry-state',
+    // stacked: targets the branch of #491, not main
+    targetBranch: 'feature/CTX-1423-webhook-retry',
+    descriptionMd: `Pending webhook retries survive a restart: they are written to the delivery store and re-queued on start-up.
+
+**Stacked on #491** — this PR extends \`withRetry\` and the dispatcher from CTX-1423, so it targets that branch. Merge #491 first, then retarget this PR to \`main\`.
+
+**What changed**
+- \`RetryStore\` persists \`attempt\` / \`nextAttemptAt\` per delivery.
+- \`recoverRetries\` re-queues them on start-up.`,
+    reviewers: [{ name: 'Mila Novak', state: 'approved' }],
+    files: [retryStoreTs, recoverTs],
+    threads: [],
+    updatedAt: '2026-11-11T09:05:00Z',
   },
 
   'CTX-1398': {

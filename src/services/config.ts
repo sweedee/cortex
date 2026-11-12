@@ -24,9 +24,18 @@ export const config = {
     backlogJql: 'assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC',
   },
 
+  /** AI review bot: a PR comment with `triggerComment` makes `botLogin` post a review (GitHubService.requestAiReview). */
+  aiReview: {
+    triggerComment: '@claude review',
+    botLogin: 'claude[bot]',
+  },
+
   /** How often running things are re-fetched. Real tools are slower than the mocks — raise these (e.g. 10–15 s for CI). */
   poll: {
     ciMs: 1500,
     devServerMs: 600,
+    /** PR poll while the AI reviewer has not answered yet, and how long to keep waiting for it */
+    prMs: 2000,
+    aiReviewTimeoutMs: 180_000,
   },
 };

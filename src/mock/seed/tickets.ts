@@ -304,6 +304,33 @@ Introduce a **per-tenant token bucket**:
       },
     ],
   },
+
+  'CTX-1450': {
+    ...base,
+    key: 'CTX-1450',
+    summary: 'Persist webhook retry state across restarts',
+    type: 'Story',
+    status: 'In Review',
+    priority: 'Medium',
+    storyPoints: 3,
+    epic: 'Reliable ingest',
+    labels: ['ingest-gateway', 'webhooks', 'reliability'],
+    updatedAt: '2026-11-11T09:05:00Z',
+    descriptionMd: `### Context
+
+CTX-1423 retries failed webhook deliveries in memory. When the gateway restarts mid-backoff, every pending retry is lost and the event is dropped, which is exactly the failure mode the retries were meant to prevent.
+
+### Expected behaviour
+
+Pending retries are written to the delivery store (\`nextAttemptAt\`, \`attempt\`) and picked up again on start-up. This work **builds on CTX-1423** (stacked PR) because it extends \`withRetry\` and the dispatcher.`,
+    acceptanceCriteria: [
+      'A retry that is pending during a restart is delivered after start-up',
+      'Retries whose `nextAttemptAt` is in the past are sent immediately, spread by jitter',
+      'No duplicate deliveries when two replicas start at the same time',
+    ],
+    links: [{ relation: 'is blocked by', key: 'CTX-1423', summary: 'Add retry with exponential backoff to webhook dispatcher' }],
+    comments: [],
+  },
 };
 
 export const backlogTickets: Ticket[] = [

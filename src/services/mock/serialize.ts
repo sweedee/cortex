@@ -40,7 +40,9 @@ export function toJiraIssue(t: Ticket): JiraIssue {
 
 // ---- GitHub --------------------------------------------------------------------
 
-export const toGhUser = (name: string): GhUser => ({ login: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name });
+export const toGhUser = (name: string): GhUser =>
+  // bots only have a login, no display name
+  name === config.aiReview.botLogin ? { login: name } : { login: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name };
 
 export function toGhPullRequest(repo: string, pr: PullRequest): GhPullRequest {
   return {

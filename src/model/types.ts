@@ -130,7 +130,8 @@ export interface PullRequest {
   sourceBranch: string;
   targetBranch: string;
   descriptionMd: string;
-  reviewers: { name: string; state: ReviewerState }[];
+  /** `isBot`: the AI reviewer (`config.aiReview.botLogin`) */
+  reviewers: { name: string; state: ReviewerState; isBot?: boolean }[];
   files: DiffFile[];
   threads: ReviewThread[];
   updatedAt: string;
@@ -191,6 +192,20 @@ export interface WorkItem {
   app: AppInstance;
   updatedAt: string;
 }
+
+/** Form values of the "Create pull request" dialog. */
+export interface CreatePrInput {
+  title: string;
+  body: string;
+  /** target branch; another work item's branch makes this a stacked PR */
+  base: string;
+  draft: boolean;
+  /** GitHub logins */
+  reviewers: string[];
+}
+
+/** Dialog that is open on top of the shell (kept in the store so any entry point can open it). */
+export type Dialog = { kind: 'create-pr'; workId: string };
 
 /** Tabs of the main view when a work item is selected. */
 export type WorkTab = 'ticket' | 'agents' | 'review' | 'pipeline' | 'preview';
@@ -313,6 +328,7 @@ export interface CortexState {
   /** skills / slash commands for the composer autocomplete */
   skills: Skill[];
   view: ViewState;
+  dialog: Dialog | null;
   /** in-flight quick actions, keyed `${workId}:${action}` (see isBusy in the store) */
   busy: Record<string, boolean>;
 }

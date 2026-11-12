@@ -111,7 +111,7 @@ export function Sidebar() {
 
   const grouped = new Map<AttentionGroup, WorkItem[]>();
   for (const w of work) {
-    const g = attentionOf(w, sessions, me).group;
+    const g = attentionOf(w, sessions, me, work).group;
     grouped.set(g, [...(grouped.get(g) ?? []), w]);
   }
 

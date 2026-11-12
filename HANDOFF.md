@@ -56,7 +56,7 @@ services/prompts.ts    the prompt each agent button sends to Claude
 
 One action, end to end — "Create PR":
 
-1. A view calls `createPr(workId)` from `state/actions.ts`.
+1. A view opens the create dialog (`openCreatePrDialog(workId)` — the open dialog lives in `state.dialog`, rendered once by `shell/CreatePrDialog.tsx`); on submit it calls `createPr(workId, input)` from `state/actions.ts`.
 2. The action calls `services.github.createPullRequest(...)` and `services.jira.transition(...)`.
 3. The action calls `refreshWork(workId, ['pr', 'ci', 'ticket'])` from `state/sync.ts`.
 4. `refreshWork` asks the services for fresh data, runs it through the mappers, and writes it to the store.
@@ -127,7 +127,9 @@ Each method's doc comment in `services/types.ts` names its command. The tables b
 | `getPullRequest` | `gh pr view <n> --repo R --json <GH_PR_FIELDS>` (the constant is in `types.ts`) |
 | `getDiff` | `gh pr diff <n> --repo R` → return stdout as a string |
 | `getReviewThreads` | `gh api graphql` with the query below |
-| `createPullRequest` | `gh pr create --repo R --head H --base B --title T --body BODY --draft` → prints the PR URL; take the number from its end |
+| `createPullRequest` | `gh pr create --repo R --head H --base B --title T --body BODY [--draft] [--reviewer <login>]…` → prints the PR URL; take the number from its end. `B` is the head branch of another PR for a stacked PR |
+| `setBase` | `gh pr edit <n> --repo R --base <base>` |
+| `requestAiReview` | `gh pr comment <n> --repo R --body "<config.aiReview.triggerComment>"` (e.g. `@claude review`); the bot `config.aiReview.botLogin` answers later |
 | `markReady` | `gh pr ready <n> --repo R` |
 | `merge` | `gh pr merge <n> --repo R --squash --delete-branch` |
 | `submitReview` | `gh pr review <n> --repo R --approve` / `--request-changes --body …` / `--comment --body …` |
@@ -160,6 +162,8 @@ Notes:
 
 - **Pending comments.** In the UI, comments on a PR I am reviewing stay "pending" until I finish the review. On GitHub that is a pending review: mutation `addPullRequestReviewThread` (new thread) or `addPullRequestReviewThreadReply` (reply) adds to my pending review, creating it if needed; `gh pr review` / `submitPullRequestReview` publishes it. For `pending: false` (comments on my own PR), add the comment and submit the review with event `COMMENT` right away. Verify the exact mutation inputs in the GitHub GraphQL docs.
 - **Names.** `gh` returns logins; only `author` in `gh pr view` carries a `name`. The UI shows `name || login` (`displayName` in `mappers/github.ts`). "Is this me?" compares against `whoami`, so the same rule applies on both sides and it works either way.
+- **AI review.** The mock shows the bot as a *pending reviewer* from the moment it is asked until it posts its review (`reviewers[].isBot`, set by the mapper when the login equals `config.aiReview.botLogin`; the UI disables the button while it is pending and `sync.ts` polls the PR, bounded by `config.poll.aiReviewTimeoutMs`). Real GitHub does **not** add a bot to `reviewRequests` when it is triggered by a comment. Decide how to derive "pending": e.g. a trigger comment (`gh pr view --json comments`) newer than the bot's latest review in `latestReviews`. The bot's inline comments arrive through the normal review-thread query (author = the bot login). Verify the trigger phrase and bot login with whoever runs the bot.
+- **Stacked PRs.** A PR is stacked when its base branch is the head branch of another PR on the board (`parentOf` / `childrenOf` in `state/derive.ts`, matched by repo + branch names — no extra GitHub call). Not "ready to merge" while the parent is unmerged; once the parent is merged the child shows **Retarget to <base>** (`setBase`, action `retargetPr`). `gh pr merge --delete-branch` of the parent may make GitHub retarget children itself (the mock does not; verify) — in that case the child's PR already targets the default branch and the stack disappears on its own. A parent that is not on the board (archived) is shown as a plain branch name and does not block anything. `WorkRef.baseBranch` is the parent branch of stacked work: it is what `sync.ts` compares the worktree with and what Rebase rebases onto; `createPr` sets it when the chosen base is not the project default, `retargetPr` clears it. Caveat: after the parent was *squash*-merged, `git rebase origin/main` on the child replays the parent's commits and conflicts; the right command is `git rebase --onto origin/<default> <old parent branch>` — not implemented.
 - **Closed PRs.** The UI model has no "closed without merging" state; such PRs show as open. Add a state to `PrState` if that matters.
 - **Rate.** `refreshWork` fetches PR, diff and threads together after every review action. Fine for `gh`; do not add more polling on top.
 
@@ -172,7 +176,7 @@ The server needs a table `repo name → main checkout path`.
 | `listWorktrees` | `git -C <checkout> worktree list --porcelain` → blocks of `worktree <path>`, `HEAD <sha>`, `branch refs/heads/<name>`; strip `refs/heads/` |
 | `addWorktree` | `git -C <checkout> fetch origin` then `git -C <checkout> worktree add -b <branch> <path> origin/<base>` |
 | `status` | `git -C <path> rev-list --left-right --count origin/<base>...HEAD` → `"<behind>\t<ahead>"`; `git -C <path> status --porcelain` → count the lines |
-| `rebase` | `git -C <path> fetch origin` then `git -C <path> rebase origin/<base>` — on conflict, abort (`git rebase --abort`) and return an error |
+| `rebase` | `git -C <path> fetch origin` then `git -C <path> rebase origin/<base>` — on conflict, abort (`git rebase --abort`) and return an error. Then `git -C <path> push --force-with-lease` if the branch has a PR (the UI expects CI to rebuild after a rebase; the mock starts a new build). `base` is the parent branch for stacked work |
 
 Notes: `config.worktreeRoot` is `~/wt`; expand `~` on the server. The UI matches a work item to its worktree by exact path (`WorkRef.worktreePath`), so return paths in the same form you were given.
 
@@ -293,6 +297,10 @@ Flows to click through after any change to state or services:
 5. Chat: send a message in "Ask Cortex"; send one in a work session; Stop a running agent.
 6. Preview: Launch app → Stop.
 7. Todos: add from the card menu, tick on the card, reload — they persist.
+8a. Create PR dialog: on CTX-1440 do flow 1 up to "Create PR" (the button opens the dialog; the card menu item and the "Create pull request" button on the PR tab of a work item without a PR open the same one). Check the prefilled title/description, the Edit/Preview toggle, the commit count and warnings, then "Create draft pull request".
+8b. Stacked PRs: CTX-1450 (PR tab) shows `main ← #491 ← #493 (this)`, the links navigate, Merge is disabled with "Merge #491 first". New work in `ingest-gateway` → Create worktree → Create pull request… → pick the `feature/CTX-1398-…` base (hint says it is stacked) → create. Merge CTX-1398 → the new PR offers "Retarget to main" → click; the stack disappears.
+8c. AI review: "Request AI review" on any open PR (PR tab header or card menu) → button reads "AI review requested", about 5 s later the bot's threads appear without any other click.
+8d. Rebase: CTX-1423 PR tab shows "2 behind main" and **Rebase**; after it, "up to date" and a new build #5 runs.
 8. Toolbox: add a link, edit, delete, reload.
 9. Projects: edit a field and Save; Roadmap: add a milestone and items; Architecture: new diagram, edit source, preview updates.
 10. Chat: type `/` in the composer, pick a skill with the arrow keys and Enter. CTX-1431 → Ticket → Plan shows a Mermaid diagram.

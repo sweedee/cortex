@@ -3,14 +3,14 @@
  * src/services. An action is: call a service → `refreshWork` the affected parts.
  * Long-running things (agents, builds, app start-up) are followed by state/sync.ts.
  */
-import type { AgentKind, AgentSession, SessionMessage, Ticket, TicketStatus, WorkItem, WorkTab } from '../model/types';
+import type { AgentKind, AgentSession, CreatePrInput, SessionMessage, Ticket, TicketStatus, WorkItem, WorkTab } from '../model/types';
 import { services } from '../services';
 import { config } from '../services/config';
 import { AGENT_TITLES, promptFor } from '../services/prompts';
 import type { SessionRef, WorkRef } from '../services/types';
 import { projectForLabels } from './projects';
 import { getState, patchSession, patchWork, setBusy, setState } from './store';
-import { blankSession, refreshWork, startedSessions, updateWorkspace } from './sync';
+import { blankSession, projectBase, refreshWork, startedSessions, updateWorkspace } from './sync';
 
 const now = () => new Date().toISOString();
 const findWork = (id: string) => getState().work.find((w) => w.id === id);
@@ -142,8 +142,9 @@ export function syncWithBase(workId: string) {
   return busy(workId, 'sync', async () => {
     const wt = findWork(workId)?.worktree;
     if (!wt) return;
+    // wt.baseBranch is the parent's branch for stacked work. The rebase is pushed, which starts a new build.
     await services.git.rebase(wt.path, wt.baseBranch);
-    await refreshWork(workId, ['git']);
+    await refreshWork(workId, ['git', 'ci']);
   });
 }
 
@@ -211,15 +212,45 @@ function prOf(workId: string) {
   return w?.pr ? { work: w, repo: w.repo, number: w.pr.number, pr: w.pr } : undefined;
 }
 
-export function createPr(workId: string) {
+export const openCreatePrDialog = (workId: string) => setState((s) => ({ ...s, dialog: { kind: 'create-pr', workId } }));
+export const closeDialog = () => setState((s) => ({ ...s, dialog: null }));
+
+/** Opens a PR for the work's branch with the values of the create dialog. A base other than the default makes it a stacked PR. */
+export function createPr(workId: string, input: CreatePrInput) {
   return busy(workId, 'pr', async () => {
     const w = findWork(workId);
     if (!w?.worktree || w.pr) return;
-    const title = w.ticket ? `${w.ticket.key} ${w.ticket.summary}` : w.title;
-    const body = w.ticket ? `Implements ${w.ticket.key}.\n\n${w.planMd ? '## Approach\n\nSee the implementation plan in Cortex.\n' : ''}` : '';
-    await services.github.createPullRequest(w.repo, { head: w.worktree.branch, base: w.worktree.baseBranch, title, body, draft: true });
+    const { title, body, base, draft, reviewers } = input;
+    await services.github.createPullRequest(w.repo, { head: w.worktree.branch, base, title: title.trim(), body, draft, reviewers: reviewers.length ? reviewers : undefined });
+    // from now on the worktree is compared with (and rebased onto) the branch it was opened against
+    const stacked = base !== projectBase(w.repo);
+    updateWorkspace((ws) => ({ ...ws, work: ws.work.map((r) => (r.id === workId ? { ...r, baseBranch: stacked ? base : undefined } : r)) }));
     if (w.ticket && w.ticket.status !== 'Done') await services.jira.transition(w.ticket.key, 'In Review');
-    await refreshWork(workId, ['pr', 'ci', 'ticket']);
+    await refreshWork(workId, ['git', 'pr', 'ci', 'ticket']);
+  });
+}
+
+/** Points a stacked PR at the default branch once its parent PR is merged (merging does not retarget it). */
+export function retargetPr(workId: string) {
+  return busy(workId, 'retarget', async () => {
+    const t = prOf(workId);
+    if (!t) return;
+    await services.github.setBase(t.repo, t.number, projectBase(t.repo));
+    updateWorkspace((ws) => ({ ...ws, work: ws.work.map((r) => (r.id === workId ? { ...r, baseBranch: undefined } : r)) }));
+    await refreshWork(workId, ['git', 'pr']);
+  });
+}
+
+/**
+ * Posts the AI-review trigger comment. The bot answers some seconds later; the PR shows it as a pending
+ * reviewer meanwhile and sync.ts keeps polling until its review arrives.
+ */
+export function requestAiReview(workId: string) {
+  return busy(workId, 'ai-review', async () => {
+    const t = prOf(workId);
+    if (!t) return;
+    await services.github.requestAiReview(t.repo, t.number);
+    await refreshWork(workId, ['pr']);
   });
 }
 

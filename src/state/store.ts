@@ -17,6 +17,7 @@ let state: CortexState = {
   projects: [],
   skills: [],
   view: { workId: null, tab: 'ticket' },
+  dialog: null,
   busy: {},
 };
 const listeners = new Set<() => void>();

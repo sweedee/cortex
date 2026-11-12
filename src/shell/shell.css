@@ -166,3 +166,13 @@
   padding-top: var(--dt-spacings-size-4);
   border-top: 1px solid var(--dt-colors-border-neutral-default);
 }
+
+/* markdown preview in the "Create pull request" dialog */
+.cx-pr-preview {
+  min-height: 160px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 12px;
+  border: 1px solid var(--dt-colors-border-neutral-default);
+  border-radius: 8px;
+}
