@@ -5,16 +5,19 @@ import { Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import { WarningIcon } from '@dynatrace/strato-icons';
 import type { AgentSession, SessionMessage } from '../../model/types';
+import { isQuestion, openQuestion } from '../../model/session';
+import { QuestionCard } from './QuestionCard';
 import { ToolCallRow } from './ToolCallRow';
 import { cxVars, subduedText } from './meta';
 
 type ToolMsg = Extract<SessionMessage, { role: 'tool' }>;
-type Block = { kind: 'msg'; msg: SessionMessage } | { kind: 'tools'; msgs: ToolMsg[] };
+type Block = { kind: 'msg'; msg: SessionMessage } | { kind: 'tools'; msgs: ToolMsg[] } | { kind: 'ask'; msg: ToolMsg };
 
 function group(messages: SessionMessage[]): Block[] {
   const out: Block[] = [];
   for (const m of messages) {
-    if (m.role === 'tool') {
+    if (m.role === 'tool' && isQuestion(m)) out.push({ kind: 'ask', msg: m });
+    else if (m.role === 'tool') {
       const last = out[out.length - 1];
       if (last?.kind === 'tools') last.msgs.push(m);
       else out.push({ kind: 'tools', msgs: [m] });
@@ -44,7 +47,8 @@ export function Transcript({ session, empty }: { session: AgentSession; empty?: 
   }, [tick]);
 
   const blocks = group(session.messages);
-  const waiting = session.status === 'waiting' && !!session.activity;
+  // an open question card says it all, no extra banner
+  const waiting = session.status === 'waiting' && !!session.activity && !openQuestion(session.messages);
 
   return (
     <div
@@ -60,7 +64,12 @@ export function Transcript({ session, empty }: { session: AgentSession; empty?: 
         {blocks.length === 0 && empty}
         {blocks.map((b, i) => {
           const prev = blocks[i - 1];
-          const gap = i === 0 ? 0 : prev?.kind === 'tools' || b.kind === 'tools' ? 10 : 18;
+          const gap = i === 0 ? 0 : prev?.kind === 'tools' || b.kind === 'tools' ? 10 : 18;          if (b.kind === 'ask')
+            return (
+              <div key={b.msg.id} style={{ marginTop: gap }}>
+                <QuestionCard sessionId={session.id} msg={b.msg} />
+              </div>
+            );
           if (b.kind === 'tools')
             return (
               <div key={b.msgs[0].id} className="cx-tools" style={{ marginTop: gap }}>

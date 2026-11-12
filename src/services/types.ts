@@ -273,20 +273,63 @@ export type ClaudeContentBlock =
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
 
+/** Token counts of one API call, as `message.usage` of an assistant event (real stream-json field names). */
+export interface ClaudeUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+
+/**
+ * Input of the `AskUserQuestion` tool (a `tool_use` block with that name). 1-4 questions, each with
+ * 2-4 options; the UI always adds an "Other..." free-text choice itself (the real tool does too).
+ */
+export interface AskUserQuestionInput {
+  questions: {
+    question: string;
+    /** very short label shown as a chip, e.g. "Approach" */
+    header: string;
+    multiSelect: boolean;
+    options: { label: string; description?: string }[];
+  }[];
+}
+
 /**
  * One line of stream-json output (subset Cortex uses). `timestamp` is not part of the CLI
  * output — the bridge should stamp events on arrival (session transcripts on disk do have it).
  */
 export type ClaudeEvent = { timestamp?: string } & (
+  /** emitted at the start of every invocation (`start` and every `send`), so `model` follows `--model` changes */
   | { type: 'system'; subtype: 'init'; session_id: string; model: string; cwd?: string }
-  /** an assistant turn: text and/or tool calls */
-  | { type: 'assistant'; session_id: string; message: { content: ClaudeContentBlock[] } }
+  /**
+   * an assistant turn: text and/or tool calls. `usage` is that API call's token count; the context
+   * window is full to `input + cache_read + cache_creation` of the latest one. The CLI may emit one
+   * event per content block with the same `message.id` and repeated usage - hence `id` (the reducer
+   * does not add the same id twice; verify against real output).
+   */
+  | { type: 'assistant'; session_id: string; message: { id?: string; content: ClaudeContentBlock[]; usage?: ClaudeUsage } }
   /** tool results — and, in stored transcripts only, the user's own prompts (string content) */
   | { type: 'user'; session_id: string; message: { content: ClaudeContentBlock[] | string } }
   /** partial text while the assistant is typing (`--include-partial-messages`) */
   | { type: 'stream_event'; session_id: string; event: { type: 'content_block_delta'; delta: { type: 'text_delta'; text: string } } }
-  /** end of a turn */
-  | { type: 'result'; session_id: string; subtype: 'success' | 'error_during_execution' | 'interrupted'; is_error: boolean; result?: string }
+  /**
+   * end of a turn (= one invocation). `total_cost_usd`, `duration_ms`, `num_turns` and `usage` are the
+   * real field names; I believe they describe this invocation only, so the reducer SUMS cost and
+   * turns across results (verify - if the CLI reports session totals, change the reducer to replace).
+   * Transcripts on disk contain no `result` lines: for those the bridge has to synthesise one.
+   */
+  | {
+      type: 'result';
+      session_id: string;
+      subtype: 'success' | 'error_during_execution' | 'interrupted';
+      is_error: boolean;
+      result?: string;
+      total_cost_usd?: number;
+      duration_ms?: number;
+      num_turns?: number;
+      usage?: ClaudeUsage;
+    }
 );
 
 export interface ClaudeStartOptions {
@@ -299,14 +342,38 @@ export interface ClaudeStartOptions {
   kind: AgentKind;
   /** Cortex work item this session belongs to; null for the global chat. The CLI does not need it — the mock does. */
   workId: string | null;
+  /** `--model <id>` (an alias like `opus` also works, Cortex sends full ids from `CLAUDE_MODELS`). Omitted: the CLI's default. */
+  model?: string;
+  /** `--effort <level>`, one of `EFFORT_LEVELS`. Verify with `claude --help` - written from memory. Omitted: the CLI's default. */
+  effort?: string;
 }
 
+/** Per-turn settings of `send`; same flags as `ClaudeStartOptions`, may differ from the previous turn. */
+export interface ClaudeSendOptions {
+  /** `--model <id>` */
+  model?: string;
+  /** `--effort <level>` - verify with `claude --help` */
+  effort?: string;
+}
+
+/** Answers to an `AskUserQuestion`: question text → chosen option label (several labels if multi-select) or free text. */
+export type ClaudeAnswers = Record<string, string | string[]>;
+
 export interface ClaudeService {
-  /** Spawns `claude -p "<prompt>" --session-id <id> --output-format stream-json --verbose` in `cwd`. */
+  /** Spawns `claude -p "<prompt>" --session-id <id> --output-format stream-json --verbose [--model <id>] [--effort <level>]` in `cwd`. */
   start(options: ClaudeStartOptions): Promise<void>;
-  /** Next turn of an existing session: `claude -p "<text>" --resume <id> --output-format stream-json --verbose`. */
-  send(sessionId: string, text: string): Promise<void>;
-  /** Kills the running process (SIGINT). Must emit a `result` event with subtype `interrupted`. */
+  /** Next turn of an existing session: `claude -p "<text>" --resume <id> --output-format stream-json --verbose [--model <id>] [--effort <level>]`. */
+  send(sessionId: string, text: string, options?: ClaudeSendOptions): Promise<void>;
+  /**
+   * Answers an open `AskUserQuestion` (`toolUseId` = id of its `tool_use` block). The session keeps
+   * running afterwards: the answer shows up as the `tool_result` of that tool use, then Claude continues.
+   * Real bridge: headless Claude asks through the SDK's `canUseTool(toolName, input)` callback (CLI:
+   * the `--permission-prompt-tool` MCP tool) - the bridge parks that callback's promise per tool use id and
+   * resolves it here, returning `{ behavior: 'allow', updatedInput: { questions, answers } }` (verify the
+   * exact shape in the SDK docs). Claude then writes the tool result itself.
+   */
+  answerQuestion(sessionId: string, toolUseId: string, answers: ClaudeAnswers): Promise<void>;
+  /** Kills the running process (SIGINT). Must emit a `result` event with subtype `interrupted`. Also cancels an open question. */
   interrupt(sessionId: string): Promise<void>;
   /**
    * Stored transcript of a session (`~/.claude/projects/<project>/<id>.jsonl`) plus whether a

@@ -305,3 +305,157 @@ button.cx-entry:focus-visible .cx-entry-arrow {
   bottom: auto;
   top: calc(100% + 6px);
 }
+
+/* ---- composer pickers (model / effort) ---- */
+.cx-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 4px 1px 6px;
+  border-radius: var(--cx-radius-sm);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--dt-colors-text-neutral-subdued);
+  white-space: nowrap;
+}
+.cx-picker:not(:disabled):hover,
+.cx-picker[aria-expanded='true'] {
+  background: var(--cx-hover);
+  color: var(--cx-text);
+}
+.cx-picker:disabled {
+  opacity: 0.55;
+}
+.cx-picker svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* in a narrow pane the composer hint goes first, then the status line's secondary figures */
+.cx-composer {
+  container-type: inline-size;
+}
+@container (max-width: 520px) {
+  .cx-composer-hint {
+    display: none;
+  }
+}
+.cx-status-wrap {
+  container-type: inline-size;
+}
+@container (max-width: 560px) {
+  .cx-status-item[data-optional] {
+    display: none;
+  }
+}
+
+/* ---- status line ---- */
+.cx-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 0 4px;
+  margin-top: 6px;
+  min-height: 20px;
+}
+.cx-status-item {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.cx-ctx-bar {
+  width: 56px;
+  height: 4px;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--cx-border);
+  overflow: hidden;
+}
+.cx-ctx-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+
+/* ---- question card ---- */
+.cx-ask {
+  border: 1px solid var(--cx-primary);
+  border-radius: var(--cx-radius-lg);
+  background: var(--cx-surface);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cx-ask[data-done='true'] {
+  border-color: var(--cx-border);
+  background: var(--cx-subdued);
+  padding: 8px 12px;
+  gap: 6px;
+}
+.cx-ask-q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cx-ask-opt {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius);
+}
+.cx-ask-opt:not(:disabled):hover {
+  background: var(--cx-hover);
+}
+.cx-ask-opt[aria-checked='true'] {
+  border-color: var(--cx-primary);
+  background: var(--cx-selected);
+}
+.cx-ask-mark {
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border: 1.5px solid var(--cx-border-strong);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cx-ask-mark[data-multi='true'] {
+  border-radius: 3px;
+}
+.cx-ask-opt[aria-checked='true'] .cx-ask-mark {
+  border-color: var(--cx-primary);
+}
+.cx-ask-opt[aria-checked='true'] .cx-ask-mark::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cx-primary);
+}
+.cx-ask-opt[aria-checked='true'] .cx-ask-mark[data-multi='true']::after {
+  border-radius: 1px;
+}
+.cx-ask-other {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0 26px;
+  max-width: calc(100% - 26px);
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--cx-surface);
+  border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius-sm);
+  resize: vertical;
+}
+.cx-ask-other:focus {
+  outline: 0;
+  border-color: var(--cx-primary);
+}

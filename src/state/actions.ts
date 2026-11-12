@@ -10,7 +10,9 @@ import { AGENT_TITLES, promptFor } from '../services/prompts';
 import type { SessionRef, WorkRef } from '../services/types';
 import { projectForLabels } from './projects';
 import { getState, patchSession, patchWork, setBusy, setState } from './store';
-import { blankSession, projectBase, refreshWork, startedSessions, updateWorkspace } from './sync';
+import { blankSession, claudeChoice, projectBase, refreshWork, saveClaudeChoice, startedSessions, updateWorkspace } from './sync';
+import { openQuestion } from '../model/session';
+import type { ClaudeAnswers } from '../services/types';
 
 const now = () => new Date().toISOString();
 const findWork = (id: string) => getState().work.find((w) => w.id === id);
@@ -161,7 +163,20 @@ function appendUserMessage(sessionId: string, text: string) {
 function startClaude(session: AgentSession, prompt: string) {
   startedSessions.add(session.id);
   const cwd = session.workId ? findWork(session.workId)?.worktree?.path : undefined;
-  void services.claude.start({ sessionId: session.id, cwd, prompt, kind: session.kind, workId: session.workId });
+  void services.claude.start({ sessionId: session.id, cwd, prompt, kind: session.kind, workId: session.workId, model: session.model, effort: session.effort });
+}
+
+/** Model / effort for the next turn of a session; also the default for sessions started later. */
+export function setSessionOptions(sessionId: string, options: { model?: string; effort?: string }) {
+  const session = getState().sessions.find((x) => x.id === sessionId);
+  if (!session || session.status === 'running') return;
+  patchSession(sessionId, () => options);
+  saveClaudeChoice({ model: options.model ?? session.model, effort: options.effort ?? session.effort ?? claudeChoice().effort });
+}
+
+/** Answers Claude's open AskUserQuestion; the answer comes back as the tool result (see state/sync.ts). */
+export function answerQuestion(sessionId: string, toolUseId: string, answers: ClaudeAnswers) {
+  return services.claude.answerQuestion(sessionId, toolUseId, answers);
 }
 
 /**
@@ -199,8 +214,15 @@ export function stopSession(sessionId: string) {
 export async function sendMessage(sessionId: string, text: string) {
   const session = getState().sessions.find((x) => x.id === sessionId);
   if (!session || !text.trim()) return;
+  // while a question is open, a typed message is the answer (to the first question; the rest are skipped)
+  const open = openQuestion(session.messages);
+  if (open?.questions) {
+    const [first, ...rest] = open.questions;
+    await answerQuestion(sessionId, open.id, { [first.question]: text.trim(), ...Object.fromEntries(rest.map((q) => [q.question, '(skipped)'])) });
+    return;
+  }
   appendUserMessage(sessionId, text);
-  if (startedSessions.has(sessionId)) await services.claude.send(sessionId, text);
+  if (startedSessions.has(sessionId)) await services.claude.send(sessionId, text, { model: session.model, effort: session.effort });
   else startClaude(session, text);
 }
 

@@ -203,9 +203,10 @@ The UI consumes **stream-json events**. `mappers/claude.ts` (`applyClaudeEvent`)
 
 | Method | What the bridge does |
 | --- | --- |
-| `start` | `spawn('claude', ['-p', prompt, '--session-id', id, '--output-format', 'stream-json', '--verbose', '--include-partial-messages'], { cwd })`; parse stdout line by line as JSON; forward each object to the events endpoint with a `timestamp` added |
-| `send` | same, with `--resume <id>` instead of `--session-id <id>` |
-| `interrupt` | kill the child process, then emit `{ type: 'result', subtype: 'interrupted', is_error: false, session_id }` yourself |
+| `start` | `spawn('claude', ['-p', prompt, '--session-id', id, '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--model', model, '--effort', effort], { cwd })`; parse stdout line by line as JSON; forward each object to the events endpoint with a `timestamp` added |
+| `send` | same, with `--resume <id>` instead of `--session-id <id>`; `model` / `effort` come from the options argument and may differ from the previous turn |
+| `answerQuestion` | resolves the parked `canUseTool` promise of that `AskUserQuestion` (see "Questions" below) |
+| `interrupt` | kill the child process (and drop a parked question), then emit `{ type: 'result', subtype: 'interrupted', is_error: false, session_id }` yourself |
 | `getTranscript` | read `~/.claude/projects/<project folder>/<id>.jsonl`; return its `user` / `assistant` entries as events, plus `running` = whether a child process exists for the id |
 | `subscribe` | an `EventSource` on the events endpoint |
 | `listSkills` | read `name` / `description` from the front matter of `<cwd>/.claude/skills/*/SKILL.md` (project) and `~/.claude/skills/*/SKILL.md` (user), plus legacy `.claude/commands/*.md`, plus the built-in slash commands that work headless |
@@ -221,6 +222,21 @@ Notes:
 - **Skills** feed the `/` autocomplete in the chat composer (`components/session/Composer.tsx`); `boot()` loads them once into `state.skills`, and a failure just means no popup. The `system`/`init` event also carries `slash_commands` and `skills` names, which is worth verifying as a cross-check (written from memory). Skills are read without a `cwd` at boot, so project skills only show up once the bridge is given one; per-work-item lists would need a `listSkills(worktreePath)` call in the agents view.
 - **Which sessions exist** is Cortex's own knowledge (`SessionRef` in the workspace), not Claude's.
 - **Prompts** live in `services/prompts.ts`. The mock ignores their wording; real Claude will not. Review them with the user.
+
+**Model and effort.** The composer has two small pickers (`Composer.tsx`); the lists, context window sizes and defaults are in `config.ts` (`CLAUDE_MODELS`, `EFFORT_LEVELS`, `CLAUDE_DEFAULTS`). They are per session, editable between turns (disabled while it runs or asks), stored on `AgentSession.model` / `.effort`, passed as `ClaudeStartOptions` / `ClaudeSendOptions` and remembered in `localStorage` (`cortex.claude.choice.v1`) as the default of the next new session. Flags: `--model <id>` and `--effort <level>`. **Verify `--effort` with `claude --help`**: I wrote the flag from memory (the Agent SDK may take it as an option instead; if the CLI has no such flag, map it to whatever the installed version offers, e.g. a thinking budget). The real `system`/`init` event reports the model actually used, and the reducer shows it. Real context windows can differ from `config.ts` (e.g. 1M variants): fix the table.
+
+**Usage and the status line.** `StatusLine.tsx` shows model, effort, context bar, cost, cache read / write (+ hit rate), turns and last turn's duration. The reducer (`mappers/claude.ts`) fills `AgentSession.usage`: from every `assistant` event's `message.usage` (context used = `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` of the **latest** message; token and cache totals add up), from `result` events `total_cost_usd`, `num_turns` (summed over turns) and `duration_ms` (last turn). The bar turns warning at 80 % and critical at 95 %. Things to **verify** against real output:
+- whether `total_cost_usd` / `num_turns` of a `result` are per invocation (what the reducer assumes: they are summed) or session totals (then replace instead of add);
+- whether the CLI emits one `assistant` event per content block with the same `message.id` and repeated usage (the reducer skips totals of a repeated `message.id`, context is replaced either way);
+- transcripts on disk (`.jsonl`) contain no `result` lines, so after a reload the bridge has to synthesise cost / turns / duration itself (the mock does this for the seeded sessions) or the status line shows context and cache only.
+
+**Questions (`AskUserQuestion`).** Claude Code's tool arrives as a `tool_use` block named `AskUserQuestion` with `input.questions[] = { question, header, multiSelect, options[] = { label, description } }`. The reducer turns it into a tool message with `questions`; `Transcript` renders those as `QuestionCard` (single / multi select, always an "Other…" free-text choice, one Submit for all questions) and, once answered, as a collapsed question → answer summary. While it is open the session is `status: 'waiting'`, `activity: 'Has a question for you'`, so the work card, digest and sidebar treat it as "waiting for you", and the composer says an answer is expected. Typing a message instead is allowed: `sendMessage` (`actions.ts`) sees the open question and sends the text as the answer to the first question (others: "(skipped)"). Stop works with a question open (the card then reads "No answer").
+
+The real bridge (**verify everything here against the SDK docs**): a headless run cannot ask a human, so it asks through the permission mechanism. With the Agent SDK pass `canUseTool(toolName, input)`; for `AskUserQuestion` do not answer at once, park the promise under the `tool_use` id and tell the browser through the events endpoint (the `assistant` event with the `tool_use` block already does that). `answerQuestion(sessionId, toolUseId, answers)` resolves the promise with `{ behavior: 'allow', updatedInput: { questions, answers } }`, after which Claude writes the `tool_result` itself and carries on. (With the bare CLI the equivalent is an MCP server passed as `--permission-prompt-tool`.) The `tool_result` text is expected to read `User has answered your questions: "<question>"="<answer>", …`; `parseAnswers` in the mapper reads exactly that, and the mock produces it (`askResultContent` in `mock/serialize.ts`) - fix both if real output differs. `interrupt` must reject the parked promise and kill the process.
+
+**Permission requests are not handled anywhere** (grep for `permission` finds nothing in `src`): a real agent that needs a tool it is not allowed to use simply fails or stops (see Permissions above). They would slot into the same mechanism: `canUseTool` is called for every tool that is not pre-approved, so the bridge parks the promise exactly as for questions and the browser needs (1) a pending-permission event or tool message (tool name + input, e.g. "Claude wants to run `npm test`"), (2) a card with Allow / Allow always / Deny that calls a new `ClaudeService.answerPermission(sessionId, toolUseId, decision)`, which resolves with `{ behavior: 'allow', updatedInput }` or `{ behavior: 'deny', message }`, (3) the same `waiting` + activity status ("Wants to run Bash …"). `openQuestion` in `model/session.ts` would become "open request" with a kind. "Allow always" maps to the SDK's permission update / `--allowedTools` for later turns.
+
+**Mock extras.** The plan agent asks two questions mid-run (approach: single choice; extras: multi-select) and its plan ends with a "Decisions" section reflecting the answers; the seeded CTX-1431 plan shows an answered question. In the global "Ask Cortex" chat any message containing *choose*, *decide*, *pick* or *prioritise* (e.g. "Help me choose what to do first") makes the mock ask a question first. The mock emits `system`/`init` on every turn, usage that grows with the context and costs that depend on the model (Fable dearest, Haiku cheapest; invented prices).
 
 ### 6.5 CI — Jenkins
 
@@ -290,7 +306,7 @@ Do these in order. Each step ends with something you can see working.
 
 Flows to click through after any change to state or services:
 
-1. On CTX-1440: Create worktree → Plan → (Ticket tab shows the plan) → Implement → Create PR → build goes green → Mark ready.
+1. On CTX-1440: Create worktree → Plan → answer its question card (pick an option, tick an extra, Submit; the plan afterwards ends with your decisions) → (Ticket tab shows the plan) → Implement → Create PR → build goes green → Mark ready.
 2. On CTX-1423: Build tab → "Let Claude fix it" → new build passes.
 3. On PR #482: add a line comment (pending) → Finish review → Approve.
 4. On CTX-1398: Merge → Archive.
@@ -304,6 +320,7 @@ Flows to click through after any change to state or services:
 8. Toolbox: add a link, edit, delete, reload.
 9. Projects: edit a field and Save; Roadmap: add a milestone and items; Architecture: new diagram, edit source, preview updates.
 10. Chat: type `/` in the composer, pick a skill with the arrow keys and Enter. CTX-1431 → Ticket → Plan shows a Mermaid diagram.
+11. Session harness: in Ask Cortex change model and effort in the composer, send "Help me choose what to do first" (a question card appears, status "waiting"), answer by option; repeat and answer with "Other…" and by typing into the composer; repeat and press Stop with the question open. Watch the status line (context bar, cost, cache, turns) grow with every turn and the model follow your pick. Launch a Plan agent and answer the two-question card (single + multi-select), also once with "Other…" and once with Stop. Pickers are disabled while the session runs or asks; the next new session starts with your last pick. Try a ~1000 px wide window: the composer hint and the secondary status figures drop out first.
 
 ## 9. Practical notes
 

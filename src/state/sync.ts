@@ -7,7 +7,7 @@
  * tool data into the store themselves; they call a service and then `refreshWork`.
  */
 import type { AgentSession, AppInstance, Pipeline, PullRequest, Ticket, WorkItem, Worktree } from '../model/types';
-import { config } from '../services/config';
+import { CLAUDE_DEFAULTS, config } from '../services/config';
 import { services } from '../services';
 import { applyClaudeEvent, mapSkill, planFromEvents, replayTranscript } from '../services/mappers/claude';
 import { mapBuild } from '../services/mappers/ci';
@@ -134,10 +134,30 @@ function watch(workId: string) {
 /** Sessions that already have a Claude process/transcript — the next message must `--resume` them. */
 export const startedSessions = new Set<string>();
 
+const CHOICE_KEY = 'cortex.claude.choice.v1';
+
+/** Model + effort of the last pick in a composer: the default for new sessions. */
+export function claudeChoice(): { model: string; effort: string } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as { model?: string; effort?: string } | null;
+    return { model: saved?.model ?? CLAUDE_DEFAULTS.model, effort: saved?.effort ?? CLAUDE_DEFAULTS.effort };
+  } catch {
+    return CLAUDE_DEFAULTS; // storage unavailable or corrupt
+  }
+}
+
+export function saveClaudeChoice(choice: { model: string; effort: string }) {
+  try {
+    localStorage.setItem(CHOICE_KEY, JSON.stringify(choice));
+  } catch {
+    // not persisted, the pick still applies to this session
+  }
+}
+
 export const blankSession = (ref: SessionRef): AgentSession => ({
   ...ref,
   status: ref.kind === 'chat' ? 'waiting' : 'done',
-  model: 'claude',
+  ...claudeChoice(), // replaced by the model the first `system` event reports
   messages: [],
 });
 

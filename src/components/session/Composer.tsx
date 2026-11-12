@@ -1,8 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
+import { Menu } from '@dynatrace/strato-components/navigation';
 import { Text } from '@dynatrace/strato-components/typography';
-import { ArrowUpIcon, StopIcon } from '@dynatrace/strato-icons';
+import { ArrowUpIcon, CheckmarkIcon, ChevronDownIcon, StopIcon } from '@dynatrace/strato-icons';
 import type { Skill } from '../../model/types';
+import { CLAUDE_DEFAULTS, CLAUDE_MODELS, EFFORT_LEVELS, modelInfo } from '../../services/config';
 import { useCortex } from '../../state/store';
 import { subduedText } from './meta';
 
@@ -46,6 +48,14 @@ function Highlighted({ name, query }: { name: string; query: string }) {
   );
 }
 
+/** Model + effort of the session the composer belongs to. Both are fixed while the session runs. */
+export interface ComposerOptions {
+  model: string;
+  effort?: string;
+  disabled?: boolean;
+  onChange: (patch: { model?: string; effort?: string }) => void;
+}
+
 interface Props {
   onSend: (text: string) => void;
   onStop?: () => void;
@@ -56,9 +66,36 @@ interface Props {
   hint?: ReactNode;
   /** skills offered by the "/" autocomplete; defaults to the ones in the store */
   skills?: Skill[];
+  options?: ComposerOptions;
 }
 
-export function Composer({ onSend, onStop, running, placeholder = 'Message Claude…', rows = 1, autoFocus, hint, skills }: Props) {
+/** A tiny dropdown: subdued text + chevron, no border until hovered. */
+function Picker({ label, value, items, disabled, onPick }: { label: string; value: string; items: { id: string; text: string }[]; disabled?: boolean; onPick: (id: string) => void }) {
+  const current = items.find((i) => i.id === value);
+  return (
+    <Menu>
+      <Menu.Trigger>
+        <button type="button" className="cx-btn cx-picker" disabled={disabled} aria-label={`${label}: ${current?.text ?? value}`} title={disabled ? `${label} can be changed between turns` : label}>
+          {current?.text ?? value}
+          <ChevronDownIcon />
+        </button>
+      </Menu.Trigger>
+      <Menu.Content>
+        {items.map((i) => (
+          <Menu.Item key={i.id} onSelect={() => onPick(i.id)}>
+            <Menu.Prefix>{i.id === value ? <CheckmarkIcon /> : <span style={{ display: 'inline-block', width: 16 }} />}</Menu.Prefix>
+            {i.text}
+          </Menu.Item>
+        ))}
+      </Menu.Content>
+    </Menu>
+  );
+}
+
+const MODEL_ITEMS = CLAUDE_MODELS.map((m) => ({ id: m.id, text: m.label }));
+const EFFORT_ITEMS = EFFORT_LEVELS.map((e) => ({ id: e, text: e }));
+
+export function Composer({ onSend, onStop, running, placeholder = 'Message Claude…', rows = 1, autoFocus, hint, skills, options }: Props) {
   const storeSkills = useCortex((s) => s.skills);
   const all = skills ?? storeSkills;
   const [text, setText] = useState('');
@@ -191,11 +228,32 @@ export function Composer({ onSend, onStop, running, placeholder = 'Message Claud
           }
         }}
       />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-        <Text textStyle="small" style={subduedText}>
-          {hint ?? `Enter to send · Shift+Enter for a new line${all.length ? ' · / for skills' : ''}`}
-        </Text>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px 8px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+          {options && (
+            <>
+              <Picker
+                label="Model"
+                value={modelInfo(options.model).id}
+                items={MODEL_ITEMS.some((m) => m.id === options.model) ? MODEL_ITEMS : [{ id: options.model, text: modelInfo(options.model).label }, ...MODEL_ITEMS]}
+                disabled={options.disabled}
+                onPick={(model) => options.onChange({ model })}
+              />
+              <Picker
+                label="Reasoning effort"
+                value={options.effort ?? CLAUDE_DEFAULTS.effort}
+                items={EFFORT_ITEMS}
+                disabled={options.disabled}
+                onPick={(effort) => options.onChange({ effort })}
+              />
+              <span style={{ width: 8 }} />
+            </>
+          )}
+          <Text textStyle="small" className="cx-ellipsis cx-composer-hint" style={subduedText}>
+            {hint ?? `Enter to send · Shift+Enter for a new line${all.length ? ' · / for skills' : ''}`}
+          </Text>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flex: 'none', marginLeft: 'auto' }}>
           {running && onStop && (
             <Button variant="default" size="condensed" onClick={onStop}>
               <Button.Prefix>
