@@ -4,7 +4,7 @@
  */
 import { agentScript, cannedReply, MODEL, planFor } from '../../mock/seed/sessions';
 import type { SessionMessage, WorkItem } from '../../model/types';
-import type { ClaudeEvent, ClaudeService, ClaudeStartOptions } from '../types';
+import type { ClaudeEvent, ClaudeService, ClaudeSkill, ClaudeStartOptions } from '../types';
 import { toClaudeEvents } from './serialize';
 import { startBuild } from './tools';
 import { delay, findWorktree, workItemById, world } from './world';
@@ -86,7 +86,26 @@ async function runAgent(options: ClaudeStartOptions, work: WorkItem) {
   emit(sessionId, { type: 'result', subtype: 'success', is_error: false, result: options.kind === 'plan' ? planFor(work) : finalText });
 }
 
+const SKILLS: ClaudeSkill[] = [
+  { name: 'run', description: 'Start the dev server for this repo and open the app', scope: 'project', path: '.claude/skills/run/SKILL.md' },
+  { name: 'release-notes', description: 'Draft release notes from merged pull requests since the last tag', scope: 'project', path: '.claude/skills/release-notes/SKILL.md' },
+  { name: 'db-migrate', description: 'Create and apply a database migration for a schema change', scope: 'project', path: '.claude/skills/db-migrate/SKILL.md' },
+  { name: 'fix-flaky-test', description: 'Reproduce a flaky test, find the race and fix it', scope: 'project', path: '.claude/skills/fix-flaky-test/SKILL.md' },
+  { name: 'code-review', description: 'Review the current diff for bugs and style problems', scope: 'user', path: '~/.claude/skills/code-review/SKILL.md' },
+  { name: 'simplify', description: 'Simplify recently changed code without changing behaviour', scope: 'user', path: '~/.claude/skills/simplify/SKILL.md' },
+  { name: 'standup', description: 'Summarise what I did yesterday from commits and tickets', scope: 'user', path: '~/.claude/skills/standup/SKILL.md' },
+  { name: 'compact', description: 'Summarise the conversation to free up context', scope: 'builtin' },
+  { name: 'clear', description: 'Clear the conversation history and start fresh', scope: 'builtin' },
+  { name: 'init', description: 'Create a CLAUDE.md with codebase documentation', scope: 'builtin' },
+  { name: 'security-review', description: 'Security review of the pending changes on this branch', scope: 'builtin' },
+];
+
 export const claude: ClaudeService = {
+  async listSkills() {
+    await delay(60);
+    return SKILLS.map((s) => ({ ...s }));
+  },
+
   async start(options) {
     await delay();
     const work = workItemById(options.workId) ?? null;

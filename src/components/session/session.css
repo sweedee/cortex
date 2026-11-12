@@ -214,6 +214,7 @@ button.cx-entry:focus-visible .cx-entry-arrow {
 
 /* ---- composer ---- */
 .cx-composer {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -243,4 +244,64 @@ button.cx-entry:focus-visible .cx-entry-arrow {
 }
 .cx-tool-row[aria-expanded='true'] {
   background: var(--cx-hover);
+}
+
+/* ---- composer: skills autocomplete ---- */
+.cx-skill-popup {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 10;
+  max-height: 264px; /* ~8 rows */
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--cx-border);
+  border-radius: var(--cx-radius-lg);
+  background: var(--cx-surface);
+  box-shadow: var(--dt-shadows-surface-raised-default, 0 4px 16px rgba(0, 0, 0, 0.18));
+}
+.cx-skill-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: var(--cx-radius, 6px);
+  cursor: pointer;
+}
+.cx-skill-row[aria-selected='true'] {
+  background: var(--cx-hover);
+}
+.cx-skill-name {
+  flex: none;
+  font-family: var(--dt-typography-code-base-default-family, monospace);
+  font-size: 0.9em;
+  color: var(--dt-colors-text-neutral-default);
+}
+.cx-skill-name mark {
+  background: transparent;
+  color: var(--cx-primary);
+  font-weight: 600;
+}
+.cx-skill-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dt-colors-text-neutral-subdued);
+  font-size: 0.9em;
+}
+.cx-skill-tag {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--cx-border);
+  border-radius: 999px;
+  font-size: 0.75em;
+  color: var(--dt-colors-text-neutral-subdued);
+}
+.cx-skill-popup.below {
+  bottom: auto;
+  top: calc(100% + 6px);
 }
