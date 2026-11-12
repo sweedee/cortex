@@ -1,0 +1,146 @@
+/* Projects page styles that Strato props cannot express. Colours come from Strato tokens only. */
+
+.cx-pj-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--dt-spacings-size-12);
+}
+.cx-pj-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dt-spacings-size-8);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: box-shadow 120ms ease;
+}
+.cx-pj-card:focus-visible {
+  box-shadow: 0 0 0 2px var(--dt-colors-border-primary-accent);
+}
+.cx-pj-card:hover {
+  box-shadow: 0 0 0 1px var(--dt-colors-border-neutral-default);
+}
+.cx-pj-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--dt-spacings-size-8);
+  min-width: 0;
+}
+.cx-pj-meta > :nth-child(odd) {
+  color: var(--dt-colors-text-neutral-subdued);
+}
+.cx-pj-meta > :nth-child(even) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-pj-counts {
+  display: flex;
+  gap: var(--dt-spacings-size-12);
+  padding-top: var(--dt-spacings-size-4);
+  border-top: 1px solid var(--dt-colors-border-neutral-default);
+}
+
+/* tab pages */
+.cx-pj-scroll {
+  height: 100%;
+  overflow-y: auto;
+}
+.cx-pj-page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--dt-spacings-size-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--dt-spacings-size-24);
+}
+.cx-pj-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dt-spacings-size-12);
+}
+.cx-pj-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dt-spacings-size-12) var(--dt-spacings-size-16);
+}
+.cx-pj-form > .cx-pj-wide {
+  grid-column: 1 / -1;
+}
+@media (max-width: 700px) {
+  .cx-pj-form {
+    grid-template-columns: 1fr;
+  }
+}
+.cx-pj-savebar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  padding: var(--dt-spacings-size-8) var(--dt-spacings-size-12);
+  background: var(--dt-colors-background-container-neutral-default);
+  border: 1px solid var(--dt-colors-border-neutral-default);
+  border-radius: 8px;
+}
+.cx-pj-ticketrow {
+  display: grid;
+  grid-template-columns: 90px 1fr auto auto;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  padding: var(--dt-spacings-size-4) 0;
+  border-bottom: 1px solid var(--dt-colors-border-neutral-default);
+}
+
+/* work table */
+.cx-pj-table {
+  display: grid;
+  grid-template-columns: minmax(200px, 3fr) auto minmax(100px, 2fr) auto auto auto;
+  align-items: center;
+  border: 1px solid var(--dt-colors-border-neutral-default);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cx-pj-table > *,
+.cx-pj-rowgroup > * {
+  padding: var(--dt-spacings-size-8) var(--dt-spacings-size-12);
+  min-width: 0;
+}
+.cx-pj-th {
+  color: var(--dt-colors-text-neutral-subdued);
+  background: var(--dt-colors-background-container-neutral-default);
+}
+.cx-pj-rowgroup {
+  display: contents;
+}
+.cx-pj-rowgroup > * {
+  border-top: 1px solid var(--dt-colors-border-neutral-default);
+}
+.cx-pj-cell {
+  min-height: 40px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--dt-spacings-size-4);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cx-pj-cell:hover,
+.cx-pj-cell:focus-visible {
+  background: var(--dt-colors-background-container-neutral-subdued);
+  outline: none;
+}
+.cx-pj-backlog {
+  display: grid;
+  grid-template-columns: 90px 1fr auto auto;
+  align-items: center;
+  gap: var(--dt-spacings-size-8);
+  padding: var(--dt-spacings-size-4) 0;
+  border-bottom: 1px solid var(--dt-colors-border-neutral-default);
+}
