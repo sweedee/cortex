@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
-import { Chip, Markdown } from '@dynatrace/strato-components/content';
+import { Chip } from '@dynatrace/strato-components/content';
 import { Menu } from '@dynatrace/strato-components/navigation';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
 import {
@@ -13,6 +13,7 @@ import {
   PendingIcon,
   WarningIcon,
 } from '@dynatrace/strato-icons';
+import { Md } from '../components/Md';
 import type { PrState, ReviewerState } from '../model/types';
 import {
   createPr,
@@ -311,7 +312,7 @@ export function ReviewView({ workId }: { workId: string }) {
         </div>
         {descOpen && (
           <div className="rv-desc">
-            <Markdown>{pr.descriptionMd}</Markdown>
+            <Md>{pr.descriptionMd}</Md>
           </div>
         )}
       </div>

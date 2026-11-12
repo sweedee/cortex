@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
-import { Avatar, Markdown } from '@dynatrace/strato-components/content';
+import { Avatar } from '@dynatrace/strato-components/content';
 import { TextArea } from '@dynatrace/strato-components/forms';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
 import { Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
+import { Md } from '../../components/Md';
 import type { TicketComment } from '../../model/types';
 import { addTicketComment } from '../../state/actions';
 import { absoluteTime, initials, relativeTime } from './time';
@@ -28,7 +29,7 @@ function Comment({ comment, me, now }: { comment: TicketComment; me: string; now
           </Tooltip>
         </div>
         <div className="ctx-ticket__comment-body ctx-ticket__md">
-          <Markdown>{comment.bodyMd}</Markdown>
+          <Md>{comment.bodyMd}</Md>
         </div>
       </div>
     </div>
