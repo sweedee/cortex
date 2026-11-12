@@ -4,10 +4,12 @@
  */
 import { makeQueuedPipeline } from '../../mock/seed/pipelines';
 import { makeDraftPr } from '../../mock/seed/prs';
-import type { PullRequest, TicketStatus, WorkItem } from '../../model/types';
+import type { PullRequest, ReviewThread, TicketStatus, WorkItem } from '../../model/types';
+import { config } from '../config';
 import type { CiService, DevServerService, GitHubService, GitService, JiraService, WorkspaceService } from '../types';
-import { toGhPullRequest, toGhReviewThreads, toJenkinsBuild, toJiraIssue, toUnifiedDiff } from './serialize';
-import { delay, findBuild, findPr, findWorktree, ME, workItemByBranch, workItemOf, world } from './world';
+import { toGhPrListItem, toGhPullRequest, toGhReviewThreads, toJenkinsBuild, toJiraIssue, toUnifiedDiff } from './serialize';
+import { reviewersLookAt } from './outside';
+import { delay, findBuild, findPr, findWorktree, ME, mergeRenovatePr, workItemByBranch, workItemOf, world } from './world';
 
 const now = () => new Date().toISOString();
 let seq = 0;
@@ -108,6 +110,41 @@ const touch = (pr: PullRequest) => {
   pr.updatedAt = now();
 };
 
+// ---- AI reviewer bot -----------------------------------------------------------
+
+/** How long the fake bot "thinks" before it posts its review. */
+const AI_REVIEW_MS = 5000;
+
+const AI_NOTES: { match: RegExp; note: (code: string) => string }[] = [
+  { match: /\bthrow\b|new \w*Error/, note: (c) => `What does the caller see when this is hit? \`${c}\` loses the surrounding context — consider carrying the identifiers (tenant, delivery id) in the error so it is diagnosable from the log alone.` },
+  { match: /\bawait\b/, note: (c) => `\`${c}\` has no timeout. If the dependency hangs, this call stalls with it; an \`AbortSignal.timeout(…)\` would bound it.` },
+  { match: /\b\d[\d_]{2,}\b/, note: (c) => `Magic number in \`${c}\`. A named constant (or a config value) would document the unit and make it tunable.` },
+  { match: /./, note: (c) => `Nit: I could not find a test that exercises \`${c}\`. A small case for the failure path would pin the behaviour down.` },
+];
+
+/** One or two added lines of the diff worth a remark — real lines, so the threads anchor correctly. */
+function aiReviewThreads(pr: PullRequest): ReviewThread[] {
+  const taken = new Set(pr.threads.map((t) => `${t.filePath}:${t.line}`));
+  const picks: { path: string; line: number; code: string }[] = [];
+  for (const file of pr.files) {
+    if (file.status === 'deleted' || picks.length >= 2) continue;
+    const candidates = file.hunks
+      .flatMap((h) => h.lines)
+      .filter((l) => l.type === 'add' && l.newNo !== undefined && l.content.trim().length >= 24 && !/^\s*(\/\/|\*|\/\*|import\b)/.test(l.content) && !taken.has(`${file.path}:${l.newNo}`));
+    // a line from the middle of the file's changes, which is usually logic rather than boilerplate
+    const l = candidates[Math.floor(candidates.length / 2)];
+    if (l) picks.push({ path: file.path, line: l.newNo!, code: l.content.trim().slice(0, 60) });
+  }
+  return picks.map(({ path, line, code }) => ({
+    id: uid('rt'),
+    filePath: path,
+    line,
+    side: 'new',
+    resolved: false,
+    comments: [{ id: uid('rc'), author: config.aiReview.botLogin, at: now(), body: AI_NOTES.find((n) => n.match.test(code))!.note(code) }],
+  }));
+}
+
 export const github: GitHubService = {
   async whoami() {
     await delay();
@@ -116,6 +153,12 @@ export const github: GitHubService = {
   async findPullRequest(repo, branch) {
     await delay();
     return world.prs.find((p) => p.repo === repo && p.pr.sourceBranch === branch)?.pr.number;
+  },
+  async listPullRequests(repo, { author, state }) {
+    await delay();
+    // only the Renovate bot's PRs exist in the mock; a merged one is gone from an open list
+    if (state !== 'open' && state !== 'all') return [];
+    return author && author !== config.renovate.author ? [] : (world.renovate[repo] ?? []).map(toGhPrListItem);
   },
   async getPullRequest(repo, number) {
     await delay();
@@ -129,23 +172,46 @@ export const github: GitHubService = {
     await delay();
     return toGhReviewThreads(pull(repo, number));
   },
-  async createPullRequest(repo, { head, base, title, body, draft }) {
+  async createPullRequest(repo, { head, base, title, body, draft, reviewers }) {
     await delay(1200);
     // the diff is whatever is on the branch — here: a generated, plausible change
     const pr: PullRequest = { ...makeDraftPr(contextFor(repo, head), ME.name), title, sourceBranch: head, targetBranch: base, state: draft ? 'draft' : 'open', updatedAt: now() };
     if (body) pr.descriptionMd = body;
+    pr.reviewers = (reviewers ?? []).map((name) => ({ name, state: 'pending' }));
     world.prs.push({ repo, pr });
     startBuild(repo, head); // opening a PR triggers CI, as the Jenkins webhook would
     return pr.number;
+  },
+  async setBase(repo, number, base) {
+    await delay();
+    const pr = pull(repo, number);
+    pr.targetBranch = base;
+    touch(pr);
+  },
+  async requestAiReview(repo, number) {
+    await delay(400); // posting the trigger comment
+    const pr = pull(repo, number);
+    const bot = config.aiReview.botLogin;
+    if (pr.reviewers.some((r) => r.name === bot && r.state === 'pending')) return;
+    pr.reviewers = [...pr.reviewers.filter((r) => r.name !== bot), { name: bot, state: 'pending' }];
+    touch(pr);
+    // the bot answers on its own, a few seconds later
+    setTimeout(() => {
+      pr.threads = [...pr.threads, ...aiReviewThreads(pr)];
+      pr.reviewers = pr.reviewers.map((r) => (r.name === bot ? { ...r, state: 'commented' } : r));
+      touch(pr);
+    }, AI_REVIEW_MS);
   },
   async markReady(repo, number) {
     await delay();
     const pr = pull(repo, number);
     pr.state = 'open';
     touch(pr);
+    reviewersLookAt(repo, pr);
   },
   async merge(repo, number) {
     await delay(1400);
+    if (world.renovate[repo]?.some((p) => p.number === number)) return mergeRenovatePr(repo, number);
     const pr = pull(repo, number);
     pr.state = 'merged';
     touch(pr);
@@ -206,7 +272,11 @@ export const git: GitService = {
   async rebase(path) {
     await delay(1100);
     const w = findWorktree(path);
-    if (w) w.behind = 0;
+    if (!w) return;
+    w.behind = 0;
+    // the rebased branch is pushed again, so CI builds the PR anew
+    const open = world.prs.some((p) => p.repo === w.repo && p.pr.sourceBranch === w.branch && p.pr.state !== 'merged');
+    if (open) startBuild(w.repo, w.branch);
   },
 };
 

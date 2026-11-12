@@ -5,23 +5,31 @@ import { Menu } from '@dynatrace/strato-components/navigation';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
 import {
   AgentIcon,
+  AiIcon,
   ArrowRightIcon,
   ChatIcon,
   CheckmarkIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   PendingIcon,
+  SyncIcon,
   WarningIcon,
 } from '@dynatrace/strato-icons';
 import { Md } from '../components/Md';
-import type { PrState, ReviewerState } from '../model/types';
+import { config } from '../services/config';
+import type { PrState, ReviewerState, WorkItem } from '../model/types';
 import {
-  createPr,
   launchAgent,
   markPrReady,
   mergePr,
+  openCreatePrDialog,
+  requestAiReview,
+  retargetPr,
+  selectWork,
   submitReview,
+  syncWithBase,
 } from '../state/actions';
+import { aiReviewPending, ancestorsOf, baseOf, blockingParent, childrenOf, headOf, needsRetarget, parentOf, prLabel } from '../state/derive';
 import { useBusy, useCortex, useWork } from '../state/store';
 import { Initials } from './review/Thread';
 import { DiffFileView, splitPath, type Anchor } from './review/DiffFileView';
@@ -48,7 +56,27 @@ const REVIEWER_LABEL: Record<ReviewerState, string> = {
   'changes-requested': 'Requested changes',
   commented: 'Commented',
 };
+const aiTrigger = config.aiReview.triggerComment;
 const STATUS_LETTER = { added: 'A', modified: 'M', deleted: 'D', renamed: 'R' } as const;
+
+/** One PR of the stack: a link to its review tab when it is on the board, else a plain branch name. */
+function StackLink({ work, current, label }: { work: WorkItem; current?: boolean; label?: string }) {
+  const pr = work.pr;
+  const text = label ?? (pr ? `#${pr.number}${pr.state === 'merged' ? ' (merged)' : ''}` : (headOf(work) ?? work.title));
+  return (
+    <>
+      {current ? (
+        <span className="rv-stack-node" data-current title={pr?.title}>{text}</span>
+      ) : (
+        <button type="button" className="rv-stack-node rv-stack-link" title={pr?.title ?? work.title} onClick={() => selectWork(work.id, 'review')}>
+          {text}
+        </button>
+      )}
+    </>
+  );
+}
+
+const Back = () => <span className="rv-stack-sep" aria-hidden>←</span>;
 
 function ReviewerIcon({ state }: { state: ReviewerState }) {
   if (state === 'approved') return <CheckmarkIcon />;
@@ -60,9 +88,14 @@ function ReviewerIcon({ state }: { state: ReviewerState }) {
 export function ReviewView({ workId }: { workId: string }) {
   const work = useWork(workId);
   const me = useCortex((s) => s.me);
+  const all = useCortex((s) => s.work);
+  const defaultBase = useCortex((s) => s.projects.find((p) => p.id === work?.repo)?.baseBranch ?? 'main');
   const creating = useBusy(workId, 'pr');
   const merging = useBusy(workId, 'merge');
   const submitting = useBusy(workId, 'review');
+  const rebasing = useBusy(workId, 'sync');
+  const requestingAi = useBusy(workId, 'ai-review');
+  const retargeting = useBusy(workId, 'retarget');
 
   const [viewed, setViewed] = useState<Set<string>>(new Set());
   const [composing, setComposing] = useState<Anchor | null>(null);
@@ -157,7 +190,7 @@ export function ReviewView({ workId }: { workId: string }) {
               color="primary"
               disabled={noWorktree}
               loading={creating}
-              onClick={() => void createPr(workId)}
+              onClick={() => openCreatePrDialog(workId)}
             >
               Create pull request
             </Button>
@@ -169,6 +202,18 @@ export function ReviewView({ workId }: { workId: string }) {
 
   const merged = pr.state === 'merged';
   const reviewMode = !!pr.reviewRequested;
+  const wt = work.worktree;
+  const aiPending = aiReviewPending(pr);
+  const aiDone = pr.reviewers.some((r) => r.isBot && r.state !== 'pending');
+  // stacked PRs: the chain base ← parents ← this, and what sits on top of it
+  const parent = parentOf(work, all);
+  const blocker = blockingParent(work, all);
+  const children = childrenOf(work, all);
+  const chain = [...ancestorsOf(work, all)].reverse();
+  const rootBase = (chain[0] ? baseOf(chain[0]) : baseOf(work)) ?? pr.targetBranch;
+  const retarget = needsRetarget(work, all);
+  const baseName = wt?.baseBranch ?? pr.targetBranch;
+  const rebaseOff = !wt ? 'There is no worktree for this pull request' : wt.behind === 0 ? `Already up to date with ${baseName}` : '';
   const additions = pr.files.reduce((n, f) => n + f.additions, 0);
   const deletions = pr.files.reduce((n, f) => n + f.deletions, 0);
   const unresolved = unresolvedIds.length;
@@ -208,7 +253,7 @@ export function ReviewView({ workId }: { workId: string }) {
             <>
               <span className="rv-meta">Reviewers</span>
               {pr.reviewers.map((r) => (
-                <Tooltip key={r.name} text={REVIEWER_LABEL[r.state]}>
+                <Tooltip key={r.name} text={`${r.isBot ? `${r.name} (AI) · ` : ''}${REVIEWER_LABEL[r.state]}`}>
                   <span className="rv-person">
                     <Initials name={r.name} me={r.name === me} />
                     <span className="rv-reviewer-state" data-state={r.state}>
@@ -277,20 +322,95 @@ export function ReviewView({ workId }: { workId: string }) {
                     Mark ready
                   </Button>
                 )}
+                {retarget && parent?.pr && (
+                  <Tooltip text={`#${parent.pr.number} is merged; this PR still targets ${pr.targetBranch}`}>
+                    <Button size="condensed" variant="accent" color="primary" loading={retargeting} onClick={() => void retargetPr(workId)}>
+                      Retarget to {defaultBase}
+                    </Button>
+                  </Tooltip>
+                )}
                 {pr.state === 'approved' && (
-                  <Button
-                    size="condensed"
-                    variant="accent"
-                    color="success"
-                    loading={merging}
-                    onClick={() => void mergePr(workId)}
-                  >
-                    Merge
-                  </Button>
+                  <Tooltip text={blocker ? `Merge #${blocker.pr!.number} first — this PR is stacked on it` : ''}>
+                    <span>
+                      <Button
+                        size="condensed"
+                        variant="accent"
+                        color="success"
+                        loading={merging}
+                        disabled={!!blocker}
+                        onClick={() => void mergePr(workId)}
+                      >
+                        Merge
+                      </Button>
+                    </span>
+                  </Tooltip>
                 )}
               </>
             )}
           </div>
+        </div>
+
+        {/* ---- stack · rebase · AI review ---- */}
+        <div className="rv-summary-row">
+          {(parent || chain.length > 0 || children.length > 0 || baseName !== defaultBase) && (
+            <span className="rv-stack" aria-label="Stack of pull requests">
+              <span className="rv-meta">Stack</span>
+              <span className="rv-branch" title={rootBase}>{rootBase}</span>
+              {chain.map((a) => (
+                <span key={a.id} className="rv-stack">
+                  <Back />
+                  <StackLink work={a} />
+                </span>
+              ))}
+              <Back />
+              <StackLink work={work} current label={`${prLabel(work)} (this)`} />
+              {children.length > 0 && <Back />}
+              {children.map((c, i) => (
+                <span key={c.id} className="rv-stack">
+                  {i > 0 && <span className="rv-stack-sep">,</span>}
+                  <StackLink work={c} />
+                </span>
+              ))}
+            </span>
+          )}
+          {wt && (
+            <span className="rv-meta" data-behind={wt.behind > 0}>
+              {wt.behind > 0 ? (
+                <span style={{ color: 'var(--rv-warning)', fontWeight: 600 }}>{wt.behind} behind</span>
+              ) : (
+                <span>up to date with</span>
+              )}
+              <span className="rv-branch" title={wt.baseBranch}>{wt.baseBranch}</span>
+              {wt.ahead > 0 && <span>· {plural(wt.ahead, 'commit')} ahead</span>}
+            </span>
+          )}
+          {wt && !merged && (
+            <Tooltip text={rebaseOff}>
+              <span>
+                <Button size="condensed" loading={rebasing} disabled={!!rebaseOff} onClick={() => void syncWithBase(workId)}>
+                  <Button.Prefix><SyncIcon /></Button.Prefix>
+                  Rebase
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+          {!merged && (
+            <div className="rv-summary-actions">
+              <Tooltip text={aiPending ? 'The AI reviewer has been asked and has not answered yet' : `Posts “${aiTrigger}” on the pull request`}>
+                <span>
+                  <Button
+                    size="condensed"
+                    loading={requestingAi}
+                    disabled={aiPending}
+                    onClick={() => void requestAiReview(workId)}
+                  >
+                    <Button.Prefix>{aiPending ? <PendingIcon /> : <AiIcon />}</Button.Prefix>
+                    {aiPending ? 'AI review requested' : aiDone ? 'Re-run AI review' : 'Request AI review'}
+                  </Button>
+                </span>
+              </Tooltip>
+            </div>
+          )}
         </div>
 
         <div className="rv-summary-row">

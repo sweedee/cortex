@@ -31,17 +31,18 @@ import {
 import type { AgentSession, PrState, TicketStatus, WorkItem } from '../model/types';
 import {
   archiveWork,
-  createPr,
   createWorktree,
   launchAgent,
   launchApp,
+  openCreatePrDialog,
+  requestAiReview,
   openSession,
   runPipeline,
   selectWork,
   stopApp,
   syncWithBase,
 } from '../state/actions';
-import { attentionOf, nextActionOf, pendingComments, relativeTime, unresolvedThreads, type Tone } from '../state/derive';
+import { aiReviewPending, attentionOf, nextActionOf, parentOf, pendingComments, relativeTime, unresolvedThreads, type Tone } from '../state/derive';
 import { useBusy, useCortex } from '../state/store';
 import { addTodo, openTodos } from '../state/todos';
 import { AutoFocus } from '../components/AutoFocus';
@@ -199,8 +200,12 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
   const allSessions = useCortex((s) => s.sessions);
   const me = useCortex((s) => s.me);
   const sessions = allSessions.filter((s) => s.workId === work.id);
-  const attention = attentionOf(work, allSessions, me);
-  const next = nextActionOf(work, allSessions, me);
+  const allWork = useCortex((s) => s.work);
+  const attention = attentionOf(work, allSessions, me, allWork);
+  const next = nextActionOf(work, allSessions, me, allWork);
+  const parent = parentOf(work, allWork);
+  const aiPending = aiReviewPending(work.pr);
+  const humans = work.pr?.reviewers.filter((r) => !r.isBot) ?? []; // the AI bot does not count towards approvals
   const nextBusy = useBusy(work.id, next?.busyKey ?? '-');
   const worktreeBusy = useBusy(work.id, 'worktree');
   const prBusy = useBusy(work.id, 'pr');
@@ -280,8 +285,11 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
               <Menu.Item onSelect={() => void syncWithBase(work.id)} disabled={!wt || wt.behind === 0}>
                 <Menu.Prefix><SyncIcon /></Menu.Prefix>Rebase on {wt?.baseBranch ?? 'main'}
               </Menu.Item>
-              <Menu.Item onSelect={() => void createPr(work.id)} disabled={!wt || !!pr}>
-                <Menu.Prefix><CompareIcon /></Menu.Prefix>Create pull request
+              <Menu.Item onSelect={() => openCreatePrDialog(work.id)} disabled={!wt || !!pr}>
+                <Menu.Prefix><CompareIcon /></Menu.Prefix>Create pull request…
+              </Menu.Item>
+              <Menu.Item onSelect={() => void requestAiReview(work.id)} disabled={!pr || pr.state === 'merged' || aiPending}>
+                <Menu.Prefix><AiIcon /></Menu.Prefix>{aiPending ? 'AI review requested' : 'Request AI review'}
               </Menu.Item>
               <Menu.Item onSelect={() => void runPipeline(work.id)} disabled={!wt && !pr}>
                 <Menu.Prefix><RefreshIcon /></Menu.Prefix>Run build
@@ -315,7 +323,11 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
               <>
                 {syncBusy && <span>rebasing…</span>}
                 {wt.ahead > 0 && <span>↑{wt.ahead}</span>}
-                {wt.behind > 0 && <span className="cx-tone-warning">↓{wt.behind}</span>}
+                {wt.behind > 0 && (
+                  <span className="cx-tone-warning" title={`${wt.behind} behind ${wt.baseBranch}`}>
+                    ↓{wt.behind} behind
+                  </span>
+                )}
                 {wt.dirtyFiles > 0 && <span>±{wt.dirtyFiles}</span>}
               </>
             }
@@ -353,11 +365,17 @@ export function WorkCard({ work, selected }: { work: WorkItem; selected: boolean
             <span className={`cx-tone-${PR_LABEL[pr.state].tone}`}>
               {pr.reviewRequested && pr.state === 'open' ? `by ${pr.author.split(' ')[0]} · review requested` : PR_LABEL[pr.state].label}
             </span>
-            {!pr.reviewRequested && pr.state !== 'merged' && pr.reviewers.length > 0 && (
+            {!pr.reviewRequested && pr.state !== 'merged' && humans.length > 0 && (
               <span className="cx-tone-neutral">
-                {' '}· {pr.reviewers.filter((r) => r.state === 'approved').length}/{pr.reviewers.length} approved
+                {' '}· {humans.filter((r) => r.state === 'approved').length}/{humans.length} approved
               </span>
             )}
+            {parent?.pr && pr.state !== 'merged' && (
+              <span className="cx-tone-neutral" title={`Targets ${pr.targetBranch}, the branch of #${parent.pr.number}`}>
+                {' '}· stacked on #{parent.pr.number}{parent.pr.state === 'merged' ? ' (merged)' : ''}
+              </span>
+            )}
+            {aiPending && <span className="cx-tone-primary"> · AI review…</span>}
           </Row>
         ) : (
           prBusy && (

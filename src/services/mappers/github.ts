@@ -1,9 +1,13 @@
 /** `gh` output → domain PullRequest. */
-import type { DiffFile, DiffHunk, PrState, PullRequest, ReviewerState, ReviewThread } from '../../model/types';
-import type { GhPullRequest, GhReviewThread, GhUser } from '../types';
+import type { CheckState, DiffFile, DiffHunk, PrState, PullRequest, RenovatePr, ReviewerState, ReviewThread, UpdateType } from '../../model/types';
+import { config } from '../config';
+import type { GhPrListItem, GhPullRequest, GhReviewThread, GhStatusCheck, GhUser } from '../types';
 
 /** GitHub only reliably gives logins; use the display name when it is there. */
 export const displayName = (user: GhUser) => user.name || user.login;
+
+/** The AI review bot (see config.aiReview). */
+export const isAiBot = (user: GhUser) => user.login === config.aiReview.botLogin;
 
 const LANGUAGES: Record<string, string> = { yml: 'yaml', mjs: 'js', cjs: 'js', kt: 'kotlin', py: 'python' };
 
@@ -114,13 +118,14 @@ export function mapReviewThread(thread: GhReviewThread): ReviewThread {
 export function mapPullRequest(pr: GhPullRequest, diff: string, threads: GhReviewThread[], me: string): PullRequest {
   const author = displayName(pr.author);
   const requested = new Set(pr.reviewRequests.map(displayName));
+  const bots = new Set([...pr.reviewRequests, ...pr.latestReviews.map((r) => r.author)].filter(isAiBot).map(displayName));
   const reviewers = [
     // somebody who reviewed and was then re-requested counts as pending again
     ...pr.latestReviews
       .filter((r) => !requested.has(displayName(r.author)))
       .map((r) => ({ name: displayName(r.author), state: REVIEW_STATE[r.state] ?? ('pending' as ReviewerState) })),
     ...[...requested].map((name) => ({ name, state: 'pending' as ReviewerState })),
-  ];
+  ].map((r) => (bots.has(r.name) ? { ...r, isBot: true } : r));
   return {
     number: pr.number,
     title: pr.title,
@@ -136,3 +141,42 @@ export function mapPullRequest(pr: GhPullRequest, diff: string, threads: GhRevie
     reviewRequested: (author !== me && reviewers.some((r) => r.name === me)) || undefined,
   };
 }
+
+// ---- gh pr list → Renovate PRs ------------------------------------------------
+
+/** Rolls the checks of a PR up into one state: any failure wins, then anything unfinished, else passed. */
+export function rollupChecks(checks: GhStatusCheck[]): CheckState {
+  if (checks.length === 0) return 'none';
+  const state = (c: GhStatusCheck): 'ok' | 'bad' | 'wait' => {
+    if (c.__typename === 'StatusContext') return c.state === 'SUCCESS' ? 'ok' : c.state === 'FAILURE' || c.state === 'ERROR' ? 'bad' : 'wait';
+    if (c.status !== 'COMPLETED') return 'wait';
+    return ['FAILURE', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'].includes(c.conclusion) ? 'bad' : 'ok';
+  };
+  const all = checks.map(state);
+  return all.includes('bad') ? 'failed' : all.includes('wait') ? 'pending' : 'passed';
+}
+
+/**
+ * Renovate says what kind of bump it is in different places depending on the repo's config: a label
+ * (`major` / `minor` / `patch`, optionally `update-…` or `type: …`), else the branch topic
+ * (`renovate/major-react-monorepo`), else a title like "… to v8" (no minor part = major bump).
+ */
+export function updateTypeOf(pr: Pick<GhPrListItem, 'title' | 'headRefName' | 'labels'>): UpdateType {
+  for (const l of pr.labels) {
+    const hit = /\b(major|minor|patch)\b/i.exec(l.name);
+    if (hit) return hit[1].toLowerCase() as UpdateType;
+  }
+  const branch = /^renovate\/(major|minor|patch)-/.exec(pr.headRefName);
+  if (branch) return branch[1] as UpdateType;
+  return /\bto v?\d+$/i.test(pr.title.trim()) ? 'major' : 'unknown';
+}
+
+export const mapRenovatePr = (pr: GhPrListItem): RenovatePr => ({
+  number: pr.number,
+  title: pr.title,
+  branch: pr.headRefName,
+  updateType: updateTypeOf(pr),
+  ci: rollupChecks(pr.statusCheckRollup),
+  approved: pr.reviewDecision === 'APPROVED',
+  updatedAt: pr.updatedAt,
+});

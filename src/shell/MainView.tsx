@@ -82,9 +82,10 @@ function useTabs(work: WorkItem): TabDef[] {
 function WorkHeader({ work, active }: { work: WorkItem; active: WorkTab }) {
   const sessions = useCortex((s) => s.sessions);
   const me = useCortex((s) => s.me);
+  const all = useCortex((s) => s.work);
   const tabs = useTabs(work);
-  const attention = attentionOf(work, sessions, me);
-  const next = nextActionOf(work, sessions, me);
+  const attention = attentionOf(work, sessions, me, all);
+  const next = nextActionOf(work, sessions, me, all);
   const nextBusy = useBusy(work.id, next?.busyKey ?? '-');
 
   return (

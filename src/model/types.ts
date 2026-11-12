@@ -48,7 +48,8 @@ export interface Worktree {
 
 // ---- Claude sessions -------------------------------------------------------
 
-export type AgentKind = 'plan' | 'implement' | 'review' | 'fix-ci' | 'chat';
+/** `renovate` belongs to a project, not to a work item (see AgentSession.projectId). */
+export type AgentKind = 'plan' | 'implement' | 'review' | 'fix-ci' | 'chat' | 'renovate';
 export type SessionStatus = 'running' | 'waiting' | 'done' | 'failed';
 
 export type SessionMessage =
@@ -61,16 +62,51 @@ export type SessionMessage =
       summary: string; // one-liner, e.g. "src/dispatcher/retry.ts"
       detail?: string; // optional output / diff snippet (plain text)
       status: 'running' | 'ok' | 'error';
+      /** AskUserQuestion only: the questions asked, and (once answered) question → answer text */
+      questions?: AskQuestion[];
+      answers?: Record<string, string>;
     };
+
+/** One question of Claude's AskUserQuestion tool. */
+export interface AskQuestion {
+  question: string;
+  header: string;
+  multiSelect: boolean;
+  options: { label: string; description?: string }[];
+}
+
+/** Token / cost figures of a session, accumulated from stream-json usage fields. */
+export interface SessionUsage {
+  /** context window in use: input + cache read + cache creation tokens of the latest assistant message */
+  contextTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** total over all finished turns; 0 until the first turn ends */
+  costUsd: number;
+  /** finished turns (sum of `num_turns` of the results) */
+  turns: number;
+  /** wall time of the last finished turn */
+  lastTurnMs?: number;
+  /** id of the last assistant message counted: repeated events of one message are not added twice */
+  lastMessageId?: string;
+}
 
 export interface AgentSession {
   id: string;
-  /** null = the global, work-independent Cortex chat */
+  /** null = the global Cortex chat, or a project-level session (then `projectId` is set) */
   workId: string | null;
+  /** set for sessions that belong to a project (e.g. the Renovate review), not to a work item */
+  projectId?: string;
   kind: AgentKind;
   title: string;
   status: SessionStatus;
   model: string;
+  /** reasoning effort chosen for the next turn; undefined = the default */
+  effort?: string;
+  /** undefined until the first usage figures arrive */
+  usage?: SessionUsage;
   startedAt: string;
   /** short "what it is doing right now" line shown on the work card */
   activity?: string;
@@ -130,7 +166,8 @@ export interface PullRequest {
   sourceBranch: string;
   targetBranch: string;
   descriptionMd: string;
-  reviewers: { name: string; state: ReviewerState }[];
+  /** `isBot`: the AI reviewer (`config.aiReview.botLogin`) */
+  reviewers: { name: string; state: ReviewerState; isBot?: boolean }[];
   files: DiffFile[];
   threads: ReviewThread[];
   updatedAt: string;
@@ -191,6 +228,79 @@ export interface WorkItem {
   app: AppInstance;
   updatedAt: string;
 }
+
+/** Form values of the "Create pull request" dialog. */
+export interface CreatePrInput {
+  title: string;
+  body: string;
+  /** target branch; another work item's branch makes this a stacked PR */
+  base: string;
+  draft: boolean;
+  /** GitHub logins */
+  reviewers: string[];
+}
+
+// ---- Project-level data (not board work) -----------------------------------
+
+export type UpdateType = 'patch' | 'minor' | 'major' | 'unknown';
+export type CheckState = 'passed' | 'failed' | 'pending' | 'none';
+
+/** An open dependency-update PR of the Renovate bot, as the project page lists it. */
+export interface RenovatePr {
+  number: number;
+  title: string;
+  branch: string;
+  updateType: UpdateType;
+  /** rolled-up state of all checks */
+  ci: CheckState;
+  approved: boolean;
+  updatedAt: string;
+}
+
+// ---- Notifications ---------------------------------------------------------
+
+export type NotificationKind =
+  | 'build-failed'
+  | 'build-fixed'
+  | 'pr-approved'
+  | 'changes-requested'
+  | 'review-comments'
+  | 'pr-merged'
+  | 'review-requested'
+  | 'claude-asks'
+  | 'claude-done'
+  | 'claude-failed'
+  | 'renovate-done';
+
+export type NotificationTone = 'neutral' | 'primary' | 'success' | 'warning' | 'critical';
+
+/** Where a notification leads: a work item tab (+ session), or a project tab. */
+export interface NotificationTarget {
+  workId?: string;
+  tab?: WorkTab;
+  sessionId?: string;
+  projectId?: string;
+  projectTab?: ProjectTab;
+}
+
+/** What detection produces (see state/notify.ts); the store adds id, time and read flag. */
+export interface Notice extends NotificationTarget {
+  kind: NotificationKind;
+  tone: NotificationTone;
+  title: string;
+  detail?: string;
+  /** the work item or project it belongs to, e.g. "CTX-1423" */
+  subject?: string;
+}
+
+export interface CortexNotification extends Notice {
+  id: string;
+  at: string;
+  read: boolean;
+}
+
+/** Dialog that is open on top of the shell (kept in the store so any entry point can open it). */
+export type Dialog = { kind: 'create-pr'; workId: string };
 
 /** Tabs of the main view when a work item is selected. */
 export type WorkTab = 'ticket' | 'agents' | 'review' | 'pipeline' | 'preview';
@@ -312,7 +422,12 @@ export interface CortexState {
   projects: Project[];
   /** skills / slash commands for the composer autocomplete */
   skills: Skill[];
+  /** newest first, capped; persisted in localStorage */
+  notifications: CortexNotification[];
+  /** open Renovate PRs per project id; missing = not loaded yet */
+  renovate: Record<string, RenovatePr[]>;
   view: ViewState;
+  dialog: Dialog | null;
   /** in-flight quick actions, keyed `${workId}:${action}` (see isBusy in the store) */
   busy: Record<string, boolean>;
 }

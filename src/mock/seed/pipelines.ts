@@ -494,6 +494,19 @@ export const pipelines: Record<string, Pipeline> = {
     'ingest-gateway',
     3,
   ),
+  'CTX-1450': seedPipeline(
+    {
+      job: 'ingest-gateway/PR-493',
+      buildNumber: 2,
+      status: 'passed',
+      branch: 'feature/CTX-1450-persist-retry-state',
+      commit: '5c1d0e7',
+      triggeredBy: 'Sven Weber',
+      startedAt: '2026-11-11T09:06:00Z',
+      history: [{ buildNumber: 1, status: 'passed', durationSec: 405 }],
+    },
+    'ingest-gateway',
+  ),
   'CTX-1398': seedPipeline(
     {
       job: 'ingest-gateway/PR-476',

@@ -4,7 +4,8 @@
  */
 import type { DiffFile, Pipeline, PullRequest, SessionMessage, Ticket } from '../../model/types';
 import { config } from '../config';
-import type { ClaudeEvent, GhPullRequest, GhReviewThread, GhUser, JenkinsBuild, JenkinsStatus, JiraIssue } from '../types';
+import { renovateBranch, renovateTitle, type RenovateSeed } from '../../mock/seed/renovate';
+import type { ClaudeEvent, GhPrListItem, GhPullRequest, GhReviewThread, GhStatusCheck, GhUser, JenkinsBuild, JenkinsStatus, JiraIssue } from '../types';
 
 // ---- Jira ----------------------------------------------------------------------
 
@@ -40,7 +41,9 @@ export function toJiraIssue(t: Ticket): JiraIssue {
 
 // ---- GitHub --------------------------------------------------------------------
 
-export const toGhUser = (name: string): GhUser => ({ login: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name });
+export const toGhUser = (name: string): GhUser =>
+  // bots only have a login, no display name
+  name === config.aiReview.botLogin ? { login: name } : { login: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name };
 
 export function toGhPullRequest(repo: string, pr: PullRequest): GhPullRequest {
   return {
@@ -64,6 +67,29 @@ export function toGhPullRequest(repo: string, pr: PullRequest): GhPullRequest {
     additions: pr.files.reduce((n, f) => n + f.additions, 0),
     deletions: pr.files.reduce((n, f) => n + f.deletions, 0),
     updatedAt: pr.updatedAt,
+  };
+}
+
+const CHECK_NAMES = ['Build / Jenkins', 'Lint', 'Unit tests'];
+
+/** An open Renovate PR as `gh pr list --json …` prints it (the checks as `statusCheckRollup` entries). */
+export function toGhPrListItem(p: RenovateSeed): GhPrListItem {
+  const done = (name: string, conclusion: 'SUCCESS' | 'FAILURE'): GhStatusCheck => ({ __typename: 'CheckRun', name, status: 'COMPLETED', conclusion });
+  const checks: GhStatusCheck[] =
+    p.ci === 'passed'
+      ? CHECK_NAMES.map((n) => done(n, 'SUCCESS'))
+      : p.ci === 'failed'
+        ? [done(CHECK_NAMES[0], 'FAILURE'), done(CHECK_NAMES[1], 'SUCCESS')]
+        : [{ __typename: 'CheckRun', name: CHECK_NAMES[0], status: 'IN_PROGRESS', conclusion: '' }, done(CHECK_NAMES[1], 'SUCCESS')];
+  return {
+    number: p.number,
+    title: renovateTitle(p),
+    headRefName: renovateBranch(p),
+    author: { login: config.renovate.author, name: 'Renovate', is_bot: true },
+    labels: [{ name: 'dependencies' }, { name: p.updateType }],
+    updatedAt: new Date(Date.now() - p.hoursAgo * 3600_000).toISOString(),
+    statusCheckRollup: checks,
+    reviewDecision: '',
   };
 }
 
@@ -158,6 +184,13 @@ function toolInput(tool: string, summary: string): Record<string, unknown> {
   }
 }
 
+/** The tool_result text Claude Code gives back for an answered AskUserQuestion (verify the wording against real output). */
+export function askResultContent(answers: Record<string, string | string[]>): string {
+  const q = (s: string) => s.replace(/"/g, '\\"');
+  const pairs = Object.entries(answers).map(([k, v]) => `"${q(k)}"="${q(Array.isArray(v) ? v.join(', ') : v)}"`);
+  return `User has answered your questions: ${pairs.join(', ')}. You can now continue with the user's answers in mind.`;
+}
+
 /** One domain message → the stream-json event(s) that would have produced it. */
 export function toClaudeEvents(sessionId: string, msg: SessionMessage, at?: string): ClaudeEvent[] {
   const base = { session_id: sessionId, timestamp: at };
@@ -166,14 +199,16 @@ export function toClaudeEvents(sessionId: string, msg: SessionMessage, at?: stri
       ? [{ ...base, type: 'user', message: { content: msg.text } }]
       : [{ ...base, type: 'assistant', message: { content: [{ type: 'text', text: msg.text }] } }];
   }
+  const input = msg.questions ? { questions: msg.questions } : toolInput(msg.tool, msg.summary);
   const events: ClaudeEvent[] = [
-    { ...base, type: 'assistant', message: { content: [{ type: 'tool_use', id: msg.id, name: msg.tool, input: toolInput(msg.tool, msg.summary) }] } },
+    { ...base, type: 'assistant', message: { content: [{ type: 'tool_use', id: msg.id, name: msg.tool, input }] } },
   ];
   if (msg.status !== 'running') {
+    const content = msg.questions ? (msg.answers ? askResultContent(msg.answers) : 'The user did not answer.') : (msg.detail ?? '');
     events.push({
       ...base,
       type: 'user',
-      message: { content: [{ type: 'tool_result', tool_use_id: msg.id, content: msg.detail ?? '', is_error: msg.status === 'error' || undefined }] },
+      message: { content: [{ type: 'tool_result', tool_use_id: msg.id, content, is_error: msg.status === 'error' || undefined }] },
     });
   }
   return events;

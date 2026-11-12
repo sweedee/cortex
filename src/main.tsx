@@ -5,12 +5,15 @@ import { App } from './shell/App';
 import { initRouter, syncHash } from './state/router';
 import { subscribe } from './state/store';
 import { boot } from './state/sync';
+import { initNotifications } from './state/notifications';
 import { initProjects } from './state/projects';
 import { initTodos } from './state/todos';
 import { initToolbox } from './state/toolbox';
 import './index.css';
+import './animations.css';
 
 initTodos();
+initNotifications();
 initToolbox();
 initProjects();
 

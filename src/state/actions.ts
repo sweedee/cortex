@@ -3,14 +3,17 @@
  * src/services. An action is: call a service → `refreshWork` the affected parts.
  * Long-running things (agents, builds, app start-up) are followed by state/sync.ts.
  */
-import type { AgentKind, AgentSession, SessionMessage, Ticket, TicketStatus, WorkItem, WorkTab } from '../model/types';
+import type { AgentKind, AgentSession, CreatePrInput, SessionMessage, Ticket, TicketStatus, WorkItem, WorkTab } from '../model/types';
 import { services } from '../services';
 import { config } from '../services/config';
-import { AGENT_TITLES, promptFor } from '../services/prompts';
+import { AGENT_TITLES, promptFor, renovatePrompt } from '../services/prompts';
 import type { SessionRef, WorkRef } from '../services/types';
-import { projectForLabels } from './projects';
+import { markNotificationRead, muteNotifications } from './notifications';
+import { openProjects, projectForLabels } from './projects';
 import { getState, patchSession, patchWork, setBusy, setState } from './store';
-import { blankSession, refreshWork, startedSessions, updateWorkspace } from './sync';
+import { blankSession, claudeChoice, projectBase, refreshRenovate, refreshWork, saveClaudeChoice, startedSessions, updateWorkspace } from './sync';
+import { needsInput, openQuestion } from '../model/session';
+import type { ClaudeAnswers } from '../services/types';
 
 const now = () => new Date().toISOString();
 const findWork = (id: string) => getState().work.find((w) => w.id === id);
@@ -142,8 +145,9 @@ export function syncWithBase(workId: string) {
   return busy(workId, 'sync', async () => {
     const wt = findWork(workId)?.worktree;
     if (!wt) return;
+    // wt.baseBranch is the parent's branch for stacked work. The rebase is pushed, which starts a new build.
     await services.git.rebase(wt.path, wt.baseBranch);
-    await refreshWork(workId, ['git']);
+    await refreshWork(workId, ['git', 'ci']);
   });
 }
 
@@ -159,8 +163,22 @@ function appendUserMessage(sessionId: string, text: string) {
 /** Starts the Claude process of a session with its first prompt. */
 function startClaude(session: AgentSession, prompt: string) {
   startedSessions.add(session.id);
-  const cwd = session.workId ? findWork(session.workId)?.worktree?.path : undefined;
-  void services.claude.start({ sessionId: session.id, cwd, prompt, kind: session.kind, workId: session.workId });
+  // a work session runs in its worktree, a project session in the project's main checkout, the global chat nowhere in particular
+  const cwd = session.workId ? findWork(session.workId)?.worktree?.path : session.projectId ? getState().projects.find((p) => p.id === session.projectId)?.localPath : undefined;
+  void services.claude.start({ sessionId: session.id, cwd, prompt, kind: session.kind, workId: session.workId, projectId: session.projectId, model: session.model, effort: session.effort });
+}
+
+/** Model / effort for the next turn of a session; also the default for sessions started later. */
+export function setSessionOptions(sessionId: string, options: { model?: string; effort?: string }) {
+  const session = getState().sessions.find((x) => x.id === sessionId);
+  if (!session || session.status === 'running') return;
+  patchSession(sessionId, () => options);
+  saveClaudeChoice({ model: options.model ?? session.model, effort: options.effort ?? session.effort ?? claudeChoice().effort });
+}
+
+/** Answers Claude's open AskUserQuestion; the answer comes back as the tool result (see state/sync.ts). */
+export function answerQuestion(sessionId: string, toolUseId: string, answers: ClaudeAnswers) {
+  return services.claude.answerQuestion(sessionId, toolUseId, answers);
 }
 
 /**
@@ -198,8 +216,15 @@ export function stopSession(sessionId: string) {
 export async function sendMessage(sessionId: string, text: string) {
   const session = getState().sessions.find((x) => x.id === sessionId);
   if (!session || !text.trim()) return;
+  // while a question is open, a typed message is the answer (to the first question; the rest are skipped)
+  const open = openQuestion(session.messages);
+  if (open?.questions) {
+    const [first, ...rest] = open.questions;
+    await answerQuestion(sessionId, open.id, { [first.question]: text.trim(), ...Object.fromEntries(rest.map((q) => [q.question, '(skipped)'])) });
+    return;
+  }
   appendUserMessage(sessionId, text);
-  if (startedSessions.has(sessionId)) await services.claude.send(sessionId, text);
+  if (startedSessions.has(sessionId)) await services.claude.send(sessionId, text, { model: session.model, effort: session.effort });
   else startClaude(session, text);
 }
 
@@ -211,15 +236,45 @@ function prOf(workId: string) {
   return w?.pr ? { work: w, repo: w.repo, number: w.pr.number, pr: w.pr } : undefined;
 }
 
-export function createPr(workId: string) {
+export const openCreatePrDialog = (workId: string) => setState((s) => ({ ...s, dialog: { kind: 'create-pr', workId } }));
+export const closeDialog = () => setState((s) => ({ ...s, dialog: null }));
+
+/** Opens a PR for the work's branch with the values of the create dialog. A base other than the default makes it a stacked PR. */
+export function createPr(workId: string, input: CreatePrInput) {
   return busy(workId, 'pr', async () => {
     const w = findWork(workId);
     if (!w?.worktree || w.pr) return;
-    const title = w.ticket ? `${w.ticket.key} ${w.ticket.summary}` : w.title;
-    const body = w.ticket ? `Implements ${w.ticket.key}.\n\n${w.planMd ? '## Approach\n\nSee the implementation plan in Cortex.\n' : ''}` : '';
-    await services.github.createPullRequest(w.repo, { head: w.worktree.branch, base: w.worktree.baseBranch, title, body, draft: true });
+    const { title, body, base, draft, reviewers } = input;
+    await services.github.createPullRequest(w.repo, { head: w.worktree.branch, base, title: title.trim(), body, draft, reviewers: reviewers.length ? reviewers : undefined });
+    // from now on the worktree is compared with (and rebased onto) the branch it was opened against
+    const stacked = base !== projectBase(w.repo);
+    updateWorkspace((ws) => ({ ...ws, work: ws.work.map((r) => (r.id === workId ? { ...r, baseBranch: stacked ? base : undefined } : r)) }));
     if (w.ticket && w.ticket.status !== 'Done') await services.jira.transition(w.ticket.key, 'In Review');
-    await refreshWork(workId, ['pr', 'ci', 'ticket']);
+    await refreshWork(workId, ['git', 'pr', 'ci', 'ticket']);
+  });
+}
+
+/** Points a stacked PR at the default branch once its parent PR is merged (merging does not retarget it). */
+export function retargetPr(workId: string) {
+  return busy(workId, 'retarget', async () => {
+    const t = prOf(workId);
+    if (!t) return;
+    await services.github.setBase(t.repo, t.number, projectBase(t.repo));
+    updateWorkspace((ws) => ({ ...ws, work: ws.work.map((r) => (r.id === workId ? { ...r, baseBranch: undefined } : r)) }));
+    await refreshWork(workId, ['git', 'pr']);
+  });
+}
+
+/**
+ * Posts the AI-review trigger comment. The bot answers some seconds later; the PR shows it as a pending
+ * reviewer meanwhile and sync.ts keeps polling until its review arrives.
+ */
+export function requestAiReview(workId: string) {
+  return busy(workId, 'ai-review', async () => {
+    const t = prOf(workId);
+    if (!t) return;
+    await services.github.requestAiReview(t.repo, t.number);
+    await refreshWork(workId, ['pr']);
   });
 }
 
@@ -234,6 +289,7 @@ export function mergePr(workId: string) {
   return busy(workId, 'merge', async () => {
     const t = prOf(workId);
     if (!t) return;
+    muteNotifications(workId, ['pr-merged']); // I merged it, no need to tell me
     await services.github.merge(t.repo, t.number);
     if (t.work.ticket) await services.jira.transition(t.work.ticket.key, 'Done');
     await refreshWork(workId, ['pr', 'ticket']);
@@ -279,6 +335,7 @@ export function submitReview(workId: string, verdict: 'approve' | 'request-chang
   return busy(workId, 'review', async () => {
     const t = prOf(workId);
     if (!t) return;
+    muteNotifications(workId, ['pr-approved', 'changes-requested', 'review-comments']);
     const event = verdict === 'approve' ? 'APPROVE' : verdict === 'request-changes' ? 'REQUEST_CHANGES' : 'COMMENT';
     await services.github.submitReview(t.repo, t.number, event);
     await refreshWork(workId, ['pr']);
@@ -311,4 +368,39 @@ export function launchApp(workId: string, navigate = true) {
 export async function stopApp(workId: string) {
   await services.devServer.stop(workId);
   await refreshWork(workId, ['app']);
+}
+
+// ---- Renovate review (project level) ---------------------------------------
+
+/** Loads the project's open Renovate PRs (call when the project page opens). */
+export const loadRenovatePrs = (projectId: string) => refreshRenovate(projectId).catch(() => undefined);
+
+/**
+ * Starts the Renovate review agent for a project and returns its session id. It lives on the project page,
+ * not on the board; when it ends, sync.ts refreshes the PR list and notifies.
+ */
+export function reviewRenovatePrs(projectId: string): string | undefined {
+  const project = getState().projects.find((p) => p.id === projectId);
+  if (!project || getState().sessions.some((s) => s.projectId === projectId && (s.status === 'running' || needsInput(s)))) return;
+  const ref: SessionRef = { id: newId(), workId: null, projectId, kind: 'renovate', title: `${AGENT_TITLES.renovate} · ${project.name}`, startedAt: now() };
+  const session: AgentSession = { ...blankSession(ref), status: 'running', activity: 'Starting…' };
+  updateWorkspace((w) => ({ ...w, sessions: [...w.sessions, ref] }));
+  setState((s) => ({ ...s, sessions: [...s.sessions, session] }));
+  // the transcript shows the gist of the prompt, not the whole briefing
+  const prompt = renovatePrompt(project);
+  appendUserMessage(session.id, prompt.split('\n\n')[0]);
+  startClaude(session, prompt);
+  return session.id;
+}
+
+// ---- notifications ----------------------------------------------------------
+
+/** Goes to what a notification is about and marks it read. */
+export function openNotification(id: string) {
+  const n = getState().notifications.find((x) => x.id === id);
+  if (!n) return;
+  markNotificationRead(id);
+  if (n.workId) selectWork(n.workId, n.tab, n.sessionId);
+  else if (n.projectId) openProjects(n.projectId, n.projectTab);
+  else selectWork(null); // the "Ask Cortex" chat
 }

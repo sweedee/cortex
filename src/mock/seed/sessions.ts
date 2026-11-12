@@ -1,5 +1,5 @@
 import { GLOBAL_SESSION_ID } from '../../services/config';
-import type { AgentKind, AgentSession, SessionMessage, WorkItem } from '../../model/types';
+import type { AgentKind, AgentSession, AskQuestion, SessionMessage, WorkItem } from '../../model/types';
 
 export const MODEL = 'claude-opus-5-5';
 
@@ -25,6 +25,16 @@ const tool = (
   summary,
   detail: Array.isArray(detail) ? detail.join('\n') : detail,
   status,
+});
+
+/** An AskUserQuestion tool call; `answers` (question → answer text) makes it an answered one. */
+const ask = (questions: AskQuestion[], answers?: Record<string, string>): Draft => ({
+  role: 'tool',
+  tool: 'AskUserQuestion',
+  summary: questions[0].question,
+  questions,
+  answers,
+  status: answers ? 'ok' : 'running',
 });
 
 /** Turns drafts into messages with ids and believable, slightly irregular timestamps. */
@@ -386,6 +396,20 @@ const s1431plan = transcript('s-1431-plan', '2026-11-11T08:20:00Z', [
   say(
     'Second cause confirmed: a new query key means `data` is `undefined` until the request resolves, and `Tile.tsx` renders the skeleton whenever `isLoading` is true. The timeframe-in-key trick came in with CTX-1377 to reset chart zoom — that intent needs to survive the fix.',
   ),
+  ask(
+    [
+      {
+        question: 'How should the zoom reset from CTX-1377 be kept?',
+        header: 'Zoom reset',
+        multiSelect: false,
+        options: [
+          { label: 'Reset via an explicit zoom key', description: 'Tiles stay mounted; only the chart zoom state is reset on a timeframe change.' },
+          { label: 'Drop the zoom reset', description: 'Simplest, but zoomed charts keep their zoom after the timeframe changes.' },
+        ],
+      },
+    ],
+    { 'How should the zoom reset from CTX-1377 be kept?': 'Reset via an explicit zoom key' },
+  ),
   tool('Read', 'src/dashboard/TileGrid.test.tsx'),
   tool('Write', '.cortex/plans/CTX-1431.md', 'Plan saved (38 lines) and attached to the work item.'),
   say(PLAN_1431),
@@ -607,7 +631,51 @@ export type ScriptStep = {
   /** shown on the work card while this step is the latest one */
   activity: string;
   message: DistributiveOmit<SessionMessage, 'id' | 'at'>;
+  /** AskUserQuestion: the run pauses here until the user answers (`message` is then only a placeholder) */
+  ask?: AskQuestion[];
+  /** step is only played if this holds for the answers given so far (question text → answer text) */
+  when?: (answers: Record<string, string>) => boolean;
+  /** what the step changes in the mock world once it was played (e.g. a PR gets merged) */
+  effect?: () => void;
+  /** assistant message whose text depends on the answers given (replaces `message.text`) */
+  text?: (answers: Record<string, string>) => string;
 };
+
+export type Answers = Record<string, string>;
+
+export const APPROACH_Q = 'Which approach should the plan take?';
+export const EXTRAS_Q = 'Which extras should the plan include?';
+
+const APPROACH_QUESTIONS: AskQuestion[] = [
+  {
+    question: APPROACH_Q,
+    header: 'Approach',
+    multiSelect: false,
+    options: [
+      { label: 'Reuse the existing pattern', description: 'Follow the shared components and hooks other pages already use: less code, consistent behaviour.' },
+      { label: 'Build it standalone', description: 'A dedicated implementation for this case: more code, but no coupling to the shared pieces.' },
+    ],
+  },
+  {
+    question: EXTRAS_Q,
+    header: 'Extras',
+    multiSelect: true,
+    options: [
+      { label: 'Edge-case tests first', description: 'Write the missing tests before touching the code.' },
+      { label: 'Feature flag', description: 'Roll the change out behind a flag.' },
+      { label: 'Migration notes', description: 'A short note for teams that depend on the old behaviour.' },
+    ],
+  },
+];
+
+const reuses = (a: Answers) => !(a[APPROACH_Q] ?? '').startsWith('Build');
+const wants = (a: Answers, extra: string) => (a[EXTRAS_Q] ?? '').includes(extra);
+
+/** What the user decided, appended to the plan so the answer visibly changes the result. */
+export function decisionsMd(a: Answers): string {
+  if (!a[APPROACH_Q] && !a[EXTRAS_Q]) return '';
+  return md('', '', '## Decisions', '', `- **Approach:** ${a[APPROACH_Q] ?? 'not decided'}`, `- **Extras:** ${a[EXTRAS_Q] || 'none'}`);
+}
 
 /** Where the code for a work item plausibly lives — keeps scripts and plans concrete. */
 interface CodeProfile {
@@ -746,13 +814,40 @@ function planScript(work: WorkItem): ScriptStep[] {
     {
       activity: 'Weighing options',
       message: say(
-        'There is an established pattern for this elsewhere in the repo, so the plan can reuse it instead of inventing a new one. Existing tests cover the happy path only — the plan adds the missing edge cases first so the refactoring has a safety net.',
+        'There is an established pattern for this elsewhere in the repo, but reusing it is a judgement call. Existing tests cover the happy path only. Two decisions are yours before I write this up.',
       ),
+    },
+    { activity: 'Has a question for you', message: tool('AskUserQuestion', APPROACH_Q, undefined, 'running'), ask: APPROACH_QUESTIONS },
+    {
+      activity: 'Checking the shared pattern',
+      when: reuses,
+      message: say('Reusing the existing pattern then. Checking its other call sites so the plan does not break them.'),
+    },
+    {
+      activity: 'Checking the shared pattern',
+      when: reuses,
+      message: tool('Grep', '"useSettingsForm|FormActions" in src/', ['src/profile/ProfilePage.tsx:12:  const form = useSettingsForm(schema);', 'src/tokens/TokenPage.tsx:9:  const form = useSettingsForm(schema);', '… 4 more matches in 3 files']),
+    },
+    {
+      activity: 'Sketching a standalone design',
+      when: (a) => !reuses(a),
+      message: say(`Going standalone then. That means owning the state handling in \`${p.main}\` and not touching the shared pieces; the plan keeps the new code in one module so it can be folded into the shared pattern later.`),
+    },
+    {
+      activity: 'Sketching a standalone design',
+      when: (a) => !reuses(a),
+      message: tool('Read', p.second),
+    },
+    {
+      activity: 'Adding a rollout step',
+      when: (a) => wants(a, 'Feature flag'),
+      message: say('You asked for a feature flag, so the plan gets a rollout step with the flag off by default.'),
     },
     {
       activity: 'Writing the plan',
       message: tool('Write', planPathOf(work), 'Plan saved and attached to the work item.'),
     },
+    // the final text gets the decisions appended by the simulator (see runAgent)
     { activity: 'Plan ready', message: say(planFor(work)) },
   ];
 }
@@ -1309,6 +1404,37 @@ function workReply(topic: Topic, text: string, work: WorkItem): string {
         '- **Fix CI** — reads the failing build and pushes a fix',
       );
   }
+}
+
+// ---- "Ask Cortex" asks back --------------------------------------------------------
+
+/** A global-chat message matching this makes the mock ask a question first (so AskUserQuestion can be tried without an agent). */
+export const CHOICE_TRIGGER = /\b(choose|decide|pick|prioriti[sz]e)\b/i;
+
+export const FOCUS_Q = 'What should we look at first?';
+
+export const FOCUS_QUESTIONS: AskQuestion[] = [
+  {
+    question: FOCUS_Q,
+    header: 'Focus',
+    multiSelect: false,
+    options: [
+      { label: 'The red build on CTX-1423', description: 'Integration stage fails: a test still expects a single delivery attempt.' },
+      { label: 'PR #482 review', description: 'Requested this morning, nothing blocks it but you.' },
+      { label: 'The flaky checkout e2e', description: 'Waiting for a decision: quarantine or fix the race.' },
+    ],
+  },
+];
+
+/** Reply once the user picked something (free text from "Other…" is answered generically). */
+export function focusReply(answer: string): string {
+  if (answer.startsWith('The red build'))
+    return 'Good call: it blocks the PR and the fix is small. Open **CTX-1423** and launch **Fix CI**; the failing test only needs to expect the retried deliveries.';
+  if (answer.startsWith('PR #482'))
+    return 'Then start with **#482**. It is a small change to the cache eviction path; the two things to check are the tenant key and the eviction test.';
+  if (answer.startsWith('The flaky'))
+    return 'I would fix it rather than quarantine it: the race in `PromoCodeField.tsx` is a real product bug. Open the **Investigate flaky checkout e2e** work and launch an **Implement** agent.';
+  return `Understood: **${answer}**. Tell me which work item it concerns and I will pull together what I know.`;
 }
 
 /** Assistant reply to a free-form user message. `work` is null in the global chat. */

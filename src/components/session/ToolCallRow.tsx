@@ -3,7 +3,7 @@ import { Text } from '@dynatrace/strato-components/typography';
 import Colors from '@dynatrace/strato-design-tokens/colors';
 import { CheckmarkIcon, ChevronDownIcon, ChevronRightIcon, CriticalIcon } from '@dynatrace/strato-icons';
 import type { SessionMessage } from '../../model/types';
-import { clock, subduedText } from './meta';
+import { clock, isFresh, subduedText } from './meta';
 
 type ToolMsg = Extract<SessionMessage, { role: 'tool' }>;
 
@@ -17,7 +17,7 @@ export function ToolCallRow({ msg }: { msg: ToolMsg }) {
   const [open, setOpen] = useState(false);
   const expandable = !!msg.detail;
   return (
-    <div className="cx-tool">
+    <div className="cx-tool" data-fresh={isFresh(msg.at)}>
       <button
         type="button"
         className="cx-btn cx-tool-row"

@@ -82,6 +82,8 @@ export interface GhUser {
   login: string;
   /** present on `author` in `gh pr view`; often missing elsewhere */
   name?: string;
+  /** `gh` marks bot accounts (GitHub Apps such as Renovate: login `app/renovate`) */
+  is_bot?: boolean;
 }
 
 /** `gh pr view <n> --json <GH_PR_FIELDS>` */
@@ -108,6 +110,38 @@ export interface GhPullRequest {
 /** The `--json` field list that produces a GhPullRequest. */
 export const GH_PR_FIELDS =
   'number,title,state,isDraft,body,url,author,headRefName,baseRefName,reviewDecision,reviewRequests,latestReviews,additions,deletions,updatedAt';
+
+/**
+ * One entry of `statusCheckRollup`: a check run (GitHub Actions, Jenkins via the Checks API) or a
+ * commit status (older integrations). Fields as `gh ... --json statusCheckRollup` prints them (verify).
+ */
+export type GhStatusCheck =
+  | {
+      __typename: 'CheckRun';
+      name: string;
+      status: 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'WAITING' | 'PENDING';
+      /** empty until COMPLETED */
+      conclusion: 'SUCCESS' | 'FAILURE' | 'NEUTRAL' | 'CANCELLED' | 'SKIPPED' | 'TIMED_OUT' | 'ACTION_REQUIRED' | 'STALE' | 'STARTUP_FAILURE' | '';
+      detailsUrl?: string;
+      startedAt?: string;
+      completedAt?: string;
+    }
+  | { __typename: 'StatusContext'; context: string; state: 'SUCCESS' | 'FAILURE' | 'ERROR' | 'PENDING' | 'EXPECTED'; targetUrl?: string; startedAt?: string };
+
+/** One entry of `gh pr list --json <GH_PR_LIST_FIELDS>`. */
+export interface GhPrListItem {
+  number: number;
+  title: string;
+  headRefName: string;
+  author: GhUser;
+  labels: { name: string; color?: string }[];
+  updatedAt: string;
+  statusCheckRollup: GhStatusCheck[];
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | '';
+}
+
+/** The `--json` field list that produces a GhPrListItem. */
+export const GH_PR_LIST_FIELDS = 'number,title,headRefName,author,labels,updatedAt,statusCheckRollup,reviewDecision';
 
 /**
  * One review thread. Not available through `gh pr view`; use
@@ -141,17 +175,38 @@ export interface GitHubService {
   whoami(): Promise<GhUser>;
   /** `gh pr list --repo <repo> --head <branch> --state all --json number --limit 1` */
   findPullRequest(repo: string, branch: string): Promise<number | undefined>;
+  /**
+   * `gh pr list --repo <repo> [--author "<filter.author>"] --state <filter.state> --limit <filter.limit> --json <GH_PR_LIST_FIELDS>`.
+   * Cortex uses it for the Renovate list: `{ author: config.renovate.author, state: 'open' }`
+   * (the bot's login is `app/renovate`; `--author` accepts that form for GitHub Apps - verify).
+   * Merged or closed PRs are simply absent from an `open` listing, which is how the list shrinks.
+   */
+  listPullRequests(repo: string, filter: { author?: string; state: 'open' | 'closed' | 'merged' | 'all'; limit?: number }): Promise<GhPrListItem[]>;
   /** `gh pr view <n> --repo <repo> --json <GH_PR_FIELDS>` */
   getPullRequest(repo: string, number: number): Promise<GhPullRequest>;
   /** `gh pr diff <n> --repo <repo>` — raw unified diff text */
   getDiff(repo: string, number: number): Promise<string>;
   /** `gh api graphql` → reviewThreads */
   getReviewThreads(repo: string, number: number): Promise<GhReviewThread[]>;
-  /** `gh pr create --repo <repo> --head <head> --base <base> --title … --body … [--draft]`, returns the PR number */
-  createPullRequest(repo: string, pr: { head: string; base: string; title: string; body: string; draft: boolean }): Promise<number>;
+  /**
+   * `gh pr create --repo <repo> --head <head> --base <base> --title … --body … [--draft] [--reviewer <login>]…`,
+   * returns the PR number. `base` may be another PR's head branch (stacked PR).
+   */
+  createPullRequest(
+    repo: string,
+    pr: { head: string; base: string; title: string; body: string; draft: boolean; reviewers?: string[] },
+  ): Promise<number>;
+  /** `gh pr edit <n> --repo <repo> --base <base>` — retargets the PR, e.g. onto the default branch once its parent PR is merged */
+  setBase(repo: string, number: number, base: string): Promise<void>;
+  /**
+   * Asks the AI reviewer bot for a review: `gh pr comment <n> --repo <repo> --body "<config.aiReview.triggerComment>"`.
+   * The bot (`config.aiReview.botLogin`) listens for that comment and posts a review some time later, so this
+   * returns right away; the review shows up in `getPullRequest` / `getReviewThreads` on a later poll.
+   */
+  requestAiReview(repo: string, number: number): Promise<void>;
   /** `gh pr ready <n>` */
   markReady(repo: string, number: number): Promise<void>;
-  /** `gh pr merge <n> --squash --delete-branch` */
+  /** `gh pr merge <n> --squash --delete-branch` (does not retarget PRs stacked on the deleted branch — see `setBase`) */
   merge(repo: string, number: number): Promise<void>;
   /**
    * Adds a review comment (new thread or reply). With `pending: true` it goes into my pending
@@ -241,7 +296,11 @@ export interface GitService {
   addWorktree(repo: string, worktree: { path: string; branch: string; base: string }): Promise<GitWorktree>;
   /** see GitStatus */
   status(path: string, base: string): Promise<GitStatus>;
-  /** `git -C <path> fetch origin && git -C <path> rebase origin/<base>` */
+  /**
+   * `git -C <path> fetch origin && git -C <path> rebase origin/<base> && git -C <path> push --force-with-lease`.
+   * `base` is the parent branch for stacked work. A rebase of a pushed branch rewrites history, so it is pushed
+   * again — which makes CI build the PR anew.
+   */
   rebase(path: string, base: string): Promise<void>;
 }
 
@@ -255,40 +314,109 @@ export type ClaudeContentBlock =
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
 
+/** Token counts of one API call, as `message.usage` of an assistant event (real stream-json field names). */
+export interface ClaudeUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+
+/**
+ * Input of the `AskUserQuestion` tool (a `tool_use` block with that name). 1-4 questions, each with
+ * 2-4 options; the UI always adds an "Other..." free-text choice itself (the real tool does too).
+ */
+export interface AskUserQuestionInput {
+  questions: {
+    question: string;
+    /** very short label shown as a chip, e.g. "Approach" */
+    header: string;
+    multiSelect: boolean;
+    options: { label: string; description?: string }[];
+  }[];
+}
+
 /**
  * One line of stream-json output (subset Cortex uses). `timestamp` is not part of the CLI
  * output — the bridge should stamp events on arrival (session transcripts on disk do have it).
  */
 export type ClaudeEvent = { timestamp?: string } & (
+  /** emitted at the start of every invocation (`start` and every `send`), so `model` follows `--model` changes */
   | { type: 'system'; subtype: 'init'; session_id: string; model: string; cwd?: string }
-  /** an assistant turn: text and/or tool calls */
-  | { type: 'assistant'; session_id: string; message: { content: ClaudeContentBlock[] } }
+  /**
+   * an assistant turn: text and/or tool calls. `usage` is that API call's token count; the context
+   * window is full to `input + cache_read + cache_creation` of the latest one. The CLI may emit one
+   * event per content block with the same `message.id` and repeated usage - hence `id` (the reducer
+   * does not add the same id twice; verify against real output).
+   */
+  | { type: 'assistant'; session_id: string; message: { id?: string; content: ClaudeContentBlock[]; usage?: ClaudeUsage } }
   /** tool results — and, in stored transcripts only, the user's own prompts (string content) */
   | { type: 'user'; session_id: string; message: { content: ClaudeContentBlock[] | string } }
   /** partial text while the assistant is typing (`--include-partial-messages`) */
   | { type: 'stream_event'; session_id: string; event: { type: 'content_block_delta'; delta: { type: 'text_delta'; text: string } } }
-  /** end of a turn */
-  | { type: 'result'; session_id: string; subtype: 'success' | 'error_during_execution' | 'interrupted'; is_error: boolean; result?: string }
+  /**
+   * end of a turn (= one invocation). `total_cost_usd`, `duration_ms`, `num_turns` and `usage` are the
+   * real field names; I believe they describe this invocation only, so the reducer SUMS cost and
+   * turns across results (verify - if the CLI reports session totals, change the reducer to replace).
+   * Transcripts on disk contain no `result` lines: for those the bridge has to synthesise one.
+   */
+  | {
+      type: 'result';
+      session_id: string;
+      subtype: 'success' | 'error_during_execution' | 'interrupted';
+      is_error: boolean;
+      result?: string;
+      total_cost_usd?: number;
+      duration_ms?: number;
+      num_turns?: number;
+      usage?: ClaudeUsage;
+    }
 );
 
 export interface ClaudeStartOptions {
   /** id to give the session (`--session-id <uuid>`), so the caller knows it before the first event */
   sessionId: string;
-  /** working directory: the worktree path, or undefined for the main checkout / global chat */
+  /** working directory: the worktree path, the project's main checkout (project sessions), or undefined for the global chat */
   cwd?: string;
   prompt: string;
   /** lets an implementation pick flags, e.g. `--permission-mode plan` for plan agents */
   kind: AgentKind;
   /** Cortex work item this session belongs to; null for the global chat. The CLI does not need it — the mock does. */
   workId: string | null;
+  /** Cortex project this session belongs to (kind `renovate`; `workId` is then null). Only the mock needs it. */
+  projectId?: string;
+  /** `--model <id>` (an alias like `opus` also works, Cortex sends full ids from `CLAUDE_MODELS`). Omitted: the CLI's default. */
+  model?: string;
+  /** `--effort <level>`, one of `EFFORT_LEVELS`. Verify with `claude --help` - written from memory. Omitted: the CLI's default. */
+  effort?: string;
 }
 
+/** Per-turn settings of `send`; same flags as `ClaudeStartOptions`, may differ from the previous turn. */
+export interface ClaudeSendOptions {
+  /** `--model <id>` */
+  model?: string;
+  /** `--effort <level>` - verify with `claude --help` */
+  effort?: string;
+}
+
+/** Answers to an `AskUserQuestion`: question text → chosen option label (several labels if multi-select) or free text. */
+export type ClaudeAnswers = Record<string, string | string[]>;
+
 export interface ClaudeService {
-  /** Spawns `claude -p "<prompt>" --session-id <id> --output-format stream-json --verbose` in `cwd`. */
+  /** Spawns `claude -p "<prompt>" --session-id <id> --output-format stream-json --verbose [--model <id>] [--effort <level>]` in `cwd`. */
   start(options: ClaudeStartOptions): Promise<void>;
-  /** Next turn of an existing session: `claude -p "<text>" --resume <id> --output-format stream-json --verbose`. */
-  send(sessionId: string, text: string): Promise<void>;
-  /** Kills the running process (SIGINT). Must emit a `result` event with subtype `interrupted`. */
+  /** Next turn of an existing session: `claude -p "<text>" --resume <id> --output-format stream-json --verbose [--model <id>] [--effort <level>]`. */
+  send(sessionId: string, text: string, options?: ClaudeSendOptions): Promise<void>;
+  /**
+   * Answers an open `AskUserQuestion` (`toolUseId` = id of its `tool_use` block). The session keeps
+   * running afterwards: the answer shows up as the `tool_result` of that tool use, then Claude continues.
+   * Real bridge: headless Claude asks through the SDK's `canUseTool(toolName, input)` callback (CLI:
+   * the `--permission-prompt-tool` MCP tool) - the bridge parks that callback's promise per tool use id and
+   * resolves it here, returning `{ behavior: 'allow', updatedInput: { questions, answers } }` (verify the
+   * exact shape in the SDK docs). Claude then writes the tool result itself.
+   */
+  answerQuestion(sessionId: string, toolUseId: string, answers: ClaudeAnswers): Promise<void>;
+  /** Kills the running process (SIGINT). Must emit a `result` event with subtype `interrupted`. Also cancels an open question. */
   interrupt(sessionId: string): Promise<void>;
   /**
    * Stored transcript of a session (`~/.claude/projects/<project>/<id>.jsonl`) plus whether a
@@ -353,12 +481,16 @@ export interface WorkRef {
   worktreePath?: string;
   /** set for review work; for own work the PR is found by branch */
   prNumber?: number;
+  /** branch this work is based on when it is not the project's default — the parent branch of a stacked PR */
+  baseBranch?: string;
   createdAt: string;
 }
 
 export interface SessionRef {
   id: string;
   workId: string | null;
+  /** set for project-level sessions (kind `renovate`); `workId` is null then, like the global chat */
+  projectId?: string;
   kind: AgentKind;
   title: string;
   startedAt: string;

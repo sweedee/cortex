@@ -8,6 +8,7 @@
  */
 import { pipelines } from '../../mock/seed/pipelines';
 import { prs } from '../../mock/seed/prs';
+import { seedRenovate, type RenovateSeed } from '../../mock/seed/renovate';
 import { seedSessions } from '../../mock/seed/sessions';
 import { backlogTickets, tickets } from '../../mock/seed/tickets';
 import type { AgentSession, Pipeline, PullRequest, Ticket, WorkItem, Worktree } from '../../model/types';
@@ -56,19 +57,25 @@ export const world = rebase({
     worktree('ingest-gateway', 'CTX-1423', 'feature/CTX-1423-webhook-retry', 6, 2, 0),
     worktree('console-ui', 'CTX-1431', 'bugfix/CTX-1431-tile-flicker', 1, 0, 3),
     worktree('ingest-gateway', 'CTX-1398', 'feature/CTX-1398-tenant-rate-limit', 9, 0, 0),
+    // stacked on CTX-1423's branch: its base is that branch, not main
+    { ...worktree('ingest-gateway', 'CTX-1450', 'feature/CTX-1450-persist-retry-state', 3, 1, 0), baseBranch: 'feature/CTX-1423-webhook-retry' },
   ] as Worktree[],
   /** pull requests, per repository */
   prs: [
     { repo: 'ingest-gateway', pr: prs['CTX-1423'] },
     { repo: 'ingest-gateway', pr: prs['CTX-1398'] },
+    { repo: 'ingest-gateway', pr: prs['CTX-1450'] },
     { repo: 'query-service', pr: prs['review-482'] },
   ] as { repo: string; pr: PullRequest }[],
   /** latest build per repository + branch */
   builds: [
     { repo: 'ingest-gateway', pipeline: pipelines['CTX-1423'] },
     { repo: 'ingest-gateway', pipeline: pipelines['CTX-1398'] },
+    { repo: 'ingest-gateway', pipeline: pipelines['CTX-1450'] },
     { repo: 'query-service', pipeline: pipelines['review-482'] },
   ] as { repo: string; pipeline: Pipeline }[],
+  /** open Renovate PRs per repository (what `gh pr list --author app/renovate` would show) */
+  renovate: seedRenovate() as Record<string, RenovateSeed[]>,
   sessions: seedSessions.map((session) => ({ session, running: session.status === 'running' })) as WorldSession[],
   devServers: {
     'CTX-1431': {
@@ -85,6 +92,7 @@ export const world = rebase({
       { id: 'CTX-1431', kind: 'ticket', title: tickets['CTX-1431'].summary, repo: 'console-ui', ticketKey: 'CTX-1431', worktreePath: '~/wt/console-ui/CTX-1431', createdAt: '2026-11-11T08:15:00Z' },
       { id: 'review-482', kind: 'review', title: 'Review #482 · Evict query cache entries by tenant', repo: 'query-service', prNumber: 482, createdAt: '2026-11-11T07:20:00Z' },
       { id: 'CTX-1398', kind: 'ticket', title: tickets['CTX-1398'].summary, repo: 'ingest-gateway', ticketKey: 'CTX-1398', worktreePath: '~/wt/ingest-gateway/CTX-1398', createdAt: '2026-11-07T10:00:00Z' },
+      { id: 'CTX-1450', kind: 'ticket', title: tickets['CTX-1450'].summary, repo: 'ingest-gateway', ticketKey: 'CTX-1450', worktreePath: '~/wt/ingest-gateway/CTX-1450', baseBranch: 'feature/CTX-1423-webhook-retry', createdAt: '2026-11-11T08:55:00Z' },
       { id: 'adhoc-flaky-e2e', kind: 'adhoc', title: 'Investigate flaky checkout e2e on main', repo: 'console-ui', createdAt: '2026-11-11T08:00:00Z' },
       { id: 'CTX-1440', kind: 'ticket', title: tickets['CTX-1440'].summary, repo: 'console-ui', ticketKey: 'CTX-1440', createdAt: '2026-11-09T14:00:00Z' },
     ],
@@ -96,6 +104,11 @@ export const world = rebase({
 
 export const findPr = (repo: string, number: number) => world.prs.find((p) => p.repo === repo && p.pr.number === number);
 export const findBuild = (repo: string, branch: string) => world.builds.find((b) => b.repo === repo && b.pipeline.branch === branch);
+/** Merging a Renovate PR takes it off the open list. */
+export function mergeRenovatePr(repo: string, number: number) {
+  world.renovate[repo] = (world.renovate[repo] ?? []).filter((p) => p.number !== number);
+}
+
 export const findWorktree = (path: string | undefined) => world.worktrees.find((w) => w.path === path);
 
 /**
