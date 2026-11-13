@@ -48,14 +48,16 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 | # | Scope | Owner | Status |
 |---|---|---|---|
 | 0a | Electron shell, typed IPC bridge (exec / pickers / notifications / openExternal / workspace file), persistence, audio + desktop notifications, vitest + oxlint | opus agent | ✅ done (`990aabd`) |
-| 0b | Domain model refactor → typed per-kind data + kind registry, zustand + zod, TanStack Query wiring, seed migrated, new kinds stubbed | opus agent | ⏳ running |
-| 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | opus agent, isolated worktree → branch `phase-1-integrations` (merge into `app` after 0b) | ✅ done (`e8f0025`, not merged yet) |
-| 2 | Shared viewers: markdown (+mermaid), diff2html, CodeMirror editor, webview panel | — | todo |
-| 3 | Kind modules (actions + sidebars), in parallel slices | — | todo |
+| 0b | Domain model refactor → typed per-kind data + kind registry, zustand + zod, TanStack Query wiring, seed migrated, new kinds stubbed | opus agent | ✅ done (`0f88e31`) |
+| 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | opus agent, isolated worktree → branch `phase-1-integrations` (merge into `app` after 0b) | ✅ done, merged (`9e9f860`) |
+| 2a | Shared viewers in `components/viewers/`: Markdown (+mermaid), DiffViewer, CodeEditor, WebPanel (webview), LogView | sonnet agent, worktree → branch `phase-2a-viewers` | ⏳ running |
+| 2b | Renderer glue: data hooks, live sync + refresher, chat → real claude sessions, AskUserQuestion answering, form dialog / runTask / SidebarTabs / openExternal toolkit, project settings with pickers | opus agent on `app` | ⏳ running |
+| 3 | Kind modules (actions + sidebars), 4 parallel slices: A project+ticket+deployment · B worktree+record+todo · C pr+build+testrun · D agent+app | — | todo (after 2a+2b) |
 | 4 | Integration pass, review, README/handoff | — | todo |
 
 ## Log
 
+- 2026-11-13 — Phase 0b done (`c4da56a`…`0f88e31`, 51 tests): typed items (`domain/schemas.ts`), kind registry (`kinds/<kind>/`), zustand store, workspace v1 + v0→v1 migration (verified on a real v0 file), TanStack Query scaffold. Merged phase 1 (`9e9f860`, doc conflict resolved by hand) → 118 tests pass, typecheck/lint/build green. Hot spots for parallel agents: `domain/schemas.ts`, `kinds/{types,registry,common,icons}`, `store.ts`, `sidebar/index.tsx`, `data/queryKeys.ts`, `seed.ts`, `index.css`, `overlays/Dialogs.tsx`, `chat/ChatBox.tsx`. Started 2a + 2b in parallel.
 - 2026-11-13 — Phase 1 done on `phase-1-integrations` (`e8f0025`, worktree `.claude/worktrees/agent-a4c50088887dfc080`). 89 tests. No new deps. Notes:
   - Channels: `git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*` (+ events `claude:state/event`, `app:state/output`, `test:state/output`); renderer via `native.<service>.*` and `native.on(channel, cb)`. Details in `docs/ARCHITECTURE.md` → Integrations.
   - AskUserQuestion: claude started with `--permission-prompt-tool stdio`; the `can_use_tool` control_request is held and answered with `control_response {behavior:'allow', updatedInput:{…, answers}}`. Derived from CLI 2.1.323 schemas, **not yet verified against a real session** — first thing to test live.
