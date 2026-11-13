@@ -115,7 +115,20 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
       <Flex flexDirection="column" gap={16}>
         <Flex gap={6} flexWrap="wrap">
           {KINDS_ADDABLE.map((k) => (
-            <Button key={k.kind} size="condensed" variant={k.kind === kind ? 'accent' : 'default'} color={k.kind === kind ? 'primary' : 'neutral'} onClick={() => setKind(k.kind)}>
+            <Button
+              key={k.kind}
+              size="condensed"
+              variant={k.kind === kind ? 'accent' : 'default'}
+              color={k.kind === kind ? 'primary' : 'neutral'}
+              onClick={() => {
+                // kinds with their own add flow (project settings, the chat box) leave this dialog
+                const open = getKind(k.kind).addable?.open;
+                if (open && k.kind !== kind) {
+                  closeDialog();
+                  open(at);
+                } else setKind(k.kind);
+              }}
+            >
               <Button.Prefix>{kindIcon(k.kind, 14)}</Button.Prefix>
               {kindLabel(k.kind)}
             </Button>

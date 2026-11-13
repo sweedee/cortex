@@ -1,9 +1,12 @@
-import { PlusIcon, WorkflowIcon } from '@dynatrace/strato-icons';
+import { PlusIcon, SettingIcon, WorkflowIcon } from '@dynatrace/strato-icons';
 import type { Segment } from '../../domain';
 import { place } from '../../layout';
 import { openDialog } from '../../store';
 import { external, skill } from '../common';
 import type { KindModule } from '../types';
+import { openProjectSettings } from './settings';
+
+export { openProjectSettings } from './settings';
 
 export const project: KindModule<'project'> = {
   kind: 'project',
@@ -62,11 +65,19 @@ export const project: KindModule<'project'> = {
       run: ([p]) => openDialog({ type: 'add', kind: 'worktree', at: place.near(p.id) }),
     },
     external('repo', 'Open repo', (i) => `github.com/${i.kind === 'project' ? i.data.repo : ''}`),
+    {
+      id: 'settings',
+      label: 'Settings…',
+      type: 'direct',
+      icon: <SettingIcon />,
+      run: ([p]) => void openProjectSettings(p.kind === 'project' ? p : undefined),
+    },
   ],
 
   addable: {
     label: 'Add project…',
     hint: 'owner/repo',
+    open: (at) => void openProjectSettings(undefined, at),
     create: (v) => {
       const name = v.split('/').pop()!.trim() || v;
       return {

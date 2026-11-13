@@ -21,7 +21,7 @@ import {
   warmUp,
 } from '../layout';
 import { resetToDemo } from '../persist';
-import { actionsForItem, actionsForSelection, KINDS_ADDABLE, relatedItems, removeSelected } from '../actions';
+import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, relatedItems, removeSelected } from '../actions';
 import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore, useVisible, visibleSet } from '../store';
 import { accentOf, groupFill, useItemColors } from '../visual';
 
@@ -550,7 +550,7 @@ export function Canvas() {
                 <Menu.Group>
                   <Menu.Label>Add to canvas</Menu.Label>
                   {KINDS_ADDABLE.map((k) => (
-                    <Menu.Item key={k.kind} onSelect={() => openDialog({ type: 'add', kind: k.kind, at: { x: menu.wx, y: menu.wy } })}>
+                    <Menu.Item key={k.kind} onSelect={() => openAdd(k.kind, { x: menu.wx, y: menu.wy })}>
                       <Menu.Prefix>{kindIcon(k.kind, 16)}</Menu.Prefix>
                       {k.label}
                     </Menu.Item>

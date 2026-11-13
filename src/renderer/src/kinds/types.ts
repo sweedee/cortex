@@ -67,6 +67,11 @@ export interface Addable {
   detect?: (input: string) => boolean;
   /** build the new item from the input and the chosen project */
   create: (input: string, project: ItemOf<'project'> | undefined) => NewItem;
+  /**
+   * A custom add flow (a form, the chat box) used by the canvas *Add* menu and the add dialog
+   * instead of the single input field. `create` still serves paste detection / tests.
+   */
+  open?: (at: { x: number; y: number }) => void;
 }
 
 export interface KindModule<K extends Kind = Kind> {
