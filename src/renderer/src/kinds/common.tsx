@@ -5,9 +5,10 @@
 import type { ReactElement } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
-import { DeleteIcon, ExternalLinkIcon, SuccessIcon, UndoIcon } from '@dynatrace/strato-icons';
+import { CodeIcon, DeleteIcon, ExternalLinkIcon, FolderOpenIcon, SuccessIcon, UndoIcon } from '@dynatrace/strato-icons';
 import type { Item } from '../domain';
 import { insertSkill, patchData, removeItems, restoreItems, select, setArchived } from '../store';
+import { openInEditor, openPath, openUrl } from '../ui/task';
 import { ArchiveIcon, skillIcon } from './icons';
 import type { Action, KindModule } from './types';
 
@@ -37,16 +38,26 @@ export function skill(id: string, label: string, name: string, extra: Partial<Ac
   };
 }
 
-/** Opens something outside Cortex (mocked as a toast until the integration lands). */
+/** Opens a URL in the OS browser (`https://` is added when missing). Disable it when there is no URL. */
 export function external(id: string, label: string, url: (i: Item) => string, extra: Partial<Action> = {}): Action {
   return {
     id,
     label,
     type: 'external',
     icon: <ExternalLinkIcon />,
-    run: (items) => showToast({ type: 'info', title: `Opening ${label.replace(/^Open (in )?/i, '')}`, message: url(items[0]) + ' (mock)', lifespan: 2500 }),
+    run: (items) => void openUrl(url(items[0])),
     ...extra,
   };
+}
+
+/** Shows a folder / file in the OS file manager. */
+export function openPathAction(id: string, label: string, path: (i: Item) => string | undefined, extra: Partial<Action> = {}): Action {
+  return { id, label, type: 'external', icon: <FolderOpenIcon />, run: (items) => void openPath(path(items[0]) ?? ''), ...extra };
+}
+
+/** Opens a folder / file in the editor (`code <path>`, falls back to the OS). */
+export function openInEditorAction(id: string, label: string, path: (i: Item) => string | undefined, extra: Partial<Action> = {}): Action {
+  return { id, label, type: 'external', icon: <CodeIcon />, run: (items) => void openInEditor(path(items[0]) ?? ''), ...extra };
 }
 
 /** A UI action that exists in the design but is not built yet: shows a toast. */

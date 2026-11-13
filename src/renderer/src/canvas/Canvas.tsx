@@ -5,7 +5,7 @@ import { Backdrop } from './Backdrop';
 import { Bubble } from './Bubble';
 import { Links } from './Links';
 import { HoverCard, InlineActions } from './Overlays';
-import { SIDEBAR_W } from '../overlays/Sidebar';
+import { sidebarWidth } from '../overlays/Sidebar';
 import { kindIcon, levelOf, radiusOf, useViews } from '../kinds/registry';
 import type { Metrics } from '../layout';
 import {
@@ -36,7 +36,7 @@ const CHAT_SPACE = 170; // px reserved at the bottom for the chat box
 const TOP_SPACE = 70;
 const MAX_RELATED = 6;
 /** px covered by the details sidebar on the right (0 when it is closed) */
-const rightSpace = () => (getState().inspected ? SIDEBAR_W + 32 : 0);
+const rightSpace = () => (getState().inspected ? sidebarWidth() + 32 : 0);
 
 export function Canvas() {
   const items = useStore((s) => s.items);
@@ -264,7 +264,7 @@ export function Canvas() {
     // keep the bubble in view: pan it out from under the sidebar
     const p = positionOf(id);
     if (p) {
-      const free = window.innerWidth - SIDEBAR_W - 32;
+      const free = window.innerWidth - sidebarWidth() - 32;
       const sx = toScreen(p.x!, p.y!).x;
       if (sx > free - 60) animateTo({ ...cam.current, x: cam.current.x - (sx - free / 2) });
     }

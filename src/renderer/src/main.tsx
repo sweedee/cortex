@@ -12,6 +12,7 @@ import { queryClient } from './data/queryClient';
 import { Dialogs } from './overlays/Dialogs';
 import { Hud } from './overlays/Hud';
 import { Sidebar } from './overlays/Sidebar';
+import { FormHost } from './ui/form';
 import './desktop';
 import { loadWorkspace, startAutosave } from './persist';
 import './index.css';
@@ -29,6 +30,7 @@ async function boot() {
           <Sidebar />
           <ChatBox />
           <Dialogs />
+          <FormHost />
           <ToastContainer />
         </AppRoot>
       </QueryClientProvider>

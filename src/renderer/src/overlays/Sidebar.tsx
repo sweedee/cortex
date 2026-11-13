@@ -1,38 +1,99 @@
 /**
  * Right-hand details panel for one bubble, opened by double-clicking it. This is the shell
- * (header + close); the body is the kind's `Sidebar` component or the generic
- * `DefaultSidebar` (sidebar/index.tsx). Actions stay in the floating list.
+ * (header with expand / close, a drag handle on the left edge); the body is the kind's
+ * `Sidebar` component or the generic `DefaultSidebar` (sidebar/index.tsx). Actions stay in the
+ * floating list.
+ *
+ * Width: `settings.sidebarWidth` (persisted; drag the left edge). "Expand" goes wide (most of
+ * the window) for webviews and diffs; kind sidebars can ask for it via `useSidebarLayout()`.
  */
-import { XmarkIcon } from '@dynatrace/strato-icons';
-import type { ComponentType } from 'react';
+import { MaximizeIcon, MinimizeIcon, XmarkIcon } from '@dynatrace/strato-icons';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { kindIcon, kindLabel, sidebarOf, useCtx } from '../kinds/registry';
 import type { SidebarProps } from '../kinds/types';
-import { DefaultSidebar } from '../sidebar';
-import { inspect, useStore } from '../store';
+import { DefaultSidebar, SidebarLayoutContext } from '../sidebar';
+import { inspect, setSettings, useStore } from '../store';
 
-export const SIDEBAR_W = 320;
+const MIN_W = 280;
+const MARGIN = 16;
+/** room left for the canvas when the sidebar is as wide as it gets */
+const CANVAS_MIN = 160;
+
+const clampW = (w: number) => Math.round(Math.max(MIN_W, Math.min(w, window.innerWidth - CANVAS_MIN)));
+const wideW = () => clampW(Math.max(720, window.innerWidth * 0.62));
+
+let currentW = 360;
+/** Width the open sidebar takes on screen (the canvas keeps bubbles out from under it). */
+export const sidebarWidth = () => currentW;
 
 export function Sidebar() {
   const inspected = useStore((s) => s.inspected);
   const item = useStore((s) => (s.inspected ? s.items.find((i) => i.id === s.inspected) : undefined));
+  const stored = useStore((s) => s.settings.sidebarWidth);
   const ctx = useCtx();
+  const [drag, setDrag] = useState<number | null>(null);
+  const [wide, setWide] = useState(false);
+  const [, setVw] = useState(0);
+
+  // re-clamp on window resize
+  useEffect(() => {
+    const on = () => setVw(window.innerWidth);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  // a new item starts narrow again
+  useEffect(() => setWide(false), [inspected]);
+
+  const width = drag ?? (wide ? wideW() : clampW(stored));
+  currentW = width;
+  const layout = useMemo(() => ({ wide, setWide, width }), [wide, width]);
+
   if (!inspected || !item) return null;
   const Body = (sidebarOf(item.kind) ?? DefaultSidebar) as ComponentType<SidebarProps>;
 
+  const startDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => setDrag(clampW(window.innerWidth - MARGIN - ev.clientX));
+    const up = (ev: PointerEvent) => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      const w = clampW(window.innerWidth - MARGIN - ev.clientX);
+      setDrag(null);
+      setWide(false);
+      setSettings({ sidebarWidth: w });
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+  };
+
   return (
-    <aside className="sidebar" key={item.id} style={{ width: SIDEBAR_W }} onPointerDown={(e) => e.stopPropagation()} aria-label={`${kindLabel(item.kind)} details`}>
+    <aside
+      className={`sidebar ${drag != null ? 'is-resizing' : ''}`}
+      key={item.id}
+      style={{ width }}
+      onPointerDown={(e) => e.stopPropagation()}
+      aria-label={`${kindLabel(item.kind)} details`}
+    >
+      <div className="sidebar-resize" onPointerDown={startDrag} onDoubleClick={() => setWide((w) => !w)} title="Drag to resize · double-click to expand" />
       <header className="sidebar-head">
         <span className="sidebar-kind">
           {kindIcon(item.kind, 14)}
           <span>{kindLabel(item.kind)}</span>
         </span>
         <span className="sidebar-handle">@{item.handle}</span>
+        <button className="sidebar-close" onClick={() => setWide((w) => !w)} aria-label={wide ? 'Narrow the sidebar' : 'Expand the sidebar'} title={wide ? 'Narrow' : 'Expand'}>
+          {wide ? <MinimizeIcon /> : <MaximizeIcon />}
+        </button>
         <button className="sidebar-close" onClick={() => inspect(null)} aria-label="Close details (Esc)">
           <XmarkIcon />
         </button>
       </header>
       <div className="sidebar-body">
-        <Body item={item} ctx={ctx} />
+        <SidebarLayoutContext.Provider value={layout}>
+          <Body item={item} ctx={ctx} />
+        </SidebarLayoutContext.Provider>
       </div>
     </aside>
   );

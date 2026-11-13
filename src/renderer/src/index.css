@@ -1616,3 +1616,99 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ---- sidebar: resize handle, tabs (phase 2b) ---------------------------------------------- */
+
+.sidebar-resize {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.sidebar-resize:hover,
+.sidebar.is-resizing .sidebar-resize {
+  background: linear-gradient(to right, transparent 3px, var(--line) 3px, var(--line) 5px, transparent 5px);
+}
+.sidebar.is-resizing {
+  user-select: none;
+}
+.sidebar-close + .sidebar-close {
+  margin-left: 0;
+}
+.sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.sidebar-tablist {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.sidebar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 7px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-subdued);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sidebar-tab:hover {
+  color: var(--ink);
+}
+.sidebar-tab.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--dt-colors-border-primary-accent, #4b6bff);
+}
+.sidebar-tab-badge {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.sidebar-tabpanel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- form dialog, task toast (phase 2b) ----------------------------------------------------- */
+
+.form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-subdued);
+}
+.form-error {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--dt-colors-text-critical-default, #f2545b);
+}
+.form-failure {
+  padding: 8px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--dt-colors-border-critical-default, #b0353b);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.task-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
