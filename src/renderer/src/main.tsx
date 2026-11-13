@@ -15,12 +15,14 @@ import { Sidebar } from './overlays/Sidebar';
 import { FormHost } from './ui/form';
 import './desktop';
 import { loadWorkspace, startAutosave } from './persist';
+import { startSync } from './sync';
 import './index.css';
 
 async function boot() {
   // load before the first render, so the layout warms up on the stored world, not the seed
   const report = await loadWorkspace();
   startAutosave();
+  startSync();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
