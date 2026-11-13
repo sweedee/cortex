@@ -1,8 +1,11 @@
-import { AgentIcon, ChatIcon, PlayIcon, StopIcon, ViewIcon } from '@dynatrace/strato-icons';
+import { AgentIcon, BlockIcon, ChatIcon, CheckmarkIcon, PauseIcon, PlayIcon, StopIcon, ViewIcon } from '@dynatrace/strato-icons';
 import type { AgentData, ItemOf, Segment } from '../../domain';
-import { openDialog, patchData } from '../../store';
+import { focusChat, insertSkill, inspect, openDialog, patchData } from '../../store';
 import { skill, toast } from '../common';
 import type { Action, KindModule } from '../types';
+import { chooseOption, decidePermission, interruptAgent, openAnswerForm, stopAgent } from './session';
+
+export { answerQuestion } from './session';
 
 type Agent = ItemOf<'agent'>;
 
@@ -28,12 +31,6 @@ const mins = (ms: number) => {
 };
 const PHRASE: Record<AgentData['status'], string> = { running: 'running', waiting: 'waiting', idle: 'idle', done: 'finished', failed: 'failed' };
 
-/** Answer the open AskUserQuestion (mock until the claude CLI integration sends it back). */
-export function answerQuestion(a: Agent, answer: string) {
-  patchData<'agent'>(a, { status: 'running', pendingQuestion: undefined, lastActivity: 'continuing with your answer' }, { notice: undefined });
-  toast('Answer sent', answer);
-}
-
 export const agent: KindModule<'agent'> = {
   kind: 'agent',
   label: 'Agent session',
@@ -56,43 +53,54 @@ export const agent: KindModule<'agent'> = {
   ],
 
   actions: ([a]) => {
-    const { status, pendingQuestion } = a.data;
+    const { status, pendingQuestion, pendingPermissions, localId } = a.data;
     const waiting = status === 'waiting';
+    const real = !!localId;
     const options: Action[] = (pendingQuestion?.questions[0]?.options ?? []).map((o, i) => ({
       id: `answer-${i}`,
       label: o.label,
       type: 'direct',
       icon: <ChatIcon />,
-      run: () => answerQuestion(a, o.label),
+      run: () => chooseOption(a, o.label),
     }));
+    const permissions: Action[] = (pendingPermissions ?? []).slice(0, 2).flatMap((p, i): Action[] => [
+      { id: `allow-${i}`, label: `Allow ${p.toolName}`, type: 'direct', icon: <CheckmarkIcon />, primary: i === 0 && !pendingQuestion, run: () => void decidePermission(a, p.requestId, true) },
+      { id: `deny-${i}`, label: `Deny ${p.toolName}`, type: 'direct', icon: <BlockIcon />, danger: true, run: () => void decidePermission(a, p.requestId, false) },
+    ]);
+    const view: Action = {
+      id: 'view',
+      label: waiting && pendingQuestion ? 'Answer' : 'View session',
+      type: 'view',
+      icon: <ViewIcon />,
+      primary: !permissions.length || !!pendingQuestion,
+      run: ([x]) => {
+        if (!real) return openDialog({ type: 'session', itemId: x.id });
+        if (waiting && pendingQuestion) return openAnswerForm(a);
+        inspect(x.id);
+      },
+    };
+    const running = status === 'running';
     return [
-      { id: 'view', label: waiting ? 'Answer' : 'View session', type: 'view', icon: <ViewIcon />, primary: true, run: ([x]) => openDialog({ type: 'session', itemId: x.id }) },
+      view,
       ...options,
-      skill('continue', 'Continue', 'continue-session'),
+      ...permissions,
+      skill('continue', 'Continue', 'continue-session', real ? { run: ([x]) => insertSkill(null, [x.id]) } : {}),
       skill('fork', 'Fork session', 'fork-session'),
-      status === 'running'
-        ? {
-            id: 'stop',
-            label: 'Stop',
-            type: 'direct',
-            icon: <StopIcon />,
-            danger: true,
-            run: () => {
-              patchData<'agent'>(a, { status: 'idle', lastActivity: 'Stopped by you', endedAt: Date.now() });
-              toast('Agent stopped', a.title, 'info');
-            },
-          }
-        : {
+      ...(running && real ? [{ id: 'interrupt', label: 'Interrupt', type: 'direct', icon: <PauseIcon />, run: () => void interruptAgent(a) } satisfies Action] : []),
+      running || (real && waiting)
+        ? ({ id: 'stop', label: 'Stop', type: 'direct', icon: <StopIcon />, danger: true, run: () => void stopAgent(a) } satisfies Action)
+        : ({
             id: 'resume',
-            label: 'Resume',
+            label: real ? 'Follow up' : 'Resume',
             type: 'direct',
             icon: <PlayIcon />,
             disabled: waiting ? 'Answer the question first' : undefined,
             run: () => {
+              if (real) return insertSkill(null, [a.id]);
               patchData<'agent'>(a, { status: 'running', lastActivity: undefined, endedAt: undefined });
               toast('Agent resumed', a.title, 'info');
             },
-          },
+          } satisfies Action),
     ];
   },
 
@@ -102,6 +110,11 @@ export const agent: KindModule<'agent'> = {
     label: 'Start agent session…',
     hint: 'what should the agent do?',
     multiline: true,
+    // real sessions start from the chat box (it picks the directory from the mentions)
+    open: () => {
+      focusChat();
+      toast('Describe the task in the chat box', '@mention a worktree or project to choose where the agent works.', 'info');
+    },
     create: (v, proj) => ({
       kind: 'agent',
       handle: `agent/${Math.random().toString(36).slice(2, 6)}`,

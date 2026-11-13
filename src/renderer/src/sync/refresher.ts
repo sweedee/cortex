@@ -13,7 +13,7 @@
  */
 import { queryClient } from '../data/queryClient';
 import { qk } from '../data/queryKeys';
-import type { Item, ItemOf } from '../domain';
+import { isRealPath, type Item, type ItemOf } from '../domain';
 import { isDesktop, native } from '../native';
 import { getState, itemById, patchData } from '../store';
 import { changes, prChecksRunning, prPatch, projectStatsPatch, ticketPatch, worktreeGitPatch } from './mapping';
@@ -22,8 +22,6 @@ const TICK_MS = 5_000;
 const FAST_MS = 15_000;
 const PARALLEL = 3;
 
-/** a real directory to run git in (not demo data) */
-export const isRealPath = (p: string | undefined) => !!p && /^([A-Za-z]:[\\/]|\/|\\\\)/.test(p);
 const isRealRepo = (r: string | undefined) => !!r && /^[\w.-]+\/[\w.-]+$/.test(r) && !r.startsWith('unknown/');
 
 interface Job {

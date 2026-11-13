@@ -47,3 +47,6 @@ export function rootsOf(items: Item[], links: Link[], kind: Kind, levelOf: Level
   }
   return out;
 }
+
+/** An absolute path a process can run in (`C:\…`, `C:/…`, `/…`, `\server\…`); demo paths like `~/code/x` are not. */
+export const isRealPath = (p: string | undefined): p is string => !!p && /^([A-Za-z]:[\\/]|\/|\\\\)/.test(p);

@@ -2,14 +2,20 @@
  * Selection-level actions and the chat box "send". Per-kind actions live in the kind
  * modules (`kinds/<kind>/index.tsx`); `actionsForItem` (registry) combines them with the shared ones.
  */
-import { showToast } from '@dynatrace/strato-components/notifications';
+import { Button } from '@dynatrace/strato-components/buttons';
+import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { ChatIcon, LinkIcon } from '@dynatrace/strato-icons';
-import type { Item, Kind } from './domain';
-import { place } from './layout';
+import { agentHandle, agentTarget, agentTitle, buildPrompt, resolveCwd, skillOf } from './chat/prompt';
+import { claudeOps } from './data/claude';
+import { isRealPath, type Item, type ItemOf, type Kind } from './domain';
+import { camera, place } from './layout';
 import { archive, archiveAction, removeAction, skill, toast, unarchiveAction } from './kinds/common';
 import { actionsForItem, ctxOf, KINDS, getKind } from './kinds/registry';
 import type { Action } from './kinds/types';
-import { addItem, addLink, getState, insertSkill, itemById, newId, notify, patchData, select } from './store';
+import { isDesktop } from './native';
+import { addItem, addLink, getState, insertSkill, inspect, itemById, newId, notify, openDialog, patchData, select } from './store';
+import { openForm } from './ui/form';
+import { errorText } from './ui/task';
 
 export type { Action, ActionKind } from './kinds/types';
 export { actionsForItem } from './kinds/registry';
@@ -48,50 +54,120 @@ export function actionsForSelection(ids: string[]): { items: Item[]; actions: Ac
 
 // ---- sending the chat box ---------------------------------------------------------
 
-const AGENT_TITLE: Record<string, string> = {
-  'plan-ticket': 'Plan',
-  implement: 'Implement',
-  'fix-ci': 'Fix CI',
-  'review-pr': 'Review',
-  'self-review': 'Self-review',
-  'address-review': 'Address review',
-  'resolve-conflicts': 'Resolve conflicts',
-  'create-pr': 'Create PR',
-  'grill-plan': 'Grill plan',
-  'implement-plan': 'Implement plan',
-  brainstorm: 'Brainstorm',
-};
+/** Ask where a session should run when no mention has a directory: a configured project or any folder. */
+async function askCwd(): Promise<{ cwd: string; project?: ItemOf<'project'> } | null> {
+  const projects = getState().items.filter((i): i is ItemOf<'project'> => i.kind === 'project' && !i.archived && isRealPath(i.data.baseDir));
+  let picked: { cwd: string; project?: ItemOf<'project'> } | null = null;
+  const values = await openForm({
+    title: 'Where should the agent work?',
+    description: 'None of the mentioned bubbles has a folder. Pick a project, or any folder.',
+    submitLabel: 'Start agent',
+    fields: [
+      ...(projects.length
+        ? [{ name: 'project', label: 'Project', type: 'radio' as const, options: [...projects.map((p) => ({ value: p.id, label: p.title, hint: p.data.baseDir })), { value: '', label: 'Another folder' }], default: projects[0].id }]
+        : []),
+      { name: 'dir', label: 'Folder', type: 'directory', when: (v) => !projects.length || !v.project, required: true, validate: (v) => (isRealPath(String(v)) ? undefined : 'Use an absolute path') },
+    ],
+    onSubmit: (v) => {
+      const p = projects.find((x) => x.id === v.project);
+      picked = p ? { cwd: p.data.baseDir!, project: p } : { cwd: String(v.dir) };
+    },
+  });
+  return values ? picked : null;
+}
 
-/** Starting an agent from the chat box spawns a new agent bubble next to what it is about. */
-export function sendPrompt(text: string, mentioned: string[]) {
-  const sk = text.match(/^\/([\w-]+)/)?.[1];
-  const subject = mentioned.map(itemById).find(Boolean);
-  const title = `${sk ? (AGENT_TITLE[sk] ?? sk) : 'Chat'}${subject ? ` ${subject.handle}` : ''}`;
+/**
+ * Send the chat box: to the one mentioned agent session (`claude:send`), or start a new Claude Code
+ * session (`claude:start`) in the most specific mentioned directory, with the @mentions expanded into
+ * context lines. Resolves with the agent item id, or null (cancelled / failed to send).
+ */
+export async function sendPrompt(text: string, mentioned: string[]): Promise<string | null> {
+  const ctx = ctxOf();
+  const items = mentioned.map((id) => ctx.get(id)).filter((i): i is Item => !!i);
+  if (!isDesktop) {
+    toast('Agents need the desktop app', 'Start Cortex with npm run dev to use Claude Code.', 'warning');
+    return null;
+  }
+
+  // a follow-up to one agent session
+  const target = agentTarget(items);
+  if (target) {
+    const prompt = buildPrompt(text, items.filter((i) => i.id !== target.id), ctx);
+    try {
+      patchData<'agent'>(target, { status: 'running', lastActivity: 'Sending your message', endedAt: undefined }, { notice: undefined });
+      await claudeOps.send(target.data.localId!, prompt);
+    } catch (e) {
+      patchData<'agent'>(target, { status: 'failed', error: errorText(e) });
+      toast('Could not send the message', errorText(e), 'critical');
+      return null;
+    }
+    select([target.id], false, { mention: false });
+    agentToast('Message sent', target);
+    return target.id;
+  }
+
+  const where = resolveCwd(items, ctx) ?? (await askCwd());
+  if (!where) return null;
+  const sk = skillOf(text);
+  const subject = items.find((i) => i.kind !== 'project') ?? items[0];
+  const project = where.project ?? (subject ? (subject.kind === 'project' ? subject : ctx.projectOf(subject)) : undefined);
+  const title = agentTitle(sk, subject);
   const id = newId('a');
-  const at = subject ? place.near(subject.id) : place.center();
-  const cwd = subject?.kind === 'worktree' ? subject.data.path : subject ? (ctxOf().projectOf(subject)?.data.baseDir ?? '') : '';
-  addItem(
+  const taken = new Set(getState().items.map((i) => i.handle.toLowerCase()));
+  const { model, permissionMode } = getState().settings;
+  const links = items.map((m) => ({ from: id, to: m.id, label: 'about' }));
+  if (project && !items.some((m) => m.id === project.id)) links.push({ from: id, to: project.id, label: 'belongs to' });
+  const at = subject ? place.near(subject.id) : project ? place.near(project.id) : place.center();
+  const agent = addItem(
     {
       id,
       kind: 'agent',
-      handle: `agent/${(sk ?? 'chat') + (subject ? '-' + subject.handle.replace(/[^\w]/g, '').toLowerCase().slice(-6) : '')}`,
+      handle: agentHandle(sk, subject, (h) => taken.has(h.toLowerCase())),
       title,
-      projectId: subject?.kind === 'project' ? subject.id : subject?.projectId,
-      data: { cwd, model: 'claude-opus-5-5', status: 'running', skill: sk, lastActivity: 'reading context', startedAt: Date.now(), usage: { contextPct: 2, costUsd: 0, turns: 0 } },
+      projectId: project?.id,
+      data: { cwd: where.cwd, localId: id, model, status: 'running', skill: sk, lastActivity: 'Starting Claude Code', startedAt: Date.now() },
     },
-    mentioned.map((m) => ({ from: id, to: m, label: 'about' })),
-  );
+    links,
+  ) as ItemOf<'agent'>;
   place.seed(id, at);
   select([id], false, { mention: false });
-  showToast({ type: 'info', title: 'Agent started', message: text.length > 90 ? text.slice(0, 90) + '…' : text, lifespan: 3000 });
-  // prototype: the agent "finishes" a little later and raises a notification (phase 1 wires the claude CLI)
-  setTimeout(() => {
-    const a = itemById(id);
-    if (!a || a.kind !== 'agent' || a.archived || a.data.status !== 'running') return;
-    patchData<'agent'>(a, { status: 'done', lastActivity: 'waiting for review', endedAt: Date.now() });
-    notify(id, { text: `${title} finished — ready for your review`, tone: 'success' });
-  }, 14000 + Math.random() * 8000);
+  try {
+    await claudeOps.start({ localId: id, cwd: where.cwd, prompt: buildPrompt(text, items, ctx), title, model, permissionMode });
+  } catch (e) {
+    patchData<'agent'>(agent, { status: 'failed', error: errorText(e), lastActivity: 'Could not start', endedAt: Date.now() });
+    notify(id, { text: `${title} could not start: ${errorText(e)}`, tone: 'critical' });
+    return id;
+  }
+  agentToast('Agent started', agent, text);
   return id;
+}
+
+function agentToast(title: string, a: Item, text?: string) {
+  const toastId = showToast({
+    type: 'info',
+    title,
+    message: text ? (text.length > 90 ? text.slice(0, 90) + '…' : text) : a.title,
+    lifespan: 4000,
+    actions: (
+      <Button
+        size="condensed"
+        onClick={() => {
+          inspect(a.id);
+          camera.focus([a.id]);
+          dismissToast(toastId);
+        }}
+      >
+        Open
+      </Button>
+    ),
+  });
+}
+
+/** The canvas *Add* entry of a kind: its own flow (`addable.open`) or the add dialog. */
+export function openAdd(kind: Kind, at: { x: number; y: number }) {
+  const a = getKind(kind).addable;
+  if (a?.open) a.open(at);
+  else openDialog({ type: 'add', kind, at });
 }
 
 /** Kinds that can be added from the canvas menu / add dialog, in display order. */

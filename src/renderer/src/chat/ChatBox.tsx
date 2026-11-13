@@ -10,7 +10,7 @@ import { actionsForItem, actionsForSelection, sendPrompt, type Action } from '..
 import type { Item } from '../domain';
 import { skillIcon } from '../kinds/icons';
 import { kindIcon, kindLabel } from '../kinds/registry';
-import { mentionedIds, select, setDraft, setSearch, useStore, useVisible } from '../store';
+import { getState, mentionedIds, select, setDraft, setSearch, useStore, useVisible } from '../store';
 import { accentOf, NEUTRAL_ACCENT, stripes, useItemColors } from '../visual';
 import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
@@ -168,12 +168,18 @@ export function ChatBox() {
     });
   };
 
+  const [sending, setSending] = useState(false);
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
-    sendPrompt(text, mentionedIds(text, items));
-    setDraft('');
+    if (!text || sending) return;
     setPopup(null);
+    setSending(true);
+    // the draft clears once it went out (it stays when the "where?" dialog is cancelled or sending failed)
+    void sendPrompt(text, mentionedIds(text, items))
+      .then((id) => {
+        if (id && getState().draft.trim() === text) setDraft('');
+      })
+      .finally(() => setSending(false));
   };
 
   // the @-query's matches light up on the canvas, the keyboard-active one strongest
@@ -314,7 +320,7 @@ export function ChatBox() {
                 <KeyboardShortcut keys="/" />
               </span>
             )}
-            <Button variant="accent" color="primary" size="condensed" disabled={!draft.trim()} onClick={send} aria-label="Send">
+            <Button variant="accent" color="primary" size="condensed" disabled={!draft.trim()} loading={sending} onClick={send} aria-label="Send">
               <Button.Prefix>
                 <ArrowUpIcon />
               </Button.Prefix>
