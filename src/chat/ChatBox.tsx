@@ -6,10 +6,10 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { Button } from '@dynatrace/strato-components/buttons';
 import { KeyboardShortcut } from '@dynatrace/strato-components/content';
 import { AiIcon, ArrowUpIcon, XmarkIcon } from '@dynatrace/strato-icons';
-import { actionsForSelection, sendPrompt } from '../actions';
+import { actionsForItem, actionsForSelection, sendPrompt, type Action } from '../actions';
 import { KIND_LABEL, type Item } from '../model';
-import { mentionedIds, select, setDraft, useStore } from '../store';
-import { KIND_ACCENT, KIND_ICON, skillIcon } from '../visual';
+import { mentionedIds, select, setDraft, setSearch, useStore, useVisible } from '../store';
+import { accentOf, KIND_ICON, NEUTRAL_ACCENT, skillIcon, stripes, useItemColors } from '../visual';
 import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
 
@@ -35,10 +35,35 @@ export const SKILLS: { name: string; desc: string }[] = [
   { name: 'fork-session', desc: 'Branch a session to try another approach' },
 ];
 
+/** One entry of the #/! action search: an action and the item(s) it runs on. */
+interface ActionOption {
+  key: string;
+  action: Action;
+  items: Item[];
+  /** who it is for, e.g. "@CTX-4821" or "3 items" */
+  target: string;
+}
+
 type Popup =
-  | { type: 'mention'; start: number; query: string; options: Item[] }
+  | { type: 'mention'; start: number; query: string; options: Item[]; hits: string[] }
   | { type: 'skill'; start: number; query: string; options: typeof SKILLS }
+  | { type: 'action'; start: number; query: string; options: ActionOption[] }
   | null;
+
+/** Actions of everything mentioned: the joint ones first (for several items), then per item. */
+function actionOptions(mentioned: Item[], query: string): ActionOption[] {
+  const out: ActionOption[] = [];
+  if (mentioned.length > 1) {
+    const all = actionsForSelection(mentioned.map((m) => m.id));
+    all.actions.forEach((a) => out.push({ key: `all:${a.id}`, action: a, items: all.items, target: `${all.items.length} items` }));
+  }
+  for (const m of mentioned) actionsForItem(m).forEach((a) => out.push({ key: `${m.id}:${a.id}`, action: a, items: [m], target: `@${m.handle}` }));
+  const q = query.toLowerCase();
+  return out
+    .filter((o) => !q || [o.action.label, o.action.skill ?? '', o.target].some((t) => t.toLowerCase().includes(q)))
+    .sort((a, b) => Number(!!a.action.disabled) - Number(!!b.action.disabled) || Number(b.action.label.toLowerCase().startsWith(q)) - Number(a.action.label.toLowerCase().startsWith(q)))
+    .slice(0, 9);
+}
 
 const TOKEN = /(@[^\s@]+|(?:^|(?<=\s))\/[\w-]+)/g;
 
@@ -47,6 +72,8 @@ export function ChatBox() {
   const items = useStore((s) => s.items);
   const selected = useStore((s) => s.selected);
   const focusTick = useStore((s) => s.focusTick);
+  const visible = useVisible();
+  const colors = useItemColors();
   const ta = useRef<HTMLTextAreaElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<Popup>(null);
@@ -79,10 +106,21 @@ export function ChatBox() {
     if (m) {
       const q = m[2].toLowerCase();
       const options = items
-        .filter((i) => i.handle.toLowerCase().includes(q) || i.title.toLowerCase().includes(q))
-        .sort((a, b) => Number(selected.includes(b.id)) - Number(selected.includes(a.id)) || Number(b.handle.toLowerCase().startsWith(q)) - Number(a.handle.toLowerCase().startsWith(q)))
-        .slice(0, 7);
-      setPopup({ type: 'mention', start: pos - m[2].length - 1, query: m[2], options });
+        .filter((i) => (visible.has(i.id) || !i.archived) && (i.handle.toLowerCase().includes(q) || i.title.toLowerCase().includes(q)))
+        .sort(
+          (a, b) =>
+            Number(visible.has(b.id)) - Number(visible.has(a.id)) ||
+            Number(selected.includes(b.id)) - Number(selected.includes(a.id)) ||
+            Number(b.handle.toLowerCase().startsWith(q)) - Number(a.handle.toLowerCase().startsWith(q)),
+        );
+      setPopup({ type: 'mention', start: pos - m[2].length - 1, query: m[2], options: options.slice(0, 7), hits: options.filter((o) => visible.has(o.id)).map((o) => o.id) });
+      setActive(0);
+      return;
+    }
+    const a = before.match(/(^|\s)[#!]([\w-]*)$/);
+    if (a) {
+      const ment = mentionedIds(text, items).map((id) => items.find((i) => i.id === id)!);
+      setPopup({ type: 'action', start: pos - a[2].length - 1, query: a[2], options: actionOptions(ment, a[2]) });
       setActive(0);
       return;
     }
@@ -99,6 +137,18 @@ export function ChatBox() {
 
   const accept = (i: number) => {
     if (!popup || !popup.options[i]) return;
+    if (popup.type === 'action') {
+      const o = popup.options[i];
+      if (o.action.disabled) return;
+      // drop the "#query" token, then run the action (skills write into the draft themselves)
+      const end = popup.start + 1 + popup.query.length;
+      const head = draft.slice(0, popup.start).replace(/\s+$/, '');
+      const tail = draft.slice(end).replace(/^\s+/, '');
+      setDraft(head && tail ? `${head} ${tail}` : head ? `${head} ` : tail);
+      setPopup(null);
+      o.action.run(o.items);
+      return;
+    }
     const insert = popup.type === 'mention' ? `@${(popup.options[i] as Item).handle} ` : `/${(popup.options[i] as (typeof SKILLS)[number]).name} `;
     const end = popup.start + 1 + popup.query.length;
     const next = draft.slice(0, popup.start) + insert + draft.slice(end);
@@ -118,6 +168,14 @@ export function ChatBox() {
     setDraft('');
     setPopup(null);
   };
+
+  // the @-query's matches light up on the canvas, the keyboard-active one strongest
+  const hits = popup?.type === 'mention' ? popup.hits : null;
+  const activeId = popup?.type === 'mention' ? popup.options[active]?.id ?? null : null;
+  useEffect(() => {
+    setSearch(hits ? { ids: hits, active: activeId } : null);
+  }, [hits, activeId]);
+  useEffect(() => () => setSearch(null), []);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (popup && popup.options.length) {
@@ -147,7 +205,7 @@ export function ChatBox() {
       if (t.startsWith('@')) {
         const it = handles.get(t.slice(1).toLowerCase());
         out.push(
-          <mark key={i} className={`tok tok-mention ${it ? '' : 'is-unknown'}`} style={it ? { ['--accent' as string]: KIND_ACCENT[it.kind] } : undefined}>
+          <mark key={i} className={`tok tok-mention ${it ? '' : 'is-unknown'}`} style={it ? { ['--accent' as string]: accentOf(colors, it.id) } : undefined}>
             {t}
           </mark>,
         );
@@ -163,7 +221,7 @@ export function ChatBox() {
     }
     out.push(draft.slice(last) + '​');
     return out;
-  }, [draft, handles]);
+  }, [draft, handles, colors]);
 
   const syncScroll = () => {
     if (mirror.current && ta.current) mirror.current.scrollTop = ta.current.scrollTop;
@@ -171,7 +229,9 @@ export function ChatBox() {
 
   const placeholder = selected.length
     ? 'Ask about the selection, or pick an action above…'
-    : 'Ask Cortex anything — @ to mention a bubble, / for a skill';
+    : 'Ask Cortex anything — @ to mention a bubble, / for a skill, # for its actions';
+  // the border takes the colours of what the message is about
+  const ctxColors = [...new Set(mentioned.flatMap((m) => colors.get(m.id) ?? [NEUTRAL_ACCENT]))];
 
   return (
     <div className="chat-dock">
@@ -196,12 +256,15 @@ export function ChatBox() {
         </div>
       )}
 
-      <div className={`chatbox ${popup ? 'has-popup' : ''}`}>
+      <div
+        className={`chatbox ${popup ? 'has-popup' : ''} ${ctxColors.length ? 'has-context' : ''}`}
+        style={ctxColors.length ? { ['--ctx-border' as string]: stripes(ctxColors) } : undefined}
+      >
         {mentioned.length > 0 && (
           <div className="chat-context">
             <span className="chat-context-label">Context</span>
             {mentioned.map((m) => (
-              <button key={m.id} className="ctx-chip" style={{ ['--accent' as string]: KIND_ACCENT[m.kind] }} onClick={() => camera.focus([m.id])} title={`${KIND_LABEL[m.kind]} · ${m.title}`}>
+              <button key={m.id} className="ctx-chip" style={{ ['--accent' as string]: stripes(colors.get(m.id) ?? [NEUTRAL_ACCENT], 180) }} onClick={() => camera.focus([m.id])} title={`${KIND_LABEL[m.kind]} · ${m.title}`}>
                 {KIND_ICON[m.kind](12)}
                 <span>{m.title}</span>
               </button>
@@ -225,7 +288,7 @@ export function ChatBox() {
               placeholder={placeholder}
               spellCheck={false}
               onChange={(e) => {
-                setDraft(e.target.value);
+                setDraft(e.target.value, true);
                 refreshPopup(e.target.value, e.target.selectionStart);
               }}
               onKeyDown={onKeyDown}
@@ -252,11 +315,44 @@ export function ChatBox() {
           </div>
         </div>
 
-        {popup && popup.options.length > 0 && (
+        {popup && (popup.options.length > 0 || popup.type === 'action') && (
           <div className="chat-popup" role="listbox" style={{ left: Math.min(popupX(draft, caret), 380) }}>
-            <div className="chat-popup-head">{popup.type === 'mention' ? 'Mention a bubble' : 'Insert a skill'}</div>
-            {popup.type === 'mention'
-              ? (popup.options as Item[]).map((o, i) => (
+            <div className="chat-popup-head">
+              {popup.type === 'mention' ? (
+                <>
+                  Mention a bubble
+                  {popup.query && <span className="chat-popup-count">{popup.hits.length} on the canvas</span>}
+                </>
+              ) : popup.type === 'skill' ? (
+                'Insert a skill'
+              ) : mentioned.length ? (
+                `Actions for ${mentioned.length === 1 ? '@' + mentioned[0].handle : mentioned.length + ' items'}`
+              ) : (
+                'Actions'
+              )}
+            </div>
+            {popup.type === 'action' && popup.options.length === 0 && (
+              <div className="chat-popup-empty">{mentioned.length ? 'No matching actions' : 'Mention or select a bubble first, then # searches its actions'}</div>
+            )}
+            {popup.type === 'action'
+              ? popup.options.map((o, i) => (
+                  <div
+                    key={o.key}
+                    role="option"
+                    aria-selected={i === active}
+                    aria-disabled={!!o.action.disabled}
+                    className={`chat-option ${i === active ? 'is-active' : ''} ${o.action.disabled ? 'is-disabled' : ''}`}
+                    onMouseDown={(e) => (e.preventDefault(), accept(i))}
+                    onMouseEnter={() => setActive(i)}
+                    title={o.action.disabled}
+                  >
+                    <span className="chat-option-icon is-action">{o.action.icon}</span>
+                    <span className="chat-option-main chat-option-label">{o.action.label}</span>
+                    <span className="chat-option-sub">{o.action.disabled ?? (o.action.skill ? `/${o.action.skill} · ${o.target}` : o.target)}</span>
+                  </div>
+                ))
+              : popup.type === 'mention'
+              ? popup.options.map((o, i) => (
                   <div
                     key={o.id}
                     role="option"
@@ -264,7 +360,7 @@ export function ChatBox() {
                     className={`chat-option ${i === active ? 'is-active' : ''}`}
                     onMouseDown={(e) => (e.preventDefault(), accept(i))}
                     onMouseEnter={() => setActive(i)}
-                    style={{ ['--accent' as string]: KIND_ACCENT[o.kind] }}
+                    style={{ ['--accent' as string]: accentOf(colors, o.id) }}
                   >
                     <span className="chat-option-icon">{KIND_ICON[o.kind](14)}</span>
                     <span className="chat-option-main">@{o.handle}</span>

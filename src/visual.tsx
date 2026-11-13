@@ -24,7 +24,8 @@ import {
   WorkflowIcon,
 } from '@dynatrace/strato-icons';
 import type { Item, Kind, Link, Tone } from './model';
-import { KIND_LEVEL } from './model';
+import { rootsOf } from './model';
+import { useStore, type ColorBy, type State } from './store';
 
 /** CSS colours (Strato tokens where one fits, Dynatrace brand colours otherwise). */
 export const TONE_COLOR: Record<Tone, string> = {
@@ -81,17 +82,16 @@ export const KIND_ICON: Record<Kind, (size?: number) => ReactElement> = {
   plan: (s) => <DescriptionIcon size={s} />,
 };
 
-/** Accent tint per kind (inner glow of the bubble), in Dynatrace brand colours. */
-export const KIND_ACCENT: Record<Kind, string> = {
-  project: '#6F2DA8',
-  ticket: '#1496FF',
-  worktree: '#73BE28',
-  agent: '#B455B6',
-  pr: '#1284EA',
-  build: '#5f6b7a',
-  plan: '#00A1B2',
-};
-
+/** Archive box; Strato icons have none. Same stroke style as the PR icon. */
+export function ArchiveIcon(props: { size?: number }) {
+  const s = props.size ?? 16;
+  return (
+    <svg width={s} height={s} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} aria-hidden>
+      <rect x="1.8" y="2.5" width="12.4" height="3.2" rx="0.6" />
+      <path d="M2.9 5.7v6.8c0 .6.4 1 1 1h8.2c.6 0 1-.4 1-1V5.7M6.4 8.4h3.2" />
+    </svg>
+  );
+}
 
 /**
  * Icon per skill, by what it does rather than "it's AI". The AI icon is kept for skills
@@ -123,44 +123,42 @@ export const skillIcon = (name: string) => (SKILL_ICONS[name] ?? (() => <AiIcon 
 /** Group colours, muted enough to sit on the dark canvas without shouting. */
 const GROUP_PALETTE = ['#4aa8ff', '#c27ad0', '#7fc24a', '#e0a33c', '#2bb5c4', '#e8697a', '#9a8cff', '#c9c94a'];
 
+/** Colour of items without a group (colouring off, or no project/ticket above them). */
+export const NEUTRAL_ACCENT = '#8a90a8';
+
 /**
- * Colours per item: walk links "upwards" (towards projects) and collect the roots of the
- * given kind. Items that belong to several roots get several colours; items with no
- * root (or colouring off) get none and stay gray.
+ * Colours per item from the project/ticket roots it rolls up to. Items that belong to
+ * several roots get several colours; items with no root (or colouring off) get none.
  */
 export function groupColors(items: Item[], links: Link[], by: 'none' | 'project' | 'ticket'): Map<string, string[]> {
   const out = new Map<string, string[]>();
   if (by === 'none') return out;
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const up = new Map<string, string[]>();
-  for (const l of links) {
-    const a = byId.get(l.from),
-      b = byId.get(l.to);
-    if (!a || !b || KIND_LEVEL[a.kind] === KIND_LEVEL[b.kind]) continue;
-    const [lo, hi] = KIND_LEVEL[a.kind] > KIND_LEVEL[b.kind] ? [a, b] : [b, a];
-    up.set(lo.id, [...(up.get(lo.id) ?? []), hi.id]);
-  }
   const roots = items.filter((i) => i.kind === by);
   const color = new Map(roots.map((r, i) => [r.id, GROUP_PALETTE[i % GROUP_PALETTE.length]]));
-  for (const it of items) {
-    const found = new Set<string>();
-    const seen = new Set<string>();
-    const stack = [it.id];
-    while (stack.length) {
-      const id = stack.pop()!;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      if (color.has(id)) {
-        found.add(id);
-        continue; // stop at the root, don't climb past it
-      }
-      stack.push(...(up.get(id) ?? []));
-    }
+  const order = new Map(roots.map((r, i) => [r.id, i]));
+  rootsOf(items, links, by).forEach((rs, id) => {
     // palette order, so a two-colour bubble always splits the same way
-    const cs = roots.filter((r) => found.has(r.id)).map((r) => color.get(r.id)!);
-    if (cs.length) out.set(it.id, cs);
-  }
+    out.set(id, [...rs].sort((a, b) => order.get(a)! - order.get(b)!).map((r) => color.get(r)!));
+  });
   return out;
+}
+
+let colorCache: { items: Item[]; links: Link[]; by: ColorBy; map: Map<string, string[]> } | null = null;
+const colorsOf = (s: State) => {
+  if (!colorCache || colorCache.items !== s.items || colorCache.links !== s.links || colorCache.by !== s.colorBy)
+    colorCache = { items: s.items, links: s.links, by: s.colorBy, map: groupColors(s.items, s.links, s.colorBy) };
+  return colorCache.map;
+};
+/** The group colours of every item, the one colour system used everywhere in the UI. */
+export const useItemColors = () => useStore(colorsOf);
+/** Main accent of one item (first group colour or neutral gray). */
+export const accentOf = (colors: Map<string, string[]>, id: string) => colors.get(id)?.[0] ?? NEUTRAL_ACCENT;
+
+/** Hard-edged slices of the given colours along a line (for borders and strips), no blending. */
+export function stripes(colors: string[], angle = 90): string {
+  if (colors.length === 1) return colors[0];
+  const step = 100 / colors.length;
+  return `linear-gradient(${angle}deg, ${colors.map((c, i) => `${c} ${i * step}% ${(i + 1) * step}%`).join(', ')})`;
 }
 
 /** Disc fill for one or more group colours: flat slices with hard edges, no blending. */

@@ -20,6 +20,8 @@ export interface Notice {
   tone: Tone;
   /** minutes ago (prototype only, avoids date math) */
   ago: number;
+  /** seen in the notifications menu or by selecting the bubble; the badge goes away */
+  read?: boolean;
 }
 
 export interface Item {
@@ -45,7 +47,11 @@ export interface Item {
   };
   /** the project cluster this item gravitates towards */
   cluster?: string;
+  /** completed or put away: hidden unless the filter shows archived items */
+  archived?: boolean;
 }
+
+export const KINDS: Kind[] = ['project', 'ticket', 'worktree', 'agent', 'pr', 'build', 'plan'];
 
 export interface Link {
   id: string;
@@ -77,3 +83,50 @@ export const KIND_RADIUS: Record<Kind, number> = {
 
 /** Position in the hierarchy: projects at the top, builds at the bottom. */
 export const KIND_LEVEL: Record<Kind, number> = { project: 0, ticket: 1, plan: 2, worktree: 2, agent: 3, pr: 3, build: 4 };
+
+/** Status buckets for filtering, derived from the ring tones (and the waiting flag). */
+export type StatusGroup = 'attention' | 'failing' | 'running' | 'active' | 'review' | 'done' | 'idle';
+
+export const STATUS_GROUPS: { id: StatusGroup; label: string; tone: Tone; test: (i: Item) => boolean }[] = [
+  { id: 'attention', label: 'Needs attention', tone: 'warning', test: (i) => !!i.flags?.waitingForInput || i.status.some((s) => s.tone === 'warning') },
+  { id: 'failing', label: 'Failing / blocked', tone: 'critical', test: (i) => i.status.some((s) => s.tone === 'critical') },
+  { id: 'running', label: 'Running', tone: 'running', test: (i) => !!i.flags?.running || i.status.some((s) => s.tone === 'running') },
+  { id: 'active', label: 'In progress', tone: 'primary', test: (i) => i.status.some((s) => s.tone === 'primary') },
+  { id: 'review', label: 'Pending / review', tone: 'pending', test: (i) => i.status.some((s) => s.tone === 'pending') },
+  { id: 'done', label: 'Green / done', tone: 'success', test: (i) => i.status.some((s) => s.tone === 'success') },
+  { id: 'idle', label: 'Idle / to do', tone: 'neutral', test: (i) => i.status.some((s) => s.tone === 'neutral') },
+];
+
+/**
+ * For every item, the roots of the given kind it rolls up to: walk links "upwards"
+ * (towards lower levels) and stop at the first item of that kind on each path.
+ */
+export function rootsOf(items: Item[], links: Link[], kind: Kind): Map<string, string[]> {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const up = new Map<string, string[]>();
+  for (const l of links) {
+    const a = byId.get(l.from),
+      b = byId.get(l.to);
+    if (!a || !b || KIND_LEVEL[a.kind] === KIND_LEVEL[b.kind]) continue;
+    const [lo, hi] = KIND_LEVEL[a.kind] > KIND_LEVEL[b.kind] ? [a, b] : [b, a];
+    up.set(lo.id, [...(up.get(lo.id) ?? []), hi.id]);
+  }
+  const out = new Map<string, string[]>();
+  for (const it of items) {
+    const found = new Set<string>();
+    const seen = new Set<string>();
+    const stack = [it.id];
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (byId.get(id)?.kind === kind) {
+        found.add(id);
+        continue; // stop at the root, don't climb past it
+      }
+      stack.push(...(up.get(id) ?? []));
+    }
+    if (found.size) out.set(it.id, [...found]);
+  }
+  return out;
+}

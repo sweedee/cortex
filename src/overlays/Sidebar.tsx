@@ -48,6 +48,11 @@ export function Sidebar() {
           <div className="sidebar-title">{item.title}</div>
           {item.subtitle && <div className="sidebar-sub">{item.subtitle}</div>}
           <div className="sidebar-status">
+            {item.archived && (
+              <Chip size="condensed" color="neutral">
+                Archived
+              </Chip>
+            )}
             {item.status.map((s, i) => (
               <Chip key={i} size="condensed" color={TONE_CHIP[s.tone]} variant={s.tone === 'neutral' || s.tone === 'pending' ? undefined : 'emphasized'}>
                 {s.label}

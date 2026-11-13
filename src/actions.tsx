@@ -3,7 +3,7 @@
  * (`skill`); the rest open something (`external`, `view`) or change something (`direct`).
  */
 import type { ReactElement } from 'react';
-import { showToast } from '@dynatrace/strato-components/notifications';
+import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import {
   CheckmarkIcon,
   CycleIcon,
@@ -15,11 +15,14 @@ import {
   StopIcon,
   ViewIcon,
   ChatIcon,
+  SuccessIcon,
+  UndoIcon,
   DescriptionIcon,
   TerminalIcon,
 } from '@dynatrace/strato-icons';
 import type { Item, Kind } from './model';
-import { skillIcon } from './visual';
+import { ArchiveIcon, skillIcon } from './visual';
+import { Button } from '@dynatrace/strato-components/buttons';
 import {
   addItem,
   addLink,
@@ -29,8 +32,10 @@ import {
   newId,
   openDialog,
   patchItem,
+  notify,
   removeItems,
   select,
+  setArchived,
 } from './store';
 import { place } from './layout';
 
@@ -75,6 +80,81 @@ const toast = (title: string, message?: string, type: 'info' | 'success' | 'warn
 
 const gh = (i: Item) => `github.com/ctx-observability/${repoOf(i)}/pull/${i.short?.replace('#', '')}`;
 const repoOf = (i: Item) => i.subtitle?.split(' ')[0] ?? 'repo';
+
+// ---- complete / archive --------------------------------------------------------------
+
+const plural = (n: number, w: string) => `${n} ${w}${n > 1 ? 's' : ''}`;
+
+/** Archive with an undo button on the toast. */
+function archive(items: Item[], patch?: (i: Item) => Partial<Item>, verb = 'Archived') {
+  const before = items.map((i) => ({ id: i.id, status: i.status, flags: i.flags, subtitle: i.subtitle }));
+  items.forEach((i) => setArchived([i.id], true, patch?.(i) ?? {}));
+  const toastId = showToast({
+    type: 'success',
+    title: `${verb} ${items.length === 1 ? items[0].handle : plural(items.length, 'item')}`,
+    message: 'Show archived items in the filter to find it again.',
+    lifespan: 5000,
+    actions: (
+      <Button
+        size="condensed"
+        onClick={() => {
+          before.forEach((b) => setArchived([b.id], false, { status: b.status, flags: b.flags, subtitle: b.subtitle }));
+          select(before.map((b) => b.id));
+          dismissToast(toastId);
+        }}
+      >
+        <Button.Prefix>
+          <UndoIcon />
+        </Button.Prefix>
+        Undo
+      </Button>
+    ),
+  });
+}
+
+const DONE_LABEL: Partial<Record<Kind, string>> = { ticket: 'Done', agent: 'Completed', plan: 'Implemented', pr: 'Closed', worktree: 'Finished' };
+
+const completeAction = (kind: Kind): Action => ({
+  id: 'complete',
+  label: kind === 'agent' ? 'Complete' : 'Mark done',
+  type: 'direct',
+  icon: <SuccessIcon />,
+  run: (items) =>
+    archive(
+      items,
+      (i) => ({ status: [{ tone: 'success', label: DONE_LABEL[i.kind] ?? 'Done' }], flags: { ...i.flags, running: false, waitingForInput: false } }),
+      'Completed',
+    ),
+});
+
+const archiveAction: Action = { id: 'archive', label: 'Archive', type: 'direct', icon: <ArchiveIcon />, run: (items) => archive(items) };
+
+const restoreAction: Action = {
+  id: 'unarchive',
+  label: 'Unarchive',
+  type: 'direct',
+  icon: <UndoIcon />,
+  primary: true,
+  run: (items) => {
+    setArchived(
+      items.map((i) => i.id),
+      false,
+    );
+    toast(`Restored ${items.length === 1 ? items[0].handle : plural(items.length, 'item')}`, undefined, 'info');
+  },
+};
+
+/** Kinds that can be "done" (rather than only put away). */
+const COMPLETABLE: Kind[] = ['ticket', 'agent', 'plan', 'worktree'];
+
+/** All actions of one item, primary first. Archived items can only be looked at or restored. */
+export function actionsForItem(item: Item): Action[] {
+  if (item.archived) return [restoreAction, ...actionsFor(item).filter((a) => a.type === 'view' || a.type === 'external')];
+  const extra: Action[] = [];
+  if (COMPLETABLE.includes(item.kind)) extra.push(completeAction(item.kind));
+  extra.push(archiveAction);
+  return sortActions([...actionsFor(item), ...extra]);
+}
 
 function actionsFor(item: Item): Action[] {
   switch (item.kind) {
@@ -268,6 +348,7 @@ function multiActions(items: Item[]): Action[] {
   if (kinds.size === 1 && kinds.has('pr')) out.push(skill('review-multi', 'Review all', 'review-pr'));
   if (kinds.size === 1 && kinds.has('build')) out.push(skill('fix-multi', 'Fix all builds', 'fix-ci'));
   out.push(skill('summary', 'Status summary', 'status-summary'));
+  if (items.every((i) => i.archived)) return [restoreAction, out[0]];
   if (items.length === 2) {
     out.push({
       id: 'link',
@@ -280,13 +361,14 @@ function multiActions(items: Item[]): Action[] {
       },
     });
   }
+  out.push({ ...archiveAction, label: 'Archive all', run: (xs) => archive(xs.filter((x) => !x.archived)) });
   return out;
 }
 
 export function actionsForSelection(ids: string[]): { items: Item[]; actions: Action[] } {
   const items = ids.map(itemById).filter((i): i is Item => !!i);
   if (items.length === 0) return { items, actions: [] };
-  if (items.length === 1) return { items, actions: sortActions(actionsFor(items[0])) };
+  if (items.length === 1) return { items, actions: actionsForItem(items[0]) };
   return { items, actions: multiActions(items) };
 }
 
@@ -330,8 +412,18 @@ export function sendPrompt(text: string, mentioned: string[]) {
     mentioned.map((m) => ({ from: id, to: m, label: 'about' })),
   );
   place.seed(id, at);
-  select([id]);
+  select([id], false, { mention: false });
   showToast({ type: 'info', title: 'Agent started', message: text.length > 90 ? text.slice(0, 90) + '…' : text, lifespan: 3000 });
+  // prototype: the agent "finishes" a little later and raises a notification
+  setTimeout(() => {
+    const a = itemById(id);
+    if (!a || a.archived || !a.flags?.running) return;
+    notify(
+      id,
+      { text: `${title} finished — ready for your review`, tone: 'success', ago: 0 },
+      { status: [{ tone: 'success', label: 'Done · waiting for review' }], flags: { ...a.flags, running: false }, subtitle: 'claude-opus-5-5 · finished' },
+    );
+  }, 14000 + Math.random() * 8000);
   return id;
 }
 
@@ -344,6 +436,18 @@ export const KINDS_ADDABLE: { kind: Kind; label: string; hint: string }[] = [
   { kind: 'plan', label: 'New plan file…', hint: 'file name, e.g. PLAN-CTX-1234.md' },
   { kind: 'build', label: 'Watch CI build…', hint: 'job/branch, e.g. console-ui/main' },
 ];
+
+/** Items linked to the given ones (not themselves), lowest level first. */
+export function relatedItems(ids: string[]): Item[] {
+  const { links } = getState();
+  const set = new Set(ids);
+  const out = new Set<string>();
+  for (const l of links) {
+    if (set.has(l.from) && !set.has(l.to)) out.add(l.to);
+    if (set.has(l.to) && !set.has(l.from)) out.add(l.from);
+  }
+  return [...out].map(itemById).filter((i): i is Item => !!i);
+}
 
 /** Delete-key handler. */
 export function removeSelected() {

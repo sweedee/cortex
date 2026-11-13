@@ -13,7 +13,13 @@ export interface BubbleProps {
   /** something else is focused and this one is not related */
   dimmed: boolean;
   mentioned: boolean;
+  /** matches the @-query being typed in the chat box */
+  hit: boolean;
+  /** the match under the keyboard cursor of the mention popup */
+  hitActive: boolean;
   isNew: boolean;
+  /** the item's group colour (mention outline) */
+  accent: string;
   /** disc fill from the group colours (related items share them); unset = neutral gray */
   fill?: string;
 }
@@ -58,7 +64,7 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
   );
 }
 
-export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, mentioned, isNew, fill }: BubbleProps) {
+export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent }: BubbleProps) {
   const r = KIND_RADIUS[item.kind];
   const tone = item.status[0]?.tone;
   const waiting = item.flags?.waitingForInput;
@@ -69,6 +75,9 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
     lit && 'is-lit',
     dimmed && 'is-dimmed',
     mentioned && 'is-mentioned',
+    hit && 'is-hit',
+    hitActive && 'is-hit-active',
+    item.archived && 'is-archived',
     waiting && 'is-waiting',
     tone === 'critical' && 'is-critical',
     isNew && 'is-new',
@@ -80,7 +89,7 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
     <div
       className={cls}
       data-id={item.id}
-      style={{ transform: `translate(${x - r}px, ${y - r}px)`, width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'] }}
+      style={{ transform: `translate(${x - r}px, ${y - r}px)`, width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'], ['--accent' as string]: accent }}
     >
       <div className="bubble-float">
         <div className="bubble-disc" style={fill ? { background: fill } : undefined}>
@@ -92,7 +101,7 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
           )}
         </div>
         <Ring r={r} segments={item.status} />
-        {item.notice && (
+        {item.notice && !item.notice.read && !item.archived && (
           <span className={`bubble-notice tone-${item.notice.tone}`} style={{ left: r + r * 0.7071 - 7, top: r - r * 0.7071 - 7 }}>
             <span className="bubble-notice-pulse" />
           </span>

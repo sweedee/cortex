@@ -8,6 +8,7 @@ import { ChatBox } from './chat/ChatBox';
 import { Dialogs } from './overlays/Dialogs';
 import { Hud } from './overlays/Hud';
 import { Sidebar } from './overlays/Sidebar';
+import './desktop';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(

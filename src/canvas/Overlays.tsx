@@ -1,20 +1,29 @@
 /** Screen-space overlays on top of the canvas: hover card and inline quick actions. */
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
+import { ChevronLeftSmallIcon, ChevronRightSmallIcon } from '@dynatrace/strato-icons';
 import { Chip } from '@dynatrace/strato-components/content';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
 import type { Item } from '../model';
 import { KIND_LABEL } from '../model';
-import type { Action } from '../actions';
-import { KIND_ACCENT, KIND_ICON, TONE_CHIP } from '../visual';
+import { actionsForItem, type Action } from '../actions';
+import { select } from '../store';
+import { accentOf, ArchiveIcon, KIND_ICON, NEUTRAL_ACCENT, stripes, TONE_CHIP, useItemColors } from '../visual';
 
 const ago = (m: number) => (m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`);
 
 export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: number; flip: boolean }) {
+  const colors = useItemColors();
   return (
-    <div className={`hover-card ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y, ['--accent' as string]: KIND_ACCENT[item.kind] }}>
+    <div className={`hover-card ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y, ['--accent' as string]: stripes(colors.get(item.id) ?? [NEUTRAL_ACCENT], 180) }}>
       <div className="hover-card-kind">
         {KIND_ICON[item.kind](14)}
         <span>{KIND_LABEL[item.kind]}</span>
+        {item.archived && (
+          <span className="archived-tag">
+            <ArchiveIcon size={12} /> archived
+          </span>
+        )}
         <span className="hover-card-handle">@{item.handle}</span>
       </div>
       <div className="hover-card-title">{item.title}</div>
@@ -47,14 +56,77 @@ export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: numb
   );
 }
 
-/** The vertical action list that appears beside a selected bubble (or a multi-selection). */
-export function InlineActions({ actions, items, x, y, flip }: { actions: Action[]; items: Item[]; x: number; y: number; flip: boolean }) {
+/**
+ * The vertical action list that appears beside a selected bubble (or a multi-selection).
+ * Below the actions: the linked items, each with its own actions in a flyout on hover.
+ */
+export function InlineActions({
+  actions,
+  items,
+  related,
+  colors,
+  x,
+  y,
+  flip,
+}: {
+  actions: Action[];
+  items: Item[];
+  related: Item[];
+  colors: Map<string, string[]>;
+  x: number;
+  y: number;
+  flip: boolean;
+}) {
+  const [open, setOpen] = useState<{ id: string; up: boolean } | null>(null);
+  const timer = useRef(0);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const openRow = (id: string, el: HTMLElement) => {
+    clearTimeout(timer.current);
+    // flyouts of rows in the lower part of the screen open upwards
+    setOpen({ id, up: el.getBoundingClientRect().top > window.innerHeight * 0.55 });
+  };
+  const closeSoon = () => {
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setOpen(null), 180);
+  };
   return (
     <div className={`inline-actions ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y }} onPointerDown={(e) => e.stopPropagation()}>
       {items.length > 1 && <span className="inline-actions-count">{items.length} selected</span>}
       {actions.map((a) => (
         <ActionButton key={a.id} action={a} items={items} placement={flip ? 'left' : 'right'} />
       ))}
+      {related.length > 0 && <span className="inline-actions-section">Related</span>}
+      {related.map((r) => {
+        const isOpen = open?.id === r.id;
+        return (
+          <div key={r.id} className="rel-wrap" onMouseEnter={(e) => openRow(r.id, e.currentTarget)} onMouseLeave={closeSoon}>
+            <button
+              className={`rel-row ${isOpen ? 'is-open' : ''}`}
+              onClick={() => select([r.id])}
+              onFocus={(e) => openRow(r.id, e.currentTarget)}
+              title={`Select ${r.title}`}
+            >
+              {flip && <ChevronLeftSmallIcon />}
+              <span className="rel-row-icon" style={{ ['--accent' as string]: accentOf(colors, r.id) }}>
+                {KIND_ICON[r.kind](12)}
+              </span>
+              <span className="rel-row-handle">{r.handle}</span>
+              {!flip && <ChevronRightSmallIcon />}
+            </button>
+            {isOpen && (
+              <div className={`rel-flyout ${flip ? 'is-flipped' : ''} ${open.up ? 'is-up' : ''}`}>
+                <span className="rel-flyout-title">
+                  {KIND_ICON[r.kind](12)}
+                  <span>{r.title}</span>
+                </span>
+                {actionsForItem(r).map((a) => (
+                  <ActionButton key={a.id} action={a} items={[r]} placement={flip ? 'left' : 'right'} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

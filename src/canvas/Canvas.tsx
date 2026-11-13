@@ -19,9 +19,9 @@ import {
   useLayoutTick,
   warmUp,
 } from '../layout';
-import { actionsForSelection, KINDS_ADDABLE, removeSelected } from '../actions';
-import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore } from '../store';
-import { groupColors, groupFill, KIND_ICON } from '../visual';
+import { actionsForItem, actionsForSelection, KINDS_ADDABLE, relatedItems, removeSelected } from '../actions';
+import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore, useVisible, visibleSet } from '../store';
+import { accentOf, groupFill, KIND_ICON, useItemColors } from '../visual';
 
 type Cam = { x: number; y: number; k: number };
 type MenuState = { sx: number; sy: number; wx: number; wy: number; itemId?: string } | null;
@@ -30,6 +30,7 @@ const MIN_K = 0.25;
 const MAX_K = 2.2;
 const CHAT_SPACE = 170; // px reserved at the bottom for the chat box
 const TOP_SPACE = 70;
+const MAX_RELATED = 6;
 /** px covered by the details sidebar on the right (0 when it is closed) */
 const rightSpace = () => (getState().inspected ? SIDEBAR_W + 32 : 0);
 
@@ -39,8 +40,9 @@ export function Canvas() {
   const selected = useStore((s) => s.selected);
   const hovered = useStore((s) => s.hovered);
   const draft = useStore((s) => s.draft);
-  const hiddenKinds = useStore((s) => s.hiddenKinds);
-  const colorBy = useStore((s) => s.colorBy);
+  const visible = useVisible();
+  const search = useStore((s) => s.search);
+  const colors = useItemColors();
   useLayoutTick();
 
   const cam = useRef<Cam>({ x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 });
@@ -217,9 +219,9 @@ export function Canvas() {
       setMarquee(m);
       const a = toWorld(Math.min(m.x0, m.x1), Math.min(m.y0, m.y1));
       const b = toWorld(Math.max(m.x0, m.x1), Math.max(m.y0, m.y1));
-      const hidden = new Set(getState().hiddenKinds);
+      const vis = visibleSet();
       const inside = getState()
-        .items.filter((i) => !hidden.has(i.kind))
+        .items.filter((i) => vis.has(i.id))
         .filter((i) => {
           const p = positionOf(i.id);
           return p && p.x! >= a.x && p.x! <= b.x && p.y! >= a.y && p.y! <= b.y;
@@ -294,8 +296,7 @@ export function Canvas() {
       else if ((e.key === 'Delete' || e.key === 'Backspace') && getState().selected.length) removeSelected();
       else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        const hidden = new Set(getState().hiddenKinds);
-        select(getState().items.filter((i) => !hidden.has(i.kind)).map((i) => i.id));
+        select([...visibleSet()]);
       } else if (e.key === 'Enter' && getState().selected.length) {
         const { actions, items: its } = actionsForSelection(getState().selected);
         actions.find((a) => a.primary && !a.disabled)?.run(its);
@@ -317,11 +318,12 @@ export function Canvas() {
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const fills = useMemo(() => {
     const m = new Map<string, string | undefined>();
-    groupColors(items, links, colorBy).forEach((cs, id) => m.set(id, groupFill(cs)));
+    colors.forEach((cs, id) => m.set(id, groupFill(cs)));
     return m;
-  }, [items, links, colorBy]);
-  const hiddenSet = useMemo(() => new Set(items.filter((i) => hiddenKinds.includes(i.kind)).map((i) => i.id)), [items, hiddenKinds]);
+  }, [colors]);
+  const hiddenSet = useMemo(() => new Set(items.filter((i) => !visible.has(i.id)).map((i) => i.id)), [items, visible]);
   const mentioned = useMemo(() => new Set(mentionedIds(draft, items)), [draft, items]);
+  const hits = useMemo(() => (search ? new Set(search.ids) : null), [search]);
   const focus = useMemo(() => {
     const f = new Set(selected);
     if (hovered) f.add(hovered);
@@ -341,6 +343,7 @@ export function Canvas() {
     return { activeLinks, lit };
   }, [links, focus, mentioned]);
   const dimming = focus.size > 0 || mentioned.size > 0;
+  const isDimmed = (id: string) => (hits ? !hits.has(id) : dimming && !lit.has(id) && !focus.has(id));
 
   const { x: cx, y: cy, k } = cam.current;
   const sel = actionsForSelection(selected.filter((id) => !hiddenSet.has(id)));
@@ -354,7 +357,8 @@ export function Canvas() {
       const right = toScreen(b.x1, b.y0);
       const left = toScreen(b.x0, b.y0);
       const flip = right.x + 16 + 230 > window.innerWidth - rightSpace();
-      const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + 10;
+      const nRel = Math.min(relatedItems(sel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).length, MAX_RELATED);
+      const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + (nRel ? nRel * 30 + 30 : 0) + 10;
       const y = Math.max(TOP_SPACE, Math.min(right.y, window.innerHeight - CHAT_SPACE - height));
       actionsAt = { x: flip ? left.x - 16 : right.x + 16, y, flip };
     }
@@ -386,6 +390,7 @@ export function Canvas() {
 
   const menuItem = menu?.itemId ? itemMap.get(menu.itemId) : undefined;
   const menuSel = menu?.itemId ? actionsForSelection(getState().selected) : null;
+  const menuRelated = menuSel ? relatedItems(menuSel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).slice(0, 8) : [];
 
   return (
     <div
@@ -413,10 +418,13 @@ export function Canvas() {
               y={p.y!}
               selected={selected.includes(it.id)}
               lit={lit.has(it.id) && !focus.has(it.id)}
-              dimmed={dimming && !lit.has(it.id) && !focus.has(it.id)}
+              dimmed={isDimmed(it.id)}
               mentioned={mentioned.has(it.id)}
+              hit={!!hits?.has(it.id)}
+              hitActive={search?.active === it.id}
               isNew={freshIds.has(it.id)}
               fill={fills.get(it.id)}
+              accent={accentOf(colors, it.id)}
             />
           );
         })}
@@ -427,13 +435,26 @@ export function Canvas() {
           {chatThreads.map((t, i) => {
             const ox = chatRect.left + chatRect.width / 2 + (i - (chatThreads.length - 1) / 2) * 26;
             const oy = chatRect.top;
-            return <path key={t.id} d={`M${ox},${oy} C${ox},${oy - 120} ${t.x},${t.y + 140} ${t.x},${t.y}`} />;
+            return <path key={t.id} d={`M${ox},${oy} C${ox},${oy - 120} ${t.x},${t.y + 140} ${t.x},${t.y}`} style={{ stroke: accentOf(colors, t.id) }} />;
           })}
         </svg>
       )}
 
       {hoverCard}
-      {actionsAt && <InlineActions key={selected.join(',')} actions={sel.actions} items={sel.items} x={actionsAt.x} y={actionsAt.y} flip={actionsAt.flip} />}
+      {actionsAt && (
+        <InlineActions
+          key={selected.join(',')}
+          actions={sel.actions}
+          items={sel.items}
+          related={relatedItems(sel.items.map((i) => i.id))
+            .filter((i) => !hiddenSet.has(i.id))
+            .slice(0, MAX_RELATED)}
+          colors={colors}
+          x={actionsAt.x}
+          y={actionsAt.y}
+          flip={actionsAt.flip}
+        />
+      )}
 
       {marquee && (
         <div
@@ -469,6 +490,34 @@ export function Canvas() {
                     </Menu.Item>
                   ))}
                 </Menu.Group>
+                {menuRelated.length > 0 && (
+                  <Menu.Group>
+                    <Menu.Label>Related</Menu.Label>
+                    {menuRelated.map((r) => (
+                      <Menu.Sub key={r.id}>
+                        <Menu.SubTrigger textValue={r.handle}>
+                          <Menu.Prefix>{KIND_ICON[r.kind](16)}</Menu.Prefix>
+                          {r.handle}
+                        </Menu.SubTrigger>
+                        <Menu.SubContent>
+                          <Menu.Label>{r.title}</Menu.Label>
+                          {actionsForItem(r).map((a) => (
+                            <Menu.Item key={a.id} disabled={!!a.disabled} onSelect={() => a.run([r])}>
+                              <Menu.Prefix>{a.icon}</Menu.Prefix>
+                              {a.label}
+                            </Menu.Item>
+                          ))}
+                          <Menu.Item onSelect={() => (select([r.id]), fitTo([r.id], true, 1.05))}>
+                            <Menu.Prefix>
+                              <ZoomToFitIcon />
+                            </Menu.Prefix>
+                            Select and zoom to
+                          </Menu.Item>
+                        </Menu.SubContent>
+                      </Menu.Sub>
+                    ))}
+                  </Menu.Group>
+                )}
                 <Menu.Group>
                   <Menu.Item onSelect={() => insertSkill(null, menuSel.items.map((i) => i.id))}>
                     <Menu.Prefix>
