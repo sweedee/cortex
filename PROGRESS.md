@@ -49,13 +49,14 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 |---|---|---|---|
 | 0a | Electron shell, typed IPC bridge (exec / pickers / notifications / openExternal / workspace file), persistence, audio + desktop notifications, vitest + oxlint | opus agent | ✅ done (`990aabd`) |
 | 0b | Domain model refactor → typed per-kind data + kind registry, zustand + zod, TanStack Query wiring, seed migrated, new kinds stubbed | opus agent | ⏳ running |
-| 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | — | todo |
+| 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | opus agent, isolated worktree → branch `phase-1-integrations` (merge into `app` after 0b) | ⏳ running |
 | 2 | Shared viewers: markdown (+mermaid), diff2html, CodeMirror editor, webview panel | — | todo |
 | 3 | Kind modules (actions + sidebars), in parallel slices | — | todo |
 | 4 | Integration pass, review, README/handoff | — | todo |
 
 ## Log
 
+- 2026-11-13 — Started 0b (renderer refactor, on `app`) and Phase 1 (main-process integrations, separate worktree branch `phase-1-integrations`) in parallel. Phase 1 only adds to shared/ipc, preload, native.ts → merge expected to be easy.
 - 2026-11-13 — Phase 0a done (3 commits up to `990aabd`). typecheck/lint/build pass, 22 tests. Bridge verified from a running app (dev + built). Notes for later phases:
   - Layout: `src/main`, `src/preload` (sandboxed CJS, only `electron` + `shared/ipc.ts`), `src/shared/{ipc,schemas}.ts`, renderer in `src/renderer/src`; `public/` stays at repo root; use `asset('brand/…')` for asset URLs.
   - All native access via `src/renderer/src/native.ts` (browser fallback). Adding a channel: see `docs/ARCHITECTURE.md`.
