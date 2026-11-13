@@ -1,0 +1,37 @@
+import { app } from 'electron';
+import { promises as fs } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWrite } from '../lib/atomicWrite';
+import { listDir } from '../lib/files';
+import { Watchers } from '../lib/watchers';
+import { WorkspaceFile } from '../lib/workspaceFile';
+import { handle, type IpcContext } from './handle';
+
+/** `workspace:*` and `fs:*`. */
+export function registerFiles(ctx: IpcContext) {
+  const workspace = new WorkspaceFile(join(app.getPath('userData'), 'workspace.json'));
+  handle(ctx, 'workspace:load', () => workspace.load());
+  handle(ctx, 'workspace:save', ({ data }) => workspace.save(data));
+  handle(ctx, 'workspace:path', () => workspace.file);
+
+  // don't quit in the middle of a workspace write
+  let flushed = false;
+  app.on('before-quit', (e) => {
+    if (flushed || !workspace.busy) return;
+    e.preventDefault();
+    void workspace.flush().finally(() => {
+      flushed = true;
+      app.quit();
+    });
+  });
+
+  handle(ctx, 'fs:readText', ({ path }) => fs.readFile(path, 'utf8'));
+  handle(ctx, 'fs:writeText', ({ path, text }) => atomicWrite(path, text));
+  handle(ctx, 'fs:list', ({ dir, options }) => listDir(dir, options));
+
+  const watchers = new Watchers((e) => ctx.send('fs:changed', e));
+  handle(ctx, 'fs:watch', ({ dir }) => watchers.watch(dir));
+  handle(ctx, 'fs:unwatch', ({ watchId }) => watchers.unwatch(watchId));
+  app.on('will-quit', () => watchers.closeAll());
+  return { closeWatchers: () => watchers.closeAll() };
+}

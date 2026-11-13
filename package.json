@@ -2,28 +2,41 @@
   "name": "cortex",
   "private": true,
   "version": "0.0.0",
+  "description": "Cortex: a single-canvas developer command center (Electron)",
   "type": "module",
+  "main": "./out/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "dev:web": "vite --config vite.web.config.ts",
+    "typecheck": "tsc -b",
+    "lint": "oxlint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@dynatrace/strato-components": "^3.17.1",
     "@dynatrace/strato-design-tokens": "^1.8.1",
     "@dynatrace/strato-icons": "^2.6.1",
+    "cross-spawn": "7.0.6",
     "d3-force": "^3.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-intl": "^7.0.0"
+    "react-intl": "^7.0.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.19.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^6.1.2",
+    "electron": "44.10.0",
+    "electron-vite": "6.0.0",
+    "oxlint": "1.89.0",
     "typescript": "~5.9.3",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "5.0.5"
   }
 }
