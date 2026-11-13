@@ -1,0 +1,975 @@
+{
+  "version": 0,
+  "items": [
+    {
+      "id": "p-ingest",
+      "kind": "project",
+      "handle": "ingest-gateway",
+      "title": "ingest-gateway",
+      "subtitle": "ctx-observability/ingest-gateway",
+      "status": [
+        {
+          "tone": "success",
+          "label": "main is green"
+        }
+      ],
+      "facts": [
+        [
+          "Open PRs",
+          "2"
+        ],
+        [
+          "Worktrees",
+          "2"
+        ],
+        [
+          "Default branch",
+          "main"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "p-console",
+      "kind": "project",
+      "handle": "console-ui",
+      "title": "console-ui",
+      "subtitle": "ctx-observability/console-ui",
+      "status": [
+        {
+          "tone": "success",
+          "label": "main is green",
+          "weight": 3
+        },
+        {
+          "tone": "warning",
+          "label": "4 Renovate PRs waiting",
+          "weight": 1
+        }
+      ],
+      "notice": {
+        "text": "4 dependency updates waiting for review",
+        "tone": "warning",
+        "ago": 50
+      },
+      "facts": [
+        [
+          "Open PRs",
+          "5"
+        ],
+        [
+          "Worktrees",
+          "1"
+        ],
+        [
+          "Default branch",
+          "main"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "p-alert",
+      "kind": "project",
+      "handle": "alerting-service",
+      "title": "alerting-service",
+      "subtitle": "ctx-observability/alerting-service",
+      "status": [
+        {
+          "tone": "success",
+          "label": "main is green"
+        }
+      ],
+      "facts": [
+        [
+          "Open PRs",
+          "1"
+        ],
+        [
+          "Worktrees",
+          "1"
+        ],
+        [
+          "Default branch",
+          "main"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "t-4821",
+      "kind": "ticket",
+      "handle": "CTX-4821",
+      "short": "4821",
+      "title": "Retry with exponential backoff in the dispatcher",
+      "subtitle": "Story · High · In Progress",
+      "status": [
+        {
+          "tone": "primary",
+          "label": "In Progress"
+        }
+      ],
+      "facts": [
+        [
+          "Assignee",
+          "you"
+        ],
+        [
+          "Sprint",
+          "CTX 26.23"
+        ],
+        [
+          "Points",
+          "5"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "t-4790",
+      "kind": "ticket",
+      "handle": "CTX-4790",
+      "short": "4790",
+      "title": "Dashboard tiles flicker on auto-refresh",
+      "subtitle": "Bug · Medium · In Review",
+      "status": [
+        {
+          "tone": "pending",
+          "label": "In Review"
+        }
+      ],
+      "facts": [
+        [
+          "Assignee",
+          "you"
+        ],
+        [
+          "Sprint",
+          "CTX 26.23"
+        ],
+        [
+          "Points",
+          "3"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "t-4833",
+      "kind": "ticket",
+      "handle": "CTX-4833",
+      "short": "4833",
+      "title": "Deduplicate alerts across regions",
+      "subtitle": "Story · High · In Progress",
+      "status": [
+        {
+          "tone": "primary",
+          "label": "In Progress"
+        }
+      ],
+      "facts": [
+        [
+          "Assignee",
+          "you"
+        ],
+        [
+          "Sprint",
+          "CTX 26.23"
+        ],
+        [
+          "Points",
+          "8"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "t-4840",
+      "kind": "ticket",
+      "handle": "CTX-4840",
+      "short": "4840",
+      "title": "Spike: OTLP/HTTP partial-success responses",
+      "subtitle": "Spike · Low · To Do",
+      "status": [
+        {
+          "tone": "neutral",
+          "label": "To Do"
+        }
+      ],
+      "notice": {
+        "text": "Assigned to you by Mara Lindqvist",
+        "tone": "primary",
+        "ago": 12
+      },
+      "facts": [
+        [
+          "Assignee",
+          "you"
+        ],
+        [
+          "Sprint",
+          "backlog"
+        ],
+        [
+          "Points",
+          "–"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "t-4802",
+      "kind": "ticket",
+      "handle": "CTX-4802",
+      "short": "4802",
+      "title": "Alert e-mails show the wrong timezone offset",
+      "subtitle": "Bug · Blocker · To Do",
+      "status": [
+        {
+          "tone": "critical",
+          "label": "Blocker · To Do"
+        }
+      ],
+      "facts": [
+        [
+          "Assignee",
+          "unassigned"
+        ],
+        [
+          "Sprint",
+          "CTX 26.23"
+        ],
+        [
+          "Points",
+          "2"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "w-4821",
+      "kind": "worktree",
+      "handle": "wt/CTX-4821-retry",
+      "title": "feat/CTX-4821-retry-backoff",
+      "subtitle": "~/wt/ingest-gateway/CTX-4821",
+      "status": [
+        {
+          "tone": "success",
+          "label": "up to date with main",
+          "weight": 2
+        },
+        {
+          "tone": "warning",
+          "label": "6 uncommitted files",
+          "weight": 1
+        }
+      ],
+      "facts": [
+        [
+          "Ahead / behind",
+          "4 / 0"
+        ],
+        [
+          "Dirty files",
+          "6"
+        ],
+        [
+          "Base",
+          "main"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "w-4790",
+      "kind": "worktree",
+      "handle": "wt/CTX-4790-flicker",
+      "title": "fix/CTX-4790-tile-flicker",
+      "subtitle": "~/wt/console-ui/CTX-4790",
+      "status": [
+        {
+          "tone": "warning",
+          "label": "12 commits behind main"
+        }
+      ],
+      "facts": [
+        [
+          "Ahead / behind",
+          "3 / 12"
+        ],
+        [
+          "Dirty files",
+          "0"
+        ],
+        [
+          "Base",
+          "main"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "w-4833a",
+      "kind": "worktree",
+      "handle": "wt/CTX-4833-alerting",
+      "title": "feat/CTX-4833-dedup",
+      "subtitle": "~/wt/alerting-service/CTX-4833",
+      "status": [
+        {
+          "tone": "success",
+          "label": "clean, up to date"
+        }
+      ],
+      "facts": [
+        [
+          "Ahead / behind",
+          "1 / 0"
+        ],
+        [
+          "Dirty files",
+          "0"
+        ],
+        [
+          "Base",
+          "main"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "w-4833b",
+      "kind": "worktree",
+      "handle": "wt/CTX-4833-ingest",
+      "title": "feat/CTX-4833-dedup-key",
+      "subtitle": "~/wt/ingest-gateway/CTX-4833",
+      "status": [
+        {
+          "tone": "success",
+          "label": "clean, up to date"
+        }
+      ],
+      "facts": [
+        [
+          "Ahead / behind",
+          "0 / 0"
+        ],
+        [
+          "Dirty files",
+          "0"
+        ],
+        [
+          "Base",
+          "main"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "a-impl-4821",
+      "kind": "agent",
+      "handle": "agent/implement-4821",
+      "title": "Implement CTX-4821",
+      "subtitle": "claude-opus-5-5 · running 18 min",
+      "status": [
+        {
+          "tone": "running",
+          "label": "Running · editing src/dispatcher/retry.ts"
+        }
+      ],
+      "flags": {
+        "running": true
+      },
+      "facts": [
+        [
+          "Context",
+          "61%"
+        ],
+        [
+          "Cost",
+          "$1.84"
+        ],
+        [
+          "Turns",
+          "23"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "a-plan-4833",
+      "kind": "agent",
+      "handle": "agent/plan-4833",
+      "title": "Plan CTX-4833",
+      "subtitle": "claude-opus-5-5 · waiting 4 min",
+      "status": [
+        {
+          "tone": "warning",
+          "label": "Waiting for your answer"
+        }
+      ],
+      "notice": {
+        "text": "Needs input: \"Dedup window — 30s or configurable per rule?\"",
+        "tone": "warning",
+        "ago": 4
+      },
+      "flags": {
+        "waitingForInput": true
+      },
+      "facts": [
+        [
+          "Context",
+          "34%"
+        ],
+        [
+          "Cost",
+          "$0.62"
+        ],
+        [
+          "Turns",
+          "9"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "a-review-4790",
+      "kind": "agent",
+      "handle": "agent/review-4790",
+      "title": "Self-review CTX-4790",
+      "subtitle": "claude-sonnet-5-5 · finished 1 h ago",
+      "status": [
+        {
+          "tone": "success",
+          "label": "Done · 2 findings fixed"
+        }
+      ],
+      "facts": [
+        [
+          "Context",
+          "22%"
+        ],
+        [
+          "Cost",
+          "$0.31"
+        ],
+        [
+          "Turns",
+          "6"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "a-renovate",
+      "kind": "agent",
+      "handle": "agent/renovate-console",
+      "title": "Renovate review · console-ui",
+      "subtitle": "claude-sonnet-5-5 · running 3 min",
+      "status": [
+        {
+          "tone": "running",
+          "label": "Running · reading release notes of vite 8.4"
+        }
+      ],
+      "flags": {
+        "running": true
+      },
+      "facts": [
+        [
+          "Context",
+          "12%"
+        ],
+        [
+          "Cost",
+          "$0.09"
+        ],
+        [
+          "Turns",
+          "3"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "pr-482",
+      "kind": "pr",
+      "handle": "PR-482",
+      "short": "#482",
+      "title": "Retry with exponential backoff in the dispatcher",
+      "subtitle": "ingest-gateway · draft → main",
+      "status": [
+        {
+          "tone": "pending",
+          "label": "Review pending (2 reviewers)"
+        },
+        {
+          "tone": "running",
+          "label": "Checks running"
+        }
+      ],
+      "flags": {
+        "mergeable": false
+      },
+      "facts": [
+        [
+          "Reviews",
+          "0 / 2"
+        ],
+        [
+          "Checks",
+          "running"
+        ],
+        [
+          "Diff",
+          "+412 −87"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "pr-477",
+      "kind": "pr",
+      "handle": "PR-477",
+      "short": "#477",
+      "title": "Keep tile DOM stable across auto-refresh",
+      "subtitle": "console-ui · open → main",
+      "status": [
+        {
+          "tone": "success",
+          "label": "Approved by Mara, Jonas"
+        },
+        {
+          "tone": "warning",
+          "label": "Merge conflict in TileGrid.tsx"
+        }
+      ],
+      "notice": {
+        "text": "Approved by Jonas Becker",
+        "tone": "success",
+        "ago": 7
+      },
+      "flags": {
+        "mergeable": false,
+        "approved": true
+      },
+      "facts": [
+        [
+          "Reviews",
+          "2 / 2 approved"
+        ],
+        [
+          "Checks",
+          "1 failed"
+        ],
+        [
+          "Diff",
+          "+96 −41"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "pr-3121",
+      "kind": "pr",
+      "handle": "PR-3121",
+      "short": "#3121",
+      "title": "Region-aware dedup key for alert fingerprints",
+      "subtitle": "alerting-service · draft → main",
+      "status": [
+        {
+          "tone": "neutral",
+          "label": "Draft"
+        }
+      ],
+      "flags": {
+        "mergeable": false
+      },
+      "facts": [
+        [
+          "Reviews",
+          "–"
+        ],
+        [
+          "Checks",
+          "passed"
+        ],
+        [
+          "Diff",
+          "+58 −4"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "pr-469",
+      "kind": "pr",
+      "handle": "PR-469",
+      "short": "#469",
+      "title": "chore(deps): update dependency vite to v8.4.1",
+      "subtitle": "console-ui · renovate[bot] → main",
+      "status": [
+        {
+          "tone": "success",
+          "label": "Approved, checks green, mergeable"
+        }
+      ],
+      "flags": {
+        "mergeable": true,
+        "approved": true
+      },
+      "facts": [
+        [
+          "Reviews",
+          "1 / 1 approved"
+        ],
+        [
+          "Checks",
+          "passed"
+        ],
+        [
+          "Diff",
+          "+3 −3"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "b-1842",
+      "kind": "build",
+      "handle": "build-1842",
+      "short": "1842",
+      "title": "ingest-gateway #1842",
+      "subtitle": "feat/CTX-4821-retry-backoff · stage 3/5 test",
+      "status": [
+        {
+          "tone": "running",
+          "label": "Running · integration tests"
+        }
+      ],
+      "flags": {
+        "running": true
+      },
+      "facts": [
+        [
+          "Duration",
+          "6m 12s"
+        ],
+        [
+          "Trigger",
+          "push"
+        ],
+        [
+          "Stage",
+          "test"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "b-1838",
+      "kind": "build",
+      "handle": "build-1838",
+      "short": "1838",
+      "title": "console-ui #1838",
+      "subtitle": "fix/CTX-4790-tile-flicker · failed in e2e",
+      "status": [
+        {
+          "tone": "critical",
+          "label": "Failed · e2e (TileGrid.spec.ts)"
+        }
+      ],
+      "notice": {
+        "text": "Build failed in stage e2e",
+        "tone": "critical",
+        "ago": 22
+      },
+      "facts": [
+        [
+          "Duration",
+          "14m 40s"
+        ],
+        [
+          "Trigger",
+          "push"
+        ],
+        [
+          "Stage",
+          "e2e"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "b-1201",
+      "kind": "build",
+      "handle": "build-1201",
+      "short": "1201",
+      "title": "alerting-service #1201",
+      "subtitle": "feat/CTX-4833-dedup · passed",
+      "status": [
+        {
+          "tone": "success",
+          "label": "Passed"
+        }
+      ],
+      "facts": [
+        [
+          "Duration",
+          "8m 03s"
+        ],
+        [
+          "Trigger",
+          "push"
+        ],
+        [
+          "Stage",
+          "done"
+        ]
+      ],
+      "cluster": "p-alert"
+    },
+    {
+      "id": "b-1836",
+      "kind": "build",
+      "handle": "build-1836",
+      "short": "1836",
+      "title": "console-ui #1836",
+      "subtitle": "renovate/vite-8.x · passed",
+      "status": [
+        {
+          "tone": "success",
+          "label": "Passed"
+        }
+      ],
+      "facts": [
+        [
+          "Duration",
+          "11m 51s"
+        ],
+        [
+          "Trigger",
+          "push"
+        ],
+        [
+          "Stage",
+          "done"
+        ]
+      ],
+      "cluster": "p-console"
+    },
+    {
+      "id": "plan-4821",
+      "kind": "plan",
+      "handle": "PLAN-CTX-4821.md",
+      "title": "PLAN-CTX-4821.md",
+      "subtitle": "Approved · 6 steps · 4 done",
+      "status": [
+        {
+          "tone": "success",
+          "label": "4 steps done",
+          "weight": 4
+        },
+        {
+          "tone": "neutral",
+          "label": "2 steps open",
+          "weight": 2
+        }
+      ],
+      "facts": [
+        [
+          "Steps",
+          "4 / 6"
+        ],
+        [
+          "Author",
+          "agent/plan-4821"
+        ],
+        [
+          "Approved",
+          "yes"
+        ]
+      ],
+      "cluster": "p-ingest"
+    },
+    {
+      "id": "plan-4833",
+      "kind": "plan",
+      "handle": "PLAN-CTX-4833.md",
+      "title": "PLAN-CTX-4833.md",
+      "subtitle": "Draft · being written",
+      "status": [
+        {
+          "tone": "pending",
+          "label": "Draft, not approved yet"
+        }
+      ],
+      "facts": [
+        [
+          "Steps",
+          "– / 9"
+        ],
+        [
+          "Author",
+          "agent/plan-4833"
+        ],
+        [
+          "Approved",
+          "no"
+        ]
+      ],
+      "cluster": "p-alert"
+    }
+  ],
+  "links": [
+    {
+      "id": "l1",
+      "from": "t-4821",
+      "to": "p-ingest",
+      "label": "in project"
+    },
+    {
+      "id": "l2",
+      "from": "t-4840",
+      "to": "p-ingest",
+      "label": "in project"
+    },
+    {
+      "id": "l3",
+      "from": "t-4790",
+      "to": "p-console",
+      "label": "in project"
+    },
+    {
+      "id": "l4",
+      "from": "t-4833",
+      "to": "p-alert",
+      "label": "involves"
+    },
+    {
+      "id": "l5",
+      "from": "t-4833",
+      "to": "p-ingest",
+      "label": "involves"
+    },
+    {
+      "id": "l6",
+      "from": "t-4802",
+      "to": "p-alert",
+      "label": "in project"
+    },
+    {
+      "id": "l7",
+      "from": "w-4821",
+      "to": "t-4821",
+      "label": "works on"
+    },
+    {
+      "id": "l8",
+      "from": "w-4790",
+      "to": "t-4790",
+      "label": "works on"
+    },
+    {
+      "id": "l9",
+      "from": "w-4833a",
+      "to": "t-4833",
+      "label": "works on"
+    },
+    {
+      "id": "l10",
+      "from": "w-4833b",
+      "to": "t-4833",
+      "label": "works on"
+    },
+    {
+      "id": "l11",
+      "from": "a-impl-4821",
+      "to": "w-4821",
+      "label": "runs in"
+    },
+    {
+      "id": "l12",
+      "from": "a-plan-4833",
+      "to": "t-4833",
+      "label": "plans"
+    },
+    {
+      "id": "l13",
+      "from": "a-review-4790",
+      "to": "w-4790",
+      "label": "ran in"
+    },
+    {
+      "id": "l14",
+      "from": "a-renovate",
+      "to": "p-console",
+      "label": "reviews deps of"
+    },
+    {
+      "id": "l15",
+      "from": "pr-482",
+      "to": "w-4821",
+      "label": "from branch"
+    },
+    {
+      "id": "l16",
+      "from": "pr-477",
+      "to": "w-4790",
+      "label": "from branch"
+    },
+    {
+      "id": "l17",
+      "from": "pr-3121",
+      "to": "w-4833a",
+      "label": "from branch"
+    },
+    {
+      "id": "l18",
+      "from": "pr-469",
+      "to": "p-console",
+      "label": "targets"
+    },
+    {
+      "id": "l19",
+      "from": "b-1842",
+      "to": "pr-482",
+      "label": "checks"
+    },
+    {
+      "id": "l20",
+      "from": "b-1838",
+      "to": "pr-477",
+      "label": "checks"
+    },
+    {
+      "id": "l21",
+      "from": "b-1201",
+      "to": "pr-3121",
+      "label": "checks"
+    },
+    {
+      "id": "l22",
+      "from": "b-1836",
+      "to": "pr-469",
+      "label": "checks"
+    },
+    {
+      "id": "l23",
+      "from": "plan-4821",
+      "to": "t-4821",
+      "label": "plan for"
+    },
+    {
+      "id": "l24",
+      "from": "plan-4833",
+      "to": "t-4833",
+      "label": "plan for"
+    },
+    {
+      "id": "l25",
+      "from": "a-plan-4833",
+      "to": "plan-4833",
+      "label": "writes"
+    }
+  ]
+}
