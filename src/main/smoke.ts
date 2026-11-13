@@ -19,7 +19,7 @@ const PROBE = `(async () => {
   await step('fs.list *.json', async () => (await c.fs.list(${JSON.stringify(process.cwd())}, { glob: '*.json' })).map((e) => e.name));
   await step('proc.list', () => c.proc.list());
   if (${JSON.stringify(!!process.env['CORTEX_USER_DATA'])}) {
-    await step('workspace save+load (temp userData)', async () => { await c.workspace.save({ version: 0, items: [{ id: 'x' }], links: [] }); await c.workspace.save({ version: 0, items: [{ id: 'y' }], links: [] }); return c.workspace.load(); });
+    await step('workspace save+load (temp userData)', async () => { await c.workspace.save({ version: 0, items: [], links: [], probe: 1 }); await c.workspace.save({ version: 0, items: [], links: [], probe: 2 }); return c.workspace.load(); });
   }
   out.rootRendered = !!document.querySelector('#root')?.children.length;
   return out;

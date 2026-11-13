@@ -16,8 +16,19 @@ interface StoredWorkspace {
   links: Link[];
 }
 
-const isStored = (d: unknown): d is StoredWorkspace =>
-  !!d && typeof d === 'object' && Array.isArray((d as StoredWorkspace).items) && Array.isArray((d as StoredWorkspace).links);
+/** shallow sanity check only (0b replaces it with zod): enough that a bad file can't crash the canvas */
+const isItem = (i: unknown) => {
+  const it = i as Partial<Item> | null;
+  return !!it && typeof it.id === 'string' && typeof it.kind === 'string' && typeof it.handle === 'string' && typeof it.title === 'string' && Array.isArray(it.status);
+};
+const isLink = (l: unknown) => {
+  const li = l as Partial<Link> | null;
+  return !!li && typeof li.id === 'string' && typeof li.from === 'string' && typeof li.to === 'string';
+};
+const isStored = (d: unknown): d is StoredWorkspace => {
+  const w = d as Partial<StoredWorkspace> | null;
+  return !!w && Array.isArray(w.items) && Array.isArray(w.links) && w.items.every(isItem) && w.links.every(isLink);
+};
 
 /** Load the stored workspace into the store (keeps the seed when nothing usable is stored). */
 export async function loadWorkspace(): Promise<void> {
