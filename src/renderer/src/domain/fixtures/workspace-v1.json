@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "p-ingest",
+      "kind": "project",
+      "handle": "ingest-gateway",
+      "title": "ingest-gateway",
+      "createdAt": 1763000000000,
+      "updatedAt": 1763000000000,
+      "data": { "repo": "ctx-observability/ingest-gateway", "baseDir": "~/code/ingest-gateway", "defaultBranch": "main", "stats": { "mainChecks": "success", "openPrs": 3 } }
+    },
+    {
+      "id": "a-impl-4821",
+      "kind": "agent",
+      "handle": "agent/impl-4821",
+      "title": "Implement CTX-4821",
+      "projectId": "p-ingest",
+      "createdAt": 1763000000000,
+      "updatedAt": 1763000000000,
+      "data": { "cwd": "~/wt/ingest-gateway/CTX-4821", "model": "claude-opus-5-5", "status": "running", "skill": "implement", "lastActivity": "editing src/dispatcher/retry.ts", "usage": { "contextPct": 41, "costUsd": 1.12, "turns": 14 } }
+    }
+  ],
+  "links": [{ "id": "l1", "from": "a-impl-4821", "to": "p-ingest", "label": "belongs to" }],
+  "prefs": { "desktopNotify": true, "soundOn": false, "colorBy": "ticket" }
+}

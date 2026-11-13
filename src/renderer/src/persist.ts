@@ -74,7 +74,7 @@ export function toWorkspace(s: State): Workspace {
   return { version: WORKSPACE_VERSION, items: s.items, links: s.links, prefs: prefsOf(s) };
 }
 
-const persisted = (s: State) => [s.items, s.links, s.desktopNotify, s.soundOn, s.colorBy, s.filter] as const;
+const persisted = (s: State) => [s.items, s.links, s.desktopNotify, s.soundOn, s.colorBy, s.filter, s.settings] as const;
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let dirty = false;

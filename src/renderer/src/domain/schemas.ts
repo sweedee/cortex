@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 
-export const WORKSPACE_VERSION = 1;
+export const WORKSPACE_VERSION = 2;
 
 // ---- shared vocabulary ---------------------------------------------------------------------
 
@@ -136,6 +136,12 @@ export const AgentDataSchema = z.object({
   pendingQuestion: z.object({ toolUseId: z.string(), questions: z.array(QuestionSchema).min(1) }).optional(),
   /** one line on what it is doing / did last */
   lastActivity: z.string().optional(),
+  /** Cortex's id of the Claude Code session in main (`claude:start` localId); unset = not a real session (demo) */
+  localId: z.string().optional(),
+  /** tool calls waiting for allow / deny (other than AskUserQuestion) */
+  pendingPermissions: z.array(z.object({ requestId: z.string(), toolName: z.string(), summary: z.string().optional() })).optional(),
+  /** why it failed (last stderr lines / error) */
+  error: z.string().optional(),
   startedAt: z.number().optional(),
   endedAt: z.number().optional(),
   usage: z.object({ contextPct: z.number().optional(), costUsd: z.number().optional(), turns: count.optional() }).optional(),
@@ -271,6 +277,9 @@ export const FilterSchema = z.object({
 
 export const ColorBySchema = z.enum(['none', 'project', 'ticket']);
 
+/** Claude Code `--permission-mode` for new sessions ('default' = the CLI asks for tools it may not run). */
+export const PermissionModeSchema = z.enum(['default', 'acceptEdits', 'plan', 'bypassPermissions', 'auto', 'dontAsk']);
+
 export const PrefsSchema = z.object({
   /** OS notifications for new notices */
   desktopNotify: z.boolean(),
@@ -280,6 +289,16 @@ export const PrefsSchema = z.object({
   colorBy: ColorBySchema,
   /** last filter; an outdated one (e.g. unknown kinds) is dropped rather than failing the prefs */
   filter: FilterSchema.optional().catch(undefined),
+  // v2: integrations / layout settings (a bad value falls back to its default instead of resetting all prefs)
+  /** Claude Code model for new sessions; unset = the CLI's default */
+  model: z.string().min(1).optional().catch(undefined),
+  permissionMode: PermissionModeSchema.catch('default'),
+  /** PR comment that triggers the AI review; unset = main's config (`@claude review` / CORTEX_AI_REVIEW_COMMENT) */
+  aiReviewComment: z.string().min(1).optional().catch(undefined),
+  /** background refresh of the canvas caches (git stats, PR / ticket status), seconds */
+  refreshSec: z.number().int().min(10).max(3600).catch(60),
+  /** details sidebar width, px */
+  sidebarWidth: z.number().int().min(280).max(2400).catch(360),
 });
 
 export const CameraSchema = z.object({ x: z.number(), y: z.number(), k: z.number().positive() });

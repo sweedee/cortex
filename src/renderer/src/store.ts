@@ -17,6 +17,10 @@ import { SEED_ITEMS, SEED_LINKS } from './seed';
 
 export type { ColorBy, Filter } from './domain';
 
+/** Persisted settings for integrations and layout (part of the workspace prefs, v2). */
+export type Settings = Pick<Prefs, 'model' | 'permissionMode' | 'aiReviewComment' | 'refreshSec' | 'sidebarWidth'>;
+const settingsOf = (p: Prefs): Settings => ({ model: p.model, permissionMode: p.permissionMode, aiReviewComment: p.aiReviewComment, refreshSec: p.refreshSec, sidebarWidth: p.sidebarWidth });
+
 export type Dialog =
   | { type: 'add'; kind: Kind; at: { x: number; y: number } }
   | { type: 'session'; itemId: string }
@@ -59,6 +63,8 @@ export interface State {
   desktopNotify: boolean;
   /** play a chime for new notices */
   soundOn: boolean;
+  /** Claude model / permission mode, AI review comment, refresh interval, sidebar width */
+  settings: Settings;
 }
 
 const initial = (): State => ({
@@ -76,6 +82,7 @@ const initial = (): State => ({
   colorBy: DEFAULT_PREFS.colorBy,
   desktopNotify: false,
   soundOn: DEFAULT_PREFS.soundOn,
+  settings: settingsOf(DEFAULT_PREFS),
 });
 
 /** The zustand store itself (for `subscribe(selector, listener)` and tests). */
@@ -342,9 +349,10 @@ export function notify(id: string, notice: Pick<Notice, 'text' | 'tone'> & { at?
 
 export const setDesktopNotify = (on: boolean) => setState((s) => ({ ...s, desktopNotify: on }));
 export const setSoundOn = (on: boolean) => setState((s) => ({ ...s, soundOn: on }));
+export const setSettings = (patch: Partial<Settings>) => setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
 
 /** The persisted prefs of a state (a new object each call: don't use it as a `useStore` selector). */
-export const prefsOf = (s: State): Prefs => ({ desktopNotify: s.desktopNotify, soundOn: s.soundOn, colorBy: s.colorBy, filter: s.filter });
+export const prefsOf = (s: State): Prefs => ({ desktopNotify: s.desktopNotify, soundOn: s.soundOn, colorBy: s.colorBy, filter: s.filter, ...s.settings });
 
 /** Replace the whole world (workspace load / reset); drops selection and other pointers into the old one. */
 export const replaceWorld = (items: Item[], links: Link[], prefs?: Prefs) =>
@@ -364,6 +372,7 @@ export const replaceWorld = (items: Item[], links: Link[], prefs?: Prefs) =>
       soundOn: prefs.soundOn,
       colorBy: prefs.colorBy,
       filter: prefs.filter ?? EMPTY_FILTER,
+      settings: settingsOf({ ...DEFAULT_PREFS, ...prefs }),
     }),
   }));
 

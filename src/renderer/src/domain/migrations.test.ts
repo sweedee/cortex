@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SEED_ITEMS, SEED_LINKS } from '../seed';
 import v0 from './fixtures/workspace-v0.json';
+import v1 from './fixtures/workspace-v1.json';
 import { DEFAULT_PREFS, migrate, parseWorkspace } from './migrations';
 import { WORKSPACE_VERSION, WorkspaceSchema } from './schemas';
 import type { Item, ItemOf, Kind } from './types';
@@ -79,7 +80,33 @@ describe('migration v0 → v1 (phase-0a seed)', () => {
 
   it('treats a file without a version as v0', () => {
     const { items, links } = v0;
-    expect(migrate({ items, links }).version).toBe(1);
+    expect(migrate({ items, links }).version).toBe(WORKSPACE_VERSION);
+  });
+});
+
+describe('migration v1 → v2 (phase-2b settings)', () => {
+  const r = parseWorkspace(v1);
+  if (!r.ok) throw new Error(r.error);
+
+  it('adds the new prefs with their defaults and keeps the old ones', () => {
+    expect(r.migrated).toBe(true);
+    expect(r.workspace.version).toBe(2);
+    expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, desktopNotify: true, soundOn: false, colorBy: 'ticket', permissionMode: 'default', refreshSec: 60, sidebarWidth: 360 });
+    expect(r.workspace.prefs.model).toBeUndefined();
+  });
+
+  it('keeps items and links as they are', () => {
+    expect(r.warnings.filter((w) => w.startsWith('dropped'))).toEqual([]);
+    expect(r.workspace.items.map((i) => i.id)).toEqual(['p-ingest', 'a-impl-4821']);
+    const a = r.workspace.items[1];
+    expect(a.kind === 'agent' && a.data).toMatchObject({ status: 'running', skill: 'implement' });
+    expect(a.kind === 'agent' && a.data.localId).toBeUndefined();
+    expect(r.workspace.links).toHaveLength(1);
+  });
+
+  it('falls back to defaults for bad new prefs instead of resetting all prefs', () => {
+    const bad = parseWorkspace({ ...v1, version: 2, prefs: { ...v1.prefs, refreshSec: 1, permissionMode: 'yolo', sidebarWidth: 'wide' } });
+    expect(bad.ok && bad.workspace.prefs).toMatchObject({ soundOn: false, refreshSec: 60, permissionMode: 'default', sidebarWidth: 360 });
   });
 });
 

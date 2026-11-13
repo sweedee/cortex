@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { ItemSchema, LinkSchema, PrefsSchema, WORKSPACE_VERSION, WorkspaceFileSchema } from './schemas';
 import type { Item, Link, Prefs, Tone, Workspace } from './types';
 
-export const DEFAULT_PREFS: Prefs = { desktopNotify: false, soundOn: true, colorBy: 'project' };
+export const DEFAULT_PREFS: Prefs = { desktopNotify: false, soundOn: true, colorBy: 'project', permissionMode: 'default', refreshSec: 60, sidebarWidth: 360 };
 
 type Raw = Record<string, unknown>;
 type Step = (file: Raw, log: string[]) => Raw;
@@ -236,8 +236,19 @@ function readLegacyPrefs(): Partial<Prefs> {
   }
 }
 
+// ---- v1 → v2 -------------------------------------------------------------------------------
+// v2 (phase 2b): prefs gain `model?`, `permissionMode`, `aiReviewComment?`, `refreshSec`, `sidebarWidth`;
+// agent data gains `localId?`, `pendingPermissions?`, `error?` (all optional: items stay as they are).
+
+const V2_PREF_DEFAULTS = { permissionMode: 'default', refreshSec: 60, sidebarWidth: 360 };
+
+function v1ToV2(file: Raw): Raw {
+  const prefs = file.prefs && typeof file.prefs === 'object' ? (file.prefs as Raw) : {};
+  return { ...file, version: 2, prefs: { ...V2_PREF_DEFAULTS, ...prefs } };
+}
+
 /** `MIGRATIONS[n]` turns a version-n file into a version-(n+1) file. */
-export const MIGRATIONS: Record<number, Step> = { 0: v0ToV1 };
+export const MIGRATIONS: Record<number, Step> = { 0: v0ToV1, 1: v1ToV2 };
 
 /** Lift a raw file to the current version. Throws on files from the future or of no known shape. */
 export function migrate(raw: unknown, log: string[] = []): Raw {

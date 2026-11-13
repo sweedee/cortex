@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import './kinds/registry'; // provides the kind info the filter needs
+import { DEFAULT_PREFS } from './domain';
 import { SEED_ITEMS, SEED_LINKS } from './seed';
 import { EMPTY_FILTER, getState, insertSkill, notify, patchData, replaceWorld, select, setArchived, setDraft, setFilter, visibleSet } from './store';
 
 const all = SEED_ITEMS.map((i) => i.id);
 
 beforeEach(() => {
-  replaceWorld(SEED_ITEMS, SEED_LINKS, { desktopNotify: false, soundOn: true, colorBy: 'project', filter: EMPTY_FILTER });
+  replaceWorld(SEED_ITEMS, SEED_LINKS, { ...DEFAULT_PREFS, filter: EMPTY_FILTER });
   setDraft('');
 });
 

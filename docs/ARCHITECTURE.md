@@ -124,7 +124,7 @@ layout cluster), `archived?`, `notice? {text, tone, at, read?}`, `createdAt`, `u
 | worktree | `path`, `branch`, `baseBranch`, `ticketKey?`, `git? {ahead, behind, dirty, changedFiles, checkedAt?}` |
 | record | `recordType` (plan / brainstorm / grill / verification), `path` (`<baseDir>/records/<ticket-branch>/<name>.md`), `ticketBranch?`, `ticketKey?`, `status` (draft / approved / done), `steps? {done, total}`, `author?` |
 | pr | `repo`, `number`, `headBranch`, `baseBranch`, `state` (open / closed / merged), `isDraft`, `author?`, `reviewDecision?`, `reviews? {approved, requested}`, `mergeable?`, `checks? {state, passed?, failed?, pending?}`, `additions?`, `deletions?`, `stackedOn?` (PR item id) |
-| agent | `sessionId?`, `cwd`, `model?`, `status` (running / waiting / idle / done / failed), `skill?`, `pendingQuestion? {toolUseId, questions[{question, header?, options[{label, description?}], multiSelect?}]}`, `lastActivity?`, `startedAt?`, `endedAt?`, `usage? {contextPct, costUsd, turns}` |
+| agent | `sessionId?`, `localId?` (session in main; unset = demo), `cwd`, `model?`, `status` (running / waiting / idle / done / failed), `skill?`, `pendingQuestion? {toolUseId, questions[{question, header?, options[{label, description?}], multiSelect?}]}`, `pendingPermissions? [{requestId, toolName, summary?}]`, `error?`, `lastActivity?`, `startedAt?`, `endedAt?`, `usage? {contextPct, costUsd, turns}` |
 | app | `command`, `cwd`, `url?`, `port?`, `procId?`, `state` (starting / running / stopped / crashed), `worktreeId?` |
 | build | `repo`, `name`, `url`, `runId?`, `number?`, `state` (queued / in_progress / completed), `conclusion?`, `prNumber?`, `branch`, `stage?`, `trigger?`, `durationSec?` |
 | deployment | `url`, `stage` (dev / staging / prod / custom), `stageLabel?`, `health?` (mocked), `version?` |
@@ -201,10 +201,18 @@ written to the items (`pos`) on drag end.
 
 ```jsonc
 {
-  "version": 1,
+  "version": 2,
   "items": [ /* Item */ ],
   "links": [ { "id": "l1", "from": "t-4821", "to": "p-ingest", "label": "in project" } ],
-  "prefs": { "desktopNotify": false, "soundOn": true, "colorBy": "project", "filter": { /* Filter */ } },
+  "prefs": {
+    "desktopNotify": false, "soundOn": true, "colorBy": "project", "filter": { /* Filter */ },
+    // v2: store.settings (setSettings); a bad value falls back to its default
+    "model": "claude-…",            // optional; unset = the Claude CLI's default
+    "permissionMode": "default",    // claude --permission-mode for new sessions
+    "aiReviewComment": "@claude review", // optional; unset = main's config
+    "refreshSec": 60,               // background refresher cadence
+    "sidebarWidth": 360             // details sidebar width (drag its left edge)
+  },
   "camera": { "x": 0, "y": 0, "k": 1 }   // optional, reserved
 }
 ```
@@ -223,6 +231,9 @@ v0 (phase 0a): `{version: 0, items, links}` with display-only items (`status`, `
 `flags`, `cluster`, `notice.ago`); prefs in localStorage. v0 → v1 parses those strings into typed `data`,
 `plan` → `record`, `cluster` → `projectId`, `notice.ago` → `notice.at`, and carries the localStorage prefs
 over. Fixture: `domain/fixtures/workspace-v0.json`.
+
+v1 → v2 (phase 2b): adds the settings prefs above with their defaults; agent data gains the optional
+`localId` (the session id in main), `pendingPermissions` and `error`. Fixture: `domain/fixtures/workspace-v1.json`.
 
 Adding a version: bump `WORKSPACE_VERSION`, add `MIGRATIONS[old]`, a fixture of the old format and a test.
 Never edit an existing step.
