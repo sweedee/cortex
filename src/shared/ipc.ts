@@ -226,3 +226,207 @@ export interface CortexApi {
     info(): Promise<AppInfo>;
   };
 }
+
+// =============================================================================================
+// Phase 1: integrations (git, gh, jira, claude, apps, tests). Declared by interface merging so
+// this block is purely additive. Payload types live in `./integrations/*` (dependency free).
+// =============================================================================================
+
+import type { ClaudeAnswers, ClaudeEvent, ClaudeEventMessage, ClaudePermissionDecision, ClaudeSession, ClaudeSessionSummary, ClaudeStartRequest } from './integrations/claude';
+import type { IntegrationConfig } from './integrations/config';
+import type { GitDiffStat, GitLogEntry, GitRebaseResult, GitStatus, GitWorktree } from './integrations/git';
+import type { GhCheck, GhMergeMethod, GhPrListItem, GhPullRequest, GhRun, GhUpdateBranchResult } from './integrations/github';
+import type { JiraComment, JiraIssue } from './integrations/jira';
+import type { AppStartRequest, AppState, RunnerOutputEvent, TestRunRequest, TestState } from './integrations/runners';
+
+export interface GitDiffRequest {
+  dir: string;
+  /** diff against the merge base with this ref, working tree included */
+  base?: string;
+  staged?: boolean;
+}
+
+export interface GhPrListRequest {
+  repo: string;
+  author?: string;
+  /** GitHub App slug, e.g. `renovate` */
+  app?: string;
+  search?: string;
+  state?: 'open' | 'closed' | 'merged' | 'all';
+  label?: string;
+  head?: string;
+  base?: string;
+  limit?: number;
+}
+
+export interface GhPrCreateRequest {
+  /** worktree the PR is created from */
+  dir: string;
+  title: string;
+  body: string;
+  /** may be another PR's head branch (stacked PR) */
+  base: string;
+  head: string;
+  draft?: boolean;
+  repo?: string;
+}
+
+export interface JiraCreateIssueRequest {
+  project: string;
+  type: string;
+  summary: string;
+  description?: string;
+  assignee?: string;
+  parent?: string;
+}
+
+export interface JiraEditIssueRequest {
+  key: string;
+  summary?: string;
+  description?: string;
+  assignee?: string;
+  labels?: string[];
+}
+
+export interface InvokeChannels {
+  'integrations:config': [void, IntegrationConfig];
+
+  'git:isRepo': [{ dir: string }, boolean];
+  'git:currentBranch': [{ dir: string }, string | null];
+  'git:remoteRepo': [{ dir: string; remote?: string }, string | null];
+  'git:worktreeList': [{ repoDir: string }, GitWorktree[]];
+  'git:worktreeAdd': [{ repoDir: string; path: string; branch: string; base?: string; newBranch?: boolean }, GitWorktree];
+  'git:worktreeRemove': [{ repoDir: string; path: string; force?: boolean }, void];
+  'git:status': [{ dir: string }, GitStatus];
+  'git:diff': [GitDiffRequest, string];
+  'git:diffStat': [GitDiffRequest, GitDiffStat];
+  'git:log': [{ dir: string; range?: string; limit?: number }, GitLogEntry[]];
+  'git:fetch': [{ dir: string; remote?: string; prune?: boolean }, void];
+  'git:rebase': [{ dir: string; onto: string }, GitRebaseResult];
+  'git:rebaseAbort': [{ dir: string }, void];
+
+  'gh:prList': [GhPrListRequest, GhPrListItem[]];
+  'gh:prView': [{ repo: string; number: number }, GhPullRequest];
+  'gh:prCreate': [GhPrCreateRequest, { number: number; url: string }];
+  'gh:prMerge': [{ repo: string; number: number; method: GhMergeMethod; deleteBranch?: boolean }, void];
+  /** without `body`: the configured AI-review trigger (`@claude review`) */
+  'gh:prComment': [{ repo: string; number: number; body?: string }, { url?: string }];
+  'gh:prUpdateBranch': [{ repo: string; number: number; rebase?: boolean }, GhUpdateBranchResult];
+  'gh:prDiff': [{ repo: string; number: number }, string];
+  'gh:prChecks': [{ repo: string; number: number }, GhCheck[]];
+  'gh:runView': [{ repo: string; runId: number }, GhRun];
+  'gh:runRerun': [{ repo: string; runId: number; failedOnly?: boolean }, void];
+  'gh:renovatePrs': [{ repo: string }, GhPrListItem[]];
+
+  'jira:search': [{ jql: string; limit?: number }, JiraIssue[]];
+  'jira:view': [{ key: string }, JiraIssue];
+  'jira:transition': [{ key: string; status: string }, void];
+  'jira:create': [JiraCreateIssueRequest, JiraIssue];
+  'jira:comment': [{ key: string; body: string }, JiraComment | null];
+  'jira:edit': [JiraEditIssueRequest, void];
+
+  'claude:start': [ClaudeStartRequest, ClaudeSessionSummary];
+  'claude:send': [{ localId: string; text: string }, ClaudeSessionSummary];
+  'claude:answer': [{ localId: string; toolUseId: string; answers: ClaudeAnswers }, { via: 'tool' | 'message' }];
+  'claude:permission': [{ localId: string; requestId: string; decision: ClaudePermissionDecision }, void];
+  'claude:interrupt': [{ localId: string }, boolean];
+  'claude:stop': [{ localId: string }, boolean];
+  'claude:remove': [{ localId: string }, boolean];
+  'claude:list': [void, ClaudeSessionSummary[]];
+  'claude:transcript': [{ localId: string }, ClaudeEvent[]];
+  'claude:session': [{ localId: string }, ClaudeSession];
+
+  'apps:start': [AppStartRequest, AppState];
+  'apps:stop': [{ id: string }, boolean];
+  'apps:restart': [{ id: string }, AppState];
+  'apps:list': [void, AppState[]];
+  'apps:log': [{ id: string }, string];
+  'apps:remove': [{ id: string }, boolean];
+
+  'tests:run': [TestRunRequest, TestState];
+  'tests:stop': [{ id: string }, boolean];
+  'tests:list': [void, TestState[]];
+  'tests:log': [{ id: string }, string];
+}
+
+export interface EventChannels {
+  'claude:event': ClaudeEventMessage;
+  'claude:state': ClaudeSessionSummary;
+  'app:state': AppState;
+  'app:output': RunnerOutputEvent;
+  'test:state': TestState;
+  'test:output': RunnerOutputEvent;
+}
+
+EVENT_CHANNELS.push('claude:event', 'claude:state', 'app:state', 'app:output', 'test:state', 'test:output');
+
+export interface CortexApi {
+  integrations: {
+    config(): Promise<IntegrationConfig>;
+  };
+  git: {
+    isRepo(dir: string): Promise<boolean>;
+    currentBranch(dir: string): Promise<string | null>;
+    remoteRepo(dir: string, remote?: string): Promise<string | null>;
+    worktreeList(repoDir: string): Promise<GitWorktree[]>;
+    worktreeAdd(repoDir: string, path: string, branch: string, base?: string, opts?: { newBranch?: boolean }): Promise<GitWorktree>;
+    worktreeRemove(repoDir: string, path: string, opts?: { force?: boolean }): Promise<void>;
+    status(dir: string): Promise<GitStatus>;
+    diff(dir: string, opts?: { base?: string; staged?: boolean }): Promise<string>;
+    diffStat(dir: string, opts?: { base?: string; staged?: boolean }): Promise<GitDiffStat>;
+    log(dir: string, opts?: { range?: string; limit?: number }): Promise<GitLogEntry[]>;
+    fetch(dir: string, opts?: { remote?: string; prune?: boolean }): Promise<void>;
+    rebase(dir: string, onto: string): Promise<GitRebaseResult>;
+    rebaseAbort(dir: string): Promise<void>;
+  };
+  gh: {
+    prList(repo: string, filter?: Omit<GhPrListRequest, 'repo'>): Promise<GhPrListItem[]>;
+    prView(repo: string, number: number): Promise<GhPullRequest>;
+    prCreate(req: GhPrCreateRequest): Promise<{ number: number; url: string }>;
+    prMerge(repo: string, number: number, method: GhMergeMethod, opts?: { deleteBranch?: boolean }): Promise<void>;
+    /** without `body`: the configured AI-review trigger comment */
+    prComment(repo: string, number: number, body?: string): Promise<{ url?: string }>;
+    prUpdateBranch(repo: string, number: number, opts?: { rebase?: boolean }): Promise<GhUpdateBranchResult>;
+    prDiff(repo: string, number: number): Promise<string>;
+    prChecks(repo: string, number: number): Promise<GhCheck[]>;
+    runView(repo: string, runId: number): Promise<GhRun>;
+    runRerun(repo: string, runId: number, opts?: { failedOnly?: boolean }): Promise<void>;
+    renovatePrs(repo: string): Promise<GhPrListItem[]>;
+  };
+  jira: {
+    search(jql: string, opts?: { limit?: number }): Promise<JiraIssue[]>;
+    view(key: string): Promise<JiraIssue>;
+    transition(key: string, status: string): Promise<void>;
+    create(req: JiraCreateIssueRequest): Promise<JiraIssue>;
+    comment(key: string, body: string): Promise<JiraComment | null>;
+    edit(req: JiraEditIssueRequest): Promise<void>;
+  };
+  claude: {
+    start(req: ClaudeStartRequest): Promise<ClaudeSessionSummary>;
+    send(localId: string, text: string): Promise<ClaudeSessionSummary>;
+    answer(localId: string, toolUseId: string, answers: ClaudeAnswers): Promise<{ via: 'tool' | 'message' }>;
+    permission(localId: string, requestId: string, decision: ClaudePermissionDecision): Promise<void>;
+    interrupt(localId: string): Promise<boolean>;
+    stop(localId: string): Promise<boolean>;
+    remove(localId: string): Promise<boolean>;
+    list(): Promise<ClaudeSessionSummary[]>;
+    transcript(localId: string): Promise<ClaudeEvent[]>;
+    session(localId: string): Promise<ClaudeSession>;
+  };
+  apps: {
+    start(req: AppStartRequest): Promise<AppState>;
+    stop(id: string): Promise<boolean>;
+    restart(id: string): Promise<AppState>;
+    list(): Promise<AppState[]>;
+    log(id: string): Promise<string>;
+    remove(id: string): Promise<boolean>;
+  };
+  tests: {
+    run(req: TestRunRequest): Promise<TestState>;
+    stop(id: string): Promise<boolean>;
+    list(): Promise<TestState[]>;
+    log(id: string): Promise<string>;
+  };
+  /** typed subscription to any event channel; returns an unsubscribe function */
+  on<C extends EventChannel>(channel: C, cb: (payload: EventChannels[C]) => void): Unsubscribe;
+}

@@ -16,7 +16,10 @@ const DEFAULT_TIMEOUT = 120_000;
 /** keep at most this many chars per stream */
 const MAX_OUTPUT = 20 * 1024 * 1024;
 
-export function runExec(req: ExecRequest): Promise<ExecResult> {
+/** What `runExec` takes: an `exec:run` request, or (main-internal) any resolved command. */
+export type ExecSpawn = Omit<ExecRequest, 'cmd'> & { cmd: string };
+
+export function runExec(req: ExecSpawn): Promise<ExecResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(req.cmd, req.args, {
       cwd: req.cwd,

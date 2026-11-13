@@ -4,6 +4,8 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CortexApi, EventChannel, EventChannels, InvokeChannel, Req, Res } from '../shared/ipc';
+import { EVENT_CHANNELS } from '../shared/ipc';
+import { integrationsApi } from './integrations';
 
 const invoke = <C extends InvokeChannel>(channel: C, req?: Req<C>) => ipcRenderer.invoke(channel, req) as Promise<Res<C>>;
 
@@ -53,6 +55,7 @@ const api: CortexApi = {
   app: {
     info: () => invoke('app:info'),
   },
+  ...integrationsApi(invoke, on, EVENT_CHANNELS),
 };
 
 contextBridge.exposeInMainWorld('cortex', api);
