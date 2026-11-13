@@ -74,3 +74,6 @@ export const KIND_RADIUS: Record<Kind, number> = {
   build: 26,
   plan: 28,
 };
+
+/** Position in the hierarchy: projects at the top, builds at the bottom. */
+export const KIND_LEVEL: Record<Kind, number> = { project: 0, ticket: 1, plan: 2, worktree: 2, agent: 3, pr: 3, build: 4 };

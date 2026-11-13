@@ -27,7 +27,11 @@ export interface State {
   dialog: Dialog;
   /** item shown in the details sidebar (opened by double-click) */
   inspected: string | null;
+  /** what bubbles are coloured by: nothing (gray), their project(s) or their ticket(s) */
+  colorBy: ColorBy;
 }
+
+export type ColorBy = 'none' | 'project' | 'ticket';
 
 let state: State = {
   items: SEED_ITEMS,
@@ -39,6 +43,7 @@ let state: State = {
   hiddenKinds: [],
   dialog: null,
   inspected: null,
+  colorBy: 'project',
 };
 
 const listeners = new Set<() => void>();
@@ -80,6 +85,7 @@ export const setHovered = (id: string | null) => {
 export const setDraft = (draft: string) => setState((s) => ({ ...s, draft }));
 export const focusChat = () => setState((s) => ({ ...s, focusTick: s.focusTick + 1 }));
 export const openDialog = (dialog: Dialog) => setState((s) => ({ ...s, dialog }));
+export const setColorBy = (colorBy: ColorBy) => setState((s) => ({ ...s, colorBy }));
 export const inspect = (id: string | null) => setState((s) => ({ ...s, inspected: id }));
 export const closeDialog = () => setState((s) => ({ ...s, dialog: null }));
 

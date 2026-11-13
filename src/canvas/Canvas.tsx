@@ -21,7 +21,7 @@ import {
 } from '../layout';
 import { actionsForSelection, KINDS_ADDABLE, removeSelected } from '../actions';
 import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore } from '../store';
-import { KIND_ICON } from '../visual';
+import { groupColors, groupFill, KIND_ICON } from '../visual';
 
 type Cam = { x: number; y: number; k: number };
 type MenuState = { sx: number; sy: number; wx: number; wy: number; itemId?: string } | null;
@@ -40,6 +40,7 @@ export function Canvas() {
   const hovered = useStore((s) => s.hovered);
   const draft = useStore((s) => s.draft);
   const hiddenKinds = useStore((s) => s.hiddenKinds);
+  const colorBy = useStore((s) => s.colorBy);
   useLayoutTick();
 
   const cam = useRef<Cam>({ x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 });
@@ -314,6 +315,11 @@ export function Canvas() {
 
   // ---- derived visuals ----------------------------------------------------------------------
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const fills = useMemo(() => {
+    const m = new Map<string, string | undefined>();
+    groupColors(items, links, colorBy).forEach((cs, id) => m.set(id, groupFill(cs)));
+    return m;
+  }, [items, links, colorBy]);
   const hiddenSet = useMemo(() => new Set(items.filter((i) => hiddenKinds.includes(i.kind)).map((i) => i.id)), [items, hiddenKinds]);
   const mentioned = useMemo(() => new Set(mentionedIds(draft, items)), [draft, items]);
   const focus = useMemo(() => {
@@ -410,6 +416,7 @@ export function Canvas() {
               dimmed={dimming && !lit.has(it.id) && !focus.has(it.id)}
               mentioned={mentioned.has(it.id)}
               isNew={freshIds.has(it.id)}
+              fill={fills.get(it.id)}
             />
           );
         })}

@@ -5,15 +5,21 @@ import { Tooltip } from '@dynatrace/strato-components/overlays';
 import { MinusIcon, NotificationActiveIcon, NotificationIcon, PlusIcon, ZoomToFitIcon } from '@dynatrace/strato-icons';
 import { camera } from '../layout';
 import { KIND_LABEL, type Kind } from '../model';
-import { select, toggleKind, useStore } from '../store';
+import { select, setColorBy, toggleKind, useStore, type ColorBy } from '../store';
 import { KIND_ACCENT, KIND_ICON, TONE_COLOR } from '../visual';
 
 const KINDS: Kind[] = ['project', 'ticket', 'worktree', 'agent', 'pr', 'build', 'plan'];
+const COLOR_BY: [ColorBy, string][] = [
+  ['none', 'Gray'],
+  ['project', 'Project'],
+  ['ticket', 'Ticket'],
+];
 const ago = (m: number) => (m < 60 ? `${m}m` : `${Math.round(m / 60)}h`);
 
 export function Hud() {
   const items = useStore((s) => s.items);
   const hidden = useStore((s) => s.hiddenKinds);
+  const colorBy = useStore((s) => s.colorBy);
   const notices = items.filter((i) => i.notice).sort((a, b) => a.notice!.ago - b.notice!.ago);
 
   return (
@@ -27,6 +33,14 @@ export function Hud() {
       </div>
 
       <div className="hud hud-top-right">
+        <div className="hud-colorby" role="radiogroup" aria-label="Colour bubbles by">
+          <span className="hud-colorby-label">Colour</span>
+          {COLOR_BY.map(([v, label]) => (
+            <button key={v} role="radio" aria-checked={colorBy === v} className={`hud-colorby-opt ${colorBy === v ? 'is-on' : ''}`} onClick={() => setColorBy(v)}>
+              {label}
+            </button>
+          ))}
+        </div>
         <Menu>
           <Menu.Trigger>
             <Button variant="default" aria-label="Notifications" className="hud-bell">

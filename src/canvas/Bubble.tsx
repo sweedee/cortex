@@ -14,6 +14,8 @@ export interface BubbleProps {
   dimmed: boolean;
   mentioned: boolean;
   isNew: boolean;
+  /** disc fill from the group colours (related items share them); unset = neutral gray */
+  fill?: string;
 }
 
 const RING_W = 3.5;
@@ -56,7 +58,7 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
   );
 }
 
-export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, mentioned, isNew }: BubbleProps) {
+export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, mentioned, isNew, fill }: BubbleProps) {
   const r = KIND_RADIUS[item.kind];
   const tone = item.status[0]?.tone;
   const waiting = item.flags?.waitingForInput;
@@ -81,7 +83,7 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
       style={{ transform: `translate(${x - r}px, ${y - r}px)`, width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'] }}
     >
       <div className="bubble-float">
-        <div className="bubble-disc">
+        <div className="bubble-disc" style={fill ? { background: fill } : undefined}>
           <span className="bubble-icon">{KIND_ICON[item.kind](item.kind === 'project' ? 28 : item.kind === 'build' || item.kind === 'plan' ? 18 : 22)}</span>
           {item.kind === 'project' ? (
             <span className="bubble-short bubble-short-project">{item.title}</span>

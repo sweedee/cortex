@@ -14,7 +14,7 @@ import {
   type SimulationNodeDatum,
 } from 'd3-force';
 import type { Item, Kind, Link } from './model';
-import { KIND_RADIUS } from './model';
+import { KIND_LEVEL, KIND_RADIUS } from './model';
 
 export interface Node extends SimulationNodeDatum {
   id: string;
@@ -49,7 +49,7 @@ const seeded = new Map<string, { x: number; y: number }>();
  * closer together the lower level they are (a build hugs its PR, a ticket sits further
  * from its project), and low-level bubbles push others away less.
  */
-const LEVEL: Record<Kind, number> = { project: 0, ticket: 1, plan: 2, worktree: 2, agent: 3, pr: 3, build: 4 };
+const LEVEL = KIND_LEVEL;
 /**
  * Spacing falls off exponentially with depth: each level down the hierarchy keeps
  * FALLOFF times the distance of the level above (project-ticket 190, ticket-worktree
