@@ -47,8 +47,8 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 
 | # | Scope | Owner | Status |
 |---|---|---|---|
-| 0a | Electron shell, typed IPC bridge (exec / pickers / notifications / openExternal / workspace file), persistence, audio + desktop notifications, vitest + oxlint | opus agent | ⏳ running |
-| 0b | Domain model refactor → typed per-kind data + kind registry, zustand + zod, TanStack Query wiring, seed migrated, new kinds stubbed | — | todo |
+| 0a | Electron shell, typed IPC bridge (exec / pickers / notifications / openExternal / workspace file), persistence, audio + desktop notifications, vitest + oxlint | opus agent | ✅ done (`990aabd`) |
+| 0b | Domain model refactor → typed per-kind data + kind registry, zustand + zod, TanStack Query wiring, seed migrated, new kinds stubbed | opus agent | ⏳ running |
 | 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | — | todo |
 | 2 | Shared viewers: markdown (+mermaid), diff2html, CodeMirror editor, webview panel | — | todo |
 | 3 | Kind modules (actions + sidebars), in parallel slices | — | todo |
@@ -56,4 +56,10 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 
 ## Log
 
+- 2026-11-13 — Phase 0a done (3 commits up to `990aabd`). typecheck/lint/build pass, 22 tests. Bridge verified from a running app (dev + built). Notes for later phases:
+  - Layout: `src/main`, `src/preload` (sandboxed CJS, only `electron` + `shared/ipc.ts`), `src/shared/{ipc,schemas}.ts`, renderer in `src/renderer/src`; `public/` stays at repo root; use `asset('brand/…')` for asset URLs.
+  - All native access via `src/renderer/src/native.ts` (browser fallback). Adding a channel: see `docs/ARCHITECTURE.md`.
+  - `exec:run` allowlist: git, gh, claude, node, jira-mock (jira-mock must be on PATH or resolution changed in Phase 1).
+  - Deferred: production CSP, notification icon, electron-builder packaging, proc output throttling, fs path sandboxing.
+  - npm 11.3.0 crashes on vitest peers → use `npx npm@11.21.2 install` when adding deps.
 - 2026-11-13 — Reviewed repo + branches, agreed decisions above, created branch `app`, started phase 0a.
