@@ -44,23 +44,40 @@ const clusterCenter = (c?: string) => {
 const nodes = new Map<string, Node>();
 const seeded = new Map<string, { x: number; y: number }>();
 
+/**
+ * How "low level" a kind is: projects are the top, builds the bottom. Related items pull
+ * closer together the lower level they are (a build hugs its PR, a ticket sits further
+ * from its project), and low-level bubbles push others away less.
+ */
+const LEVEL: Record<Kind, number> = { project: 0, ticket: 1, plan: 2, worktree: 2, agent: 3, pr: 3, build: 4 };
+/** extra gap (beyond both radii) between two linked bubbles, by the lower level of the pair */
+const LINK_GAP = [120, 84, 56, 42, 32];
+const LINK_STRENGTH = [0.35, 0.5, 0.7, 0.85, 1];
+/** collision padding per kind, leaves room for the caption under the bubble */
+const COLLIDE_PAD = [36, 34, 30, 28, 24];
+const CHARGE = [-700, -220, -140, -100, -60];
+
+const linkLevel = (l: SimLink) => Math.max(LEVEL[(l.source as Node).kind], LEVEL[(l.target as Node).kind]);
+
 const sim = forceSimulation<Node>([])
   .alphaDecay(0.025)
   .velocityDecay(0.38)
   .force(
     'charge',
-    forceManyBody<Node>().strength((n) => (n.kind === 'project' ? -700 : -180)),
+    forceManyBody<Node>()
+      .strength((n) => CHARGE[LEVEL[n.kind]])
+      .distanceMax(600),
   )
-  .force('collide', forceCollide<Node>((n) => n.r + (n.kind === 'project' ? 34 : 48)).strength(0.85))
+  .force('collide', forceCollide<Node>((n) => n.r + COLLIDE_PAD[LEVEL[n.kind]]).strength(0.85))
   .force(
     'link',
     forceLink<Node, SimLink>([])
       .id((n) => n.id)
-      .distance((l) => (l.source as Node).r + (l.target as Node).r + 80)
-      .strength(0.45),
+      .distance((l) => (l.source as Node).r + (l.target as Node).r + LINK_GAP[linkLevel(l)])
+      .strength((l) => LINK_STRENGTH[linkLevel(l)]),
   )
-  .force('x', forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.kind === 'project' ? 0.2 : 0.05)))
-  .force('y', forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.kind === 'project' ? 0.2 : 0.05)));
+  .force('x', forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.kind === 'project' ? 0.2 : 0.04)))
+  .force('y', forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.kind === 'project' ? 0.2 : 0.04)));
 
 const tickListeners = new Set<() => void>();
 let frame = 0;

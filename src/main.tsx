@@ -7,6 +7,7 @@ import { Canvas } from './canvas/Canvas';
 import { ChatBox } from './chat/ChatBox';
 import { Dialogs } from './overlays/Dialogs';
 import { Hud } from './overlays/Hud';
+import { Sidebar } from './overlays/Sidebar';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
     <AppRoot>
       <Canvas />
       <Hud />
+      <Sidebar />
       <ChatBox />
       <Dialogs />
       <ToastContainer />

@@ -19,7 +19,7 @@ export function Hud() {
   return (
     <>
       <div className="hud hud-brand">
-        <img src="/dt-mark.svg" alt="" width={22} height={22} />
+        <img src="/brand/cortex-mark.svg" alt="" width={22} height={22} />
         <div>
           <div className="hud-title">Cortex</div>
           <div className="hud-sub">canvas · experimental</div>

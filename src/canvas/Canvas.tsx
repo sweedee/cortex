@@ -4,7 +4,8 @@ import { DeleteIcon, PinOffIcon, ZoomToFitIcon, ChatIcon, LinkIcon } from '@dyna
 import { Backdrop } from './Backdrop';
 import { Bubble } from './Bubble';
 import { Links } from './Links';
-import { HoverCard, InlineActions } from './Overlays';
+import { HoverCard } from './Overlays';
+import { SIDEBAR_W } from '../overlays/Sidebar';
 import { KIND_RADIUS } from '../model';
 import {
   bounds,
@@ -29,6 +30,8 @@ const MIN_K = 0.25;
 const MAX_K = 2.2;
 const CHAT_SPACE = 170; // px reserved at the bottom for the chat box
 const TOP_SPACE = 70;
+/** px covered by the selection sidebar on the right (0 when nothing is selected) */
+const rightSpace = () => (getState().selected.length ? SIDEBAR_W + 32 : 0);
 
 export function Canvas() {
   const items = useStore((s) => s.items);
@@ -93,7 +96,7 @@ export function Canvas() {
     (ids?: string[], animate = true, maxK = 1.1) => {
       const b = bounds(ids);
       if (!b) return;
-      const W = window.innerWidth,
+      const W = window.innerWidth - rightSpace(),
         H = window.innerHeight - CHAT_SPACE - TOP_SPACE;
       const pad = 80;
       const k = Math.max(MIN_K, Math.min(maxK, (W - pad * 2) / (b.x1 - b.x0), (H - pad) / (b.y1 - b.y0)));
@@ -107,7 +110,7 @@ export function Canvas() {
   useEffect(() => {
     camera.center = () => {
       const { x, y, k } = cam.current;
-      return { x: (window.innerWidth / 2 - x) / k, y: ((window.innerHeight - CHAT_SPACE) / 2 - y) / k };
+      return { x: ((window.innerWidth - rightSpace()) / 2 - x) / k, y: ((window.innerHeight - CHAT_SPACE) / 2 - y) / k };
     };
     camera.focus = (ids) => fitTo(ids, true, 1.05);
     camera.fit = () => fitTo();
@@ -133,7 +136,7 @@ export function Canvas() {
   useEffect(() => {
     const el = root.current!;
     const onWheel = (e: WheelEvent) => {
-      if ((e.target as HTMLElement).closest('.chatbox, .hud, [role="menu"], [role="dialog"]')) return;
+      if ((e.target as HTMLElement).closest('.chatbox, .hud, .sidebar, [role="menu"], [role="dialog"]')) return;
       e.preventDefault();
       cancelAnimationFrame(anim.current);
       const { x, y, k } = cam.current;
@@ -160,7 +163,7 @@ export function Canvas() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || outside(e)) return;
-    if ((e.target as HTMLElement).closest('.inline-actions, .hover-card')) return;
+    if ((e.target as HTMLElement).closest('.sidebar, .hover-card')) return;
     setMenu(null);
     const bubble = (e.target as HTMLElement).closest<HTMLElement>('.bubble');
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -243,7 +246,7 @@ export function Canvas() {
     if (outside(e)) return;
     // pointer capture retargets dblclick to the canvas, so hit-test the point instead
     const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    if (hit?.closest('.inline-actions, .hover-card')) return;
+    if (hit?.closest('.sidebar, .hover-card')) return;
     const bubble = hit?.closest<HTMLElement>('.bubble');
     if (!bubble) return fitTo();
     const id = bubble.dataset.id!;
@@ -254,7 +257,7 @@ export function Canvas() {
 
   const onContextMenu = (e: React.MouseEvent) => {
     if (outside(e)) return;
-    if ((e.target as HTMLElement).closest('.chatbox, .hud, .inline-actions')) return;
+    if ((e.target as HTMLElement).closest('.chatbox, .hud, .sidebar')) return;
     e.preventDefault();
     const bubble = (e.target as HTMLElement).closest<HTMLElement>('.bubble');
     const w = toWorld(e.clientX, e.clientY);
@@ -323,23 +326,6 @@ export function Canvas() {
   const dimming = focus.size > 0 || mentioned.size > 0;
 
   const { x: cx, y: cy, k } = cam.current;
-  const sel = actionsForSelection(selected.filter((id) => !hiddenSet.has(id)));
-
-  // inline actions sit under the selection
-  // inline actions: a vertical list beside the selection (flips left near the right edge)
-  let actionsAt: { x: number; y: number; flip: boolean } | null = null;
-  if (sel.items.length && !dragging) {
-    const b = bounds(sel.items.map((i) => i.id));
-    if (b) {
-      const right = toScreen(b.x1, b.y0);
-      const left = toScreen(b.x0, b.y0);
-      const flip = right.x + 16 + 230 > window.innerWidth;
-      const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + 10;
-      const y = Math.max(TOP_SPACE, Math.min(right.y, window.innerHeight - CHAT_SPACE - height));
-      actionsAt = { x: flip ? left.x - 16 : right.x + 16, y, flip };
-    }
-  }
-
   // hover card next to the bubble
   let hoverCard: React.ReactNode = null;
   const hItem = hoverShown ? itemMap.get(hoverShown) : undefined;
@@ -348,7 +334,7 @@ export function Canvas() {
     if (p) {
       const r = KIND_RADIUS[hItem.kind] * k;
       const s = toScreen(p.x!, p.y!);
-      const flip = s.x + r + 300 > window.innerWidth;
+      const flip = s.x + r + 300 > window.innerWidth - rightSpace();
       hoverCard = <HoverCard item={hItem} x={flip ? s.x - r - 18 : s.x + r + 18} y={s.y} flip={flip} />;
     }
   }
@@ -412,7 +398,6 @@ export function Canvas() {
       )}
 
       {hoverCard}
-      {actionsAt && <InlineActions key={selected.join(',')} actions={sel.actions} items={sel.items} x={actionsAt.x} y={actionsAt.y} flip={actionsAt.flip} />}
 
       {marquee && (
         <div

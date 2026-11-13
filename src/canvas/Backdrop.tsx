@@ -1,5 +1,8 @@
-/** Floating particles in Dynatrace colours and the faint logo mark, with a little parallax. */
+/** Floating pixel particles in brand colours and the faint logo mark, with a little parallax. */
 import { useEffect, useRef } from 'react';
+
+/** particle grid size in css px */
+const PX = 2;
 
 const COLORS = ['#1496FF', '#6F2DA8', '#B455B6', '#73BE28', '#B4DC00', '#00A1B2'];
 
@@ -40,7 +43,7 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
         y: Math.random() * h,
         vx: (Math.random() - 0.5) * 0.12,
         vy: -0.03 - Math.random() * 0.1,
-        r: 0.6 + Math.random() * 1.8,
+        r: 1 + Math.floor(Math.random() * Math.random() * 3), // 1-3 grid cells, mostly 1
         c: COLORS[Math.floor(Math.random() * COLORS.length)],
         depth: 0.05 + Math.random() * 0.25,
         phase: Math.random() * Math.PI * 2,
@@ -58,22 +61,14 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
           p.y += p.vy;
         }
         // parallax: deeper particles follow the camera less
-        let sx = (((p.x + cx * p.depth) % w) + w) % w;
-        let sy = (((p.y + cy * p.depth) % h) + h) % h;
-        const tw = 0.35 + 0.35 * Math.sin(t / 1400 + p.phase);
-        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, p.r * 5);
-        g.addColorStop(0, p.c);
-        g.addColorStop(1, 'transparent');
-        ctx.globalAlpha = tw * 0.55;
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(sx, sy, p.r * 5, 0, Math.PI * 2);
-        ctx.fill();
+        const sx = (((p.x + cx * p.depth) % w) + w) % w;
+        const sy = (((p.y + cy * p.depth) % h) + h) % h;
+        // stepped twinkle and whole-pixel squares: crisp, no glow
+        const tw = 0.3 + 0.15 * Math.round(2 * (1 + Math.sin(t / 1400 + p.phase)));
+        const size = p.r * PX;
         ctx.globalAlpha = tw;
         ctx.fillStyle = p.c;
-        ctx.beginPath();
-        ctx.arc(sx, sy, p.r * 0.7, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(Math.round(sx / PX) * PX, Math.round(sy / PX) * PX, size, size);
       }
       ctx.globalAlpha = 1;
       if (logo.current) logo.current.style.transform = `translate(calc(-50% + ${cx * 0.04}px), calc(-50% + ${cy * 0.04}px))`;
@@ -89,7 +84,7 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
   return (
     <div className="backdrop" aria-hidden>
       <div className="backdrop-glow" />
-      <img ref={logo} className="backdrop-logo" src="/dt-mark.svg" alt="" draggable={false} />
+      <img ref={logo} className="backdrop-logo" src="/brand/cortex-mark.svg" alt="" draggable={false} />
       <canvas ref={ref} className="backdrop-particles" />
     </div>
   );

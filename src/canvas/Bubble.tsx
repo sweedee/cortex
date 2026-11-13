@@ -25,7 +25,6 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
   const total = segments.reduce((s, x) => s + (x.weight ?? 1), 0);
   const gaps = segments.length > 1 ? segments.length * GAP : 0;
   let offset = 0;
-  const running = segments.some((s) => s.tone === 'running');
   const size = (R + RING_W + 4) * 2;
   const c = size / 2;
   return (
@@ -53,11 +52,6 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
           return el;
         })}
       </g>
-      {running && (
-        <g className="ring-comet" style={{ transformOrigin: `${c}px ${c}px` }}>
-          <circle cx={c} cy={c} r={R} fill="none" stroke="#7cc4ff" strokeWidth={RING_W + 1.5} strokeLinecap="round" strokeDasharray={`${C * 0.22} ${C}`} />
-        </g>
-      )}
     </svg>
   );
 }

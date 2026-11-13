@@ -5,7 +5,6 @@
 import type { ReactElement } from 'react';
 import { showToast } from '@dynatrace/strato-components/notifications';
 import {
-  AiIcon,
   CheckmarkIcon,
   CycleIcon,
   DeleteIcon,
@@ -23,6 +22,7 @@ import {
   TerminalIcon,
 } from '@dynatrace/strato-icons';
 import type { Item, Kind } from './model';
+import { CortexMark } from './visual';
 import {
   addItem,
   addLink,
@@ -59,7 +59,7 @@ const skill = (id: string, label: string, name: string, extra: Partial<Action> =
   label,
   type: 'skill',
   skill: name,
-  icon: <AiIcon />,
+  icon: <CortexMark mono />,
   run: (items) => insertSkill(name, items.map((i) => i.id)),
   ...extra,
 });
