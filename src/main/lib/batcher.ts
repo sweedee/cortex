@@ -52,10 +52,16 @@ export class LogTail {
   push(s: string) {
     this.parts.push(s);
     this.size += s.length;
-    while (this.size > this.max && this.parts.length > 1) this.size -= this.parts.shift()!.length;
-    if (this.size > this.max) {
-      this.parts[0] = this.parts[0].slice(this.size - this.max);
-      this.size = this.max;
+    while (this.size > this.max) {
+      const over = this.size - this.max;
+      const first = this.parts[0];
+      if (first.length <= over) {
+        this.parts.shift();
+        this.size -= first.length;
+      } else {
+        this.parts[0] = first.slice(over);
+        this.size = this.max;
+      }
     }
   }
   text() {

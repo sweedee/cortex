@@ -111,13 +111,14 @@ describe.runIf(process.env['CORTEX_LIVE_GH'] === '1')('GhService (live, read-onl
   const repo = process.env['CORTEX_LIVE_GH_REPO'] ?? 'sweedee/cortex';
   it('lists and views PRs', async () => {
     const gh = new GhService(DEFAULT_CONFIG.github);
+    // the repo needs at least one PR (any state)
     const prs = await gh.prList(repo, { state: 'all', limit: 3 });
-    expect(Array.isArray(prs)).toBe(true);
-    if (prs[0]) {
-      const pr = await gh.prView(repo, prs[0].number);
-      expect(pr.number).toBe(prs[0].number);
-      expect(typeof pr.mergeStateStatus).toBe('string');
-      expect(Array.isArray(await gh.prChecks(repo, pr.number))).toBe(true);
-    }
+    expect(prs.length).toBeGreaterThan(0);
+    const pr = await gh.prView(repo, prs[0].number);
+    expect(pr.number).toBe(prs[0].number);
+    expect(typeof pr.mergeStateStatus).toBe('string');
+    expect(Array.isArray(pr.files)).toBe(true);
+    expect(Array.isArray(await gh.prChecks(repo, pr.number))).toBe(true);
+    expect(typeof (await gh.prDiff(repo, pr.number))).toBe('string');
   }, 60_000);
 });
