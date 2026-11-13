@@ -49,13 +49,19 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 |---|---|---|---|
 | 0a | Electron shell, typed IPC bridge (exec / pickers / notifications / openExternal / workspace file), persistence, audio + desktop notifications, vitest + oxlint | opus agent | ✅ done (`990aabd`) |
 | 0b | Domain model refactor → typed per-kind data + kind registry, zustand + zod, TanStack Query wiring, seed migrated, new kinds stubbed | opus agent | ⏳ running |
-| 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | opus agent, isolated worktree → branch `phase-1-integrations` (merge into `app` after 0b) | ⏳ running |
+| 1 | Integrations in main: gh, git, jira-mock CLI, process manager (apps / tests), claude CLI sessions | opus agent, isolated worktree → branch `phase-1-integrations` (merge into `app` after 0b) | ✅ done (`e8f0025`, not merged yet) |
 | 2 | Shared viewers: markdown (+mermaid), diff2html, CodeMirror editor, webview panel | — | todo |
 | 3 | Kind modules (actions + sidebars), in parallel slices | — | todo |
 | 4 | Integration pass, review, README/handoff | — | todo |
 
 ## Log
 
+- 2026-11-13 — Phase 1 done on `phase-1-integrations` (`e8f0025`, worktree `.claude/worktrees/agent-a4c50088887dfc080`). 89 tests. No new deps. Notes:
+  - Channels: `git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*` (+ events `claude:state/event`, `app:state/output`, `test:state/output`); renderer via `native.<service>.*` and `native.on(channel, cb)`. Details in `docs/ARCHITECTURE.md` → Integrations.
+  - AskUserQuestion: claude started with `--permission-prompt-tool stdio`; the `can_use_tool` control_request is held and answered with `control_response {behavior:'allow', updatedInput:{…, answers}}`. Derived from CLI 2.1.323 schemas, **not yet verified against a real session** — first thing to test live.
+  - Live-verified: git on this repo, gh prList/prView/prChecks/prDiff on sweedee/cortex (read-only), jira-mock via exec, test runner. gh write ops only unit-tested.
+  - Jira: `CORTEX_JIRA_CLI=acli` switches to real acli (output shape unverified). Config knobs are env vars (see docs).
+  - Gaps: no `git push` channel yet (pr create assumes pushed branch); jira-mock must ship unpacked when packaging; after `npm ci` in a fresh worktree run `node node_modules/electron/install.js`.
 - 2026-11-13 — Started 0b (renderer refactor, on `app`) and Phase 1 (main-process integrations, separate worktree branch `phase-1-integrations`) in parallel. Phase 1 only adds to shared/ipc, preload, native.ts → merge expected to be easy.
 - 2026-11-13 — Phase 0a done (3 commits up to `990aabd`). typecheck/lint/build pass, 22 tests. Bridge verified from a running app (dev + built). Notes for later phases:
   - Layout: `src/main`, `src/preload` (sandboxed CJS, only `electron` + `shared/ipc.ts`), `src/shared/{ipc,schemas}.ts`, renderer in `src/renderer/src`; `public/` stays at repo root; use `asset('brand/…')` for asset URLs.
