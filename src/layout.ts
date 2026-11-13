@@ -26,16 +26,16 @@ type SimLink = SimulationLinkDatum<Node> & { id: string };
 
 /** Where each project's cluster gravitates to. New clusters are placed on a ring. */
 const clusterCenters = new Map<string, { x: number; y: number }>([
-  ['p-ingest', { x: -420, y: -20 }],
-  ['p-console', { x: 430, y: -40 }],
-  ['p-alert', { x: 10, y: 380 }],
+  ['p-ingest', { x: -380, y: -30 }],
+  ['p-console', { x: 390, y: -50 }],
+  ['p-alert', { x: 10, y: 360 }],
 ]);
 const clusterCenter = (c?: string) => {
   if (!c) return { x: 0, y: 0 };
   let p = clusterCenters.get(c);
   if (!p) {
     const a = clusterCenters.size * 2.1;
-    p = { x: Math.cos(a) * 700, y: Math.sin(a) * 520 };
+    p = { x: Math.cos(a) * 900, y: Math.sin(a) * 680 };
     clusterCenters.set(c, p);
   }
   return p;
@@ -50,12 +50,21 @@ const seeded = new Map<string, { x: number; y: number }>();
  * from its project), and low-level bubbles push others away less.
  */
 const LEVEL: Record<Kind, number> = { project: 0, ticket: 1, plan: 2, worktree: 2, agent: 3, pr: 3, build: 4 };
+/**
+ * Spacing falls off exponentially with depth: each level down the hierarchy keeps
+ * FALLOFF times the distance of the level above (project-ticket 190, ticket-worktree
+ * ~120, worktree-PR ~75, PR-build ~47).
+ */
+const FALLOFF = 0.63;
+const decay = (level: number, top: number) => top * Math.pow(FALLOFF, Math.max(level - 1, 0));
 /** extra gap (beyond both radii) between two linked bubbles, by the lower level of the pair */
-const LINK_GAP = [120, 84, 56, 42, 32];
-const LINK_STRENGTH = [0.35, 0.5, 0.7, 0.85, 1];
-/** collision padding per kind, leaves room for the caption under the bubble */
-const COLLIDE_PAD = [36, 34, 30, 28, 24];
-const CHARGE = [-700, -220, -140, -100, -60];
+const linkGap = (level: number) => decay(level, 190);
+/** deeper links are stiffer, so small things really stay with their parent */
+const linkStrength = (level: number) => 1 - decay(level, 0.6);
+/** collision padding per kind; never below what the caption under the bubble needs */
+const collidePad = (level: number) => Math.max(30, decay(level, 52));
+/** low-level bubbles push the others away less */
+const charge = (level: number) => (level === 0 ? -800 : -decay(level, 300));
 
 const linkLevel = (l: SimLink) => Math.max(LEVEL[(l.source as Node).kind], LEVEL[(l.target as Node).kind]);
 
@@ -65,16 +74,16 @@ const sim = forceSimulation<Node>([])
   .force(
     'charge',
     forceManyBody<Node>()
-      .strength((n) => CHARGE[LEVEL[n.kind]])
-      .distanceMax(600),
+      .strength((n) => charge(LEVEL[n.kind]))
+      .distanceMax(800),
   )
-  .force('collide', forceCollide<Node>((n) => n.r + COLLIDE_PAD[LEVEL[n.kind]]).strength(0.85))
+  .force('collide', forceCollide<Node>((n) => n.r + collidePad(LEVEL[n.kind])).strength(0.85))
   .force(
     'link',
     forceLink<Node, SimLink>([])
       .id((n) => n.id)
-      .distance((l) => (l.source as Node).r + (l.target as Node).r + LINK_GAP[linkLevel(l)])
-      .strength((l) => LINK_STRENGTH[linkLevel(l)]),
+      .distance((l) => (l.source as Node).r + (l.target as Node).r + linkGap(linkLevel(l)))
+      .strength((l) => linkStrength(linkLevel(l))),
   )
   .force('x', forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.kind === 'project' ? 0.2 : 0.04)))
   .force('y', forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.kind === 'project' ? 0.2 : 0.04)));

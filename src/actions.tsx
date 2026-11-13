@@ -15,14 +15,11 @@ import {
   StopIcon,
   ViewIcon,
   ChatIcon,
-  MagnifyingGlassIcon,
-  RepairIcon,
-  CompareIcon,
   DescriptionIcon,
   TerminalIcon,
 } from '@dynatrace/strato-icons';
 import type { Item, Kind } from './model';
-import { CortexMark } from './visual';
+import { skillIcon } from './visual';
 import {
   addItem,
   addLink,
@@ -59,7 +56,7 @@ const skill = (id: string, label: string, name: string, extra: Partial<Action> =
   label,
   type: 'skill',
   skill: name,
-  icon: <CortexMark mono />,
+  icon: skillIcon(name),
   run: (items) => insertSkill(name, items.map((i) => i.id)),
   ...extra,
 });
@@ -156,7 +153,7 @@ function actionsFor(item: Item): Action[] {
       const running = item.flags?.running;
       return [
         { id: 'view', label: waiting ? 'Answer' : 'View session', type: 'view', icon: <ViewIcon />, primary: true, run: ([a]) => openDialog({ type: 'session', itemId: a.id }) },
-        skill('continue', 'Continue', 'continue-session', { icon: <ChatIcon /> }),
+        skill('continue', 'Continue', 'continue-session'),
         skill('fork', 'Fork session', 'fork-session'),
         running
           ? {
@@ -207,16 +204,16 @@ function actionsFor(item: Item): Action[] {
               },
             }),
         },
-        ...(conflicted ? [skill('conflicts', 'Resolve conflicts', 'resolve-conflicts', { primary: true, icon: <CompareIcon /> })] : []),
+        ...(conflicted ? [skill('conflicts', 'Resolve conflicts', 'resolve-conflicts', { primary: true })] : []),
         skill('address', 'Address review', 'address-review'),
-        skill('review', 'Review PR', 'review-pr', { icon: <MagnifyingGlassIcon /> }),
+        skill('review', 'Review PR', 'review-pr'),
         skill('describe', 'Write description', 'describe-pr'),
       ];
     }
     case 'build': {
       const failed = item.status[0].tone === 'critical';
       return [
-        ...(failed ? [skill('fix-ci', 'Fix CI', 'fix-ci', { primary: true, icon: <RepairIcon /> })] : []),
+        ...(failed ? [skill('fix-ci', 'Fix CI', 'fix-ci', { primary: true })] : []),
         { id: 'log', label: 'View log', type: 'view', icon: <DescriptionIcon />, primary: !failed, run: ([b]) => openDialog({ type: 'log', itemId: b.id }) },
         skill('explain', 'Explain failure', 'explain-build', { disabled: failed ? undefined : 'Build did not fail' }),
         {

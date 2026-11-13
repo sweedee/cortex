@@ -1,4 +1,4 @@
-/** Screen-space overlays on top of the canvas: hover card and the shared action button. */
+/** Screen-space overlays on top of the canvas: hover card and inline quick actions. */
 import { Button } from '@dynatrace/strato-components/buttons';
 import { Chip } from '@dynatrace/strato-components/content';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
@@ -43,6 +43,18 @@ export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: numb
           ))}
         </dl>
       )}
+    </div>
+  );
+}
+
+/** The vertical action list that appears beside a selected bubble (or a multi-selection). */
+export function InlineActions({ actions, items, x, y, flip }: { actions: Action[]; items: Item[]; x: number; y: number; flip: boolean }) {
+  return (
+    <div className={`inline-actions ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y }} onPointerDown={(e) => e.stopPropagation()}>
+      {items.length > 1 && <span className="inline-actions-count">{items.length} selected</span>}
+      {actions.map((a) => (
+        <ActionButton key={a.id} action={a} items={items} placement={flip ? 'left' : 'right'} />
+      ))}
     </div>
   );
 }

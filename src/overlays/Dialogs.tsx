@@ -4,6 +4,7 @@ import { Chip, CodeSnippet, Markdown } from '@dynatrace/strato-components/conten
 import { FormField, Label, TextArea, TextInput } from '@dynatrace/strato-components/forms';
 import { Flex } from '@dynatrace/strato-components/layouts';
 import { Modal, Sheet } from '@dynatrace/strato-components/overlays';
+import { ChatIcon } from '@dynatrace/strato-icons';
 import { Text } from '@dynatrace/strato-components/typography';
 import { showToast } from '@dynatrace/strato-components/notifications';
 import { KINDS_ADDABLE } from '../actions';
@@ -11,7 +12,7 @@ import { place } from '../layout';
 import type { Item, Kind } from '../model';
 import { KIND_LABEL } from '../model';
 import { addItem, closeDialog, insertSkill, itemById, newId, patchItem, select, useStore } from '../store';
-import { CortexMark, KIND_ICON, TONE_CHIP } from '../visual';
+import { KIND_ICON, TONE_CHIP } from '../visual';
 
 export function Dialogs() {
   const dialog = useStore((s) => s.dialog);
@@ -227,7 +228,7 @@ function SessionSheet({ id }: { id: string }) {
           }}
         >
           <Button.Prefix>
-            <CortexMark mono />
+            <ChatIcon />
           </Button.Prefix>
           Follow up in chat
         </Button>

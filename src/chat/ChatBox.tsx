@@ -5,11 +5,12 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { KeyboardShortcut } from '@dynatrace/strato-components/content';
-import { ArrowUpIcon } from '@dynatrace/strato-icons';
-import { sendPrompt } from '../actions';
+import { AiIcon, ArrowUpIcon, XmarkIcon } from '@dynatrace/strato-icons';
+import { actionsForSelection, sendPrompt } from '../actions';
 import { KIND_LABEL, type Item } from '../model';
-import { mentionedIds, setDraft, useStore } from '../store';
-import { CortexMark, KIND_ACCENT, KIND_ICON } from '../visual';
+import { mentionedIds, select, setDraft, useStore } from '../store';
+import { KIND_ACCENT, KIND_ICON, skillIcon } from '../visual';
+import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
 
 export const SKILLS: { name: string; desc: string }[] = [
@@ -54,6 +55,7 @@ export function ChatBox() {
 
   const handles = useMemo(() => new Map(items.map((i) => [i.handle.toLowerCase(), i])), [items]);
   const mentioned = useMemo(() => mentionedIds(draft, items).map((id) => items.find((i) => i.id === id)!), [draft, items]);
+  const sel = actionsForSelection(selected);
 
   // focus requests (actions inserting a skill, "/" shortcut): caret to the end
   useEffect(() => {
@@ -168,11 +170,32 @@ export function ChatBox() {
   };
 
   const placeholder = selected.length
-    ? 'Ask about the selection, or pick an action in the panel…'
+    ? 'Ask about the selection, or pick an action above…'
     : 'Ask Cortex anything — @ to mention a bubble, / for a skill';
 
   return (
     <div className="chat-dock">
+      {sel.items.length > 0 && (
+        <div className="chat-actions" key={selected.join(',')}>
+          <span className="chat-actions-for">
+            {sel.items.length === 1 ? (
+              <>
+                {KIND_ICON[sel.items[0].kind](14)}
+                <span>{sel.items[0].handle}</span>
+              </>
+            ) : (
+              <span>{sel.items.length} selected</span>
+            )}
+          </span>
+          {sel.actions.map((a) => (
+            <ActionButton key={a.id} action={a} items={sel.items} />
+          ))}
+          <button className="chat-actions-clear" onClick={() => select([])} aria-label="Clear selection">
+            <XmarkIcon />
+          </button>
+        </div>
+      )}
+
       <div className={`chatbox ${popup ? 'has-popup' : ''}`}>
         {mentioned.length > 0 && (
           <div className="chat-context">
@@ -187,7 +210,7 @@ export function ChatBox() {
         )}
         <div className="chat-row">
           <span className="chat-spark">
-            <CortexMark size={18} />
+            <AiIcon />
           </span>
           <div className="chat-input">
             <div ref={mirror} className="chat-mirror" aria-hidden>
@@ -257,9 +280,7 @@ export function ChatBox() {
                     onMouseDown={(e) => (e.preventDefault(), accept(i))}
                     onMouseEnter={() => setActive(i)}
                   >
-                    <span className="chat-option-icon">
-                      <CortexMark size={14} />
-                    </span>
+                    <span className="chat-option-icon">{skillIcon(o.name)}</span>
                     <span className="chat-option-main">/{o.name}</span>
                     <span className="chat-option-sub">{o.desc}</span>
                   </div>

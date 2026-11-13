@@ -2,10 +2,25 @@
 import type { ReactElement } from 'react';
 import {
   AgentIcon,
+  AiIcon,
+  ChatIcon,
+  CodeIcon,
+  CompareIcon,
+  CrosshairIcon,
   DescriptionIcon,
+  DuplicateIcon,
+  EditIcon,
   EpicIcon,
   FlowIcon,
+  GroupItemsIcon,
+  ListIcon,
+  MagnifyingGlassIcon,
+  MarkdownIcon,
   RepairIcon,
+  SorterIcon,
+  UpgradeIcon,
+  UploadIcon,
+  ViewIcon,
   WorkflowIcon,
 } from '@dynatrace/strato-icons';
 import type { Kind, Tone } from './model';
@@ -76,23 +91,30 @@ export const KIND_ACCENT: Record<Kind, string> = {
   plan: '#00A1B2',
 };
 
-/** The Cortex mark (public/brand/cortex-mark.svg) as a component. `mono` paints it in currentColor. */
-export function CortexMark({ size = 16, mono = false }: { size?: number; mono?: boolean }) {
-  return (
-    <svg width={size} height={size} viewBox="6.3 9.3 110.4 100" aria-hidden className="cortex-mark">
-      {MARK_PATHS.map(([d, c], i) => (
-        <path key={i} d={d} fill={mono ? 'currentColor' : c} />
-      ))}
-    </svg>
-  );
-}
 
-const MARK_PATHS: [string, string][] = [
-  ['M11.15,66.01Q14.75,66.17 14.91,62.57L15.53,49.02Q15.69,45.42 17.98,42.64L26.01,32.88Q28.30,30.10 31.63,28.72L48.12,21.85Q51.44,20.46 50.06,17.14L49.94,16.86Q48.56,13.54 45.23,14.92L27.02,22.51Q23.70,23.90 21.41,26.68L10.60,39.80Q8.31,42.58 8.15,46.18L7.42,62.23Q7.25,65.83 10.85,65.99ZM23.89,35.11Q21.35,37.65 23.89,40.20L30.80,47.11Q33.35,49.65 35.89,47.11L36.11,46.89Q38.65,44.35 36.11,41.80L29.20,34.89Q26.65,32.35 24.11,34.89Z', '#1496FF'],
-  ['M59.98,14.15Q59.50,17.72 63.07,18.19L84.93,21.11Q88.50,21.58 91.34,23.79L101.70,31.85Q104.54,34.06 105.13,37.61L107.71,53.07Q108.30,56.62 111.85,56.02L112.15,55.98Q115.70,55.38 115.11,51.83L112.05,33.49Q111.46,29.94 108.62,27.73L94.34,16.63Q91.50,14.42 87.93,13.94L64.06,10.76Q60.50,10.28 60.02,13.85ZM89.87,17.93Q86.69,16.24 85.00,19.41L78.76,31.11Q77.06,34.29 80.09,36.23L90.94,43.21Q93.97,45.15 95.92,42.13L96.08,41.87Q98.03,38.85 95.00,36.90L89.96,33.66Q86.94,31.71 88.63,28.54L91.61,22.94Q93.31,19.76 90.13,18.07Z', '#73BE28'],
-  ['M25.11,56.11Q27.65,58.65 30.20,56.11L41.14,45.16Q43.69,42.62 46.86,44.31L55.70,49.02Q58.87,50.72 61.23,48.00L71.48,36.18Q73.83,33.46 71.11,31.10L70.89,30.90Q68.17,28.54 65.81,31.26L59.48,38.56Q57.13,41.28 53.95,39.59L45.49,35.08Q42.31,33.38 39.77,35.93L24.89,50.80Q22.35,53.35 24.89,55.89Z', '#B4DC00'],
-  ['M18.08,74.13Q20.04,77.14 23.06,75.18L36.21,66.63Q39.23,64.67 42.82,64.42L63.26,62.96Q66.85,62.70 70.19,61.36L82.49,56.44Q85.83,55.11 89.05,56.72L95.10,59.74Q98.32,61.35 99.93,58.13L100.07,57.87Q101.68,54.65 98.46,53.04L89.39,48.50Q86.17,46.89 82.83,48.23L68.49,53.96Q65.15,55.30 61.56,55.56L40.36,57.07Q36.77,57.33 33.75,59.29L18.97,68.89Q15.96,70.86 17.92,73.87ZM65.87,58.92Q62.81,57.03 60.92,60.10L56.69,66.97Q54.81,70.03 57.87,71.92L58.13,72.08Q61.19,73.97 63.08,70.90L67.31,64.03Q69.19,60.97 66.13,59.08Z', '#6F2DA8'],
-  ['M27.97,84.15Q27.33,87.69 30.87,88.33L47.28,91.32Q50.82,91.96 53.82,89.96L61.08,85.12Q64.08,83.12 62.08,80.12L61.92,79.88Q59.92,76.88 56.92,78.88L52.18,82.04Q49.18,84.04 45.64,83.40L32.21,80.95Q28.67,80.31 28.03,83.85Z', '#1284EA'],
-  ['M82.01,70.15Q82.37,73.73 85.96,73.37L96.03,72.37Q99.61,72.01 100.96,75.24L101.02,75.41Q102.37,78.64 99.41,80.69L94.83,83.87Q91.87,85.92 93.91,88.88L94.09,89.12Q96.13,92.08 99.09,90.03L108.67,83.41Q111.63,81.36 110.24,78.03L105.78,67.32Q104.39,63.99 100.81,64.35L85.21,65.91Q81.63,66.27 81.99,69.85Z', '#73BE28'],
-  ['M69.86,70.04Q66.39,71.03 67.38,74.49L69.22,80.91Q70.21,84.37 69.91,87.96L68.56,104.10Q68.26,107.69 71.85,107.99L72.15,108.01Q75.74,108.31 76.04,104.72L77.49,87.22Q77.79,83.63 76.80,80.17L74.59,72.43Q73.61,68.97 70.14,69.96Z', '#591F91'],
-];
+/**
+ * Icon per skill, by what it does rather than "it's AI". The AI icon is kept for skills
+ * that are mainly about the model's judgement (explaining, summarising) and as fallback.
+ */
+const SKILL_ICONS: Record<string, () => ReactElement> = {
+  'plan-ticket': () => <ListIcon />,
+  'plan-feature': () => <GroupItemsIcon />,
+  implement: () => <CodeIcon />,
+  'implement-plan': () => <CodeIcon />,
+  'self-review': () => <ViewIcon />,
+  'review-pr': () => <MagnifyingGlassIcon />,
+  'create-pr': () => <UploadIcon />,
+  'address-review': () => <ChatIcon />,
+  'resolve-conflicts': () => <CompareIcon />,
+  'fix-ci': () => <RepairIcon />,
+  'explain-build': () => <AiIcon />,
+  'grill-plan': () => <CrosshairIcon />,
+  'refine-ticket': () => <EditIcon />,
+  'triage-tickets': () => <SorterIcon />,
+  'review-renovate': () => <UpgradeIcon />,
+  'describe-pr': () => <MarkdownIcon />,
+  'status-summary': () => <AiIcon />,
+  'continue-session': () => <ChatIcon />,
+  'fork-session': () => <DuplicateIcon />,
+};
+export const skillIcon = (name: string) => (SKILL_ICONS[name] ?? (() => <AiIcon />))();

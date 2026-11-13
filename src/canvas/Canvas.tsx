@@ -4,7 +4,7 @@ import { DeleteIcon, PinOffIcon, ZoomToFitIcon, ChatIcon, LinkIcon } from '@dyna
 import { Backdrop } from './Backdrop';
 import { Bubble } from './Bubble';
 import { Links } from './Links';
-import { HoverCard } from './Overlays';
+import { HoverCard, InlineActions } from './Overlays';
 import { SIDEBAR_W } from '../overlays/Sidebar';
 import { KIND_RADIUS } from '../model';
 import {
@@ -20,7 +20,7 @@ import {
   warmUp,
 } from '../layout';
 import { actionsForSelection, KINDS_ADDABLE, removeSelected } from '../actions';
-import { focusChat, getState, insertSkill, mentionedIds, openDialog, removeItems, select, setHovered, useStore } from '../store';
+import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore } from '../store';
 import { KIND_ICON } from '../visual';
 
 type Cam = { x: number; y: number; k: number };
@@ -30,8 +30,8 @@ const MIN_K = 0.25;
 const MAX_K = 2.2;
 const CHAT_SPACE = 170; // px reserved at the bottom for the chat box
 const TOP_SPACE = 70;
-/** px covered by the selection sidebar on the right (0 when nothing is selected) */
-const rightSpace = () => (getState().selected.length ? SIDEBAR_W + 32 : 0);
+/** px covered by the details sidebar on the right (0 when it is closed) */
+const rightSpace = () => (getState().inspected ? SIDEBAR_W + 32 : 0);
 
 export function Canvas() {
   const items = useStore((s) => s.items);
@@ -163,7 +163,7 @@ export function Canvas() {
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || outside(e)) return;
-    if ((e.target as HTMLElement).closest('.sidebar, .hover-card')) return;
+    if ((e.target as HTMLElement).closest('.inline-actions, .hover-card, .sidebar')) return;
     setMenu(null);
     const bubble = (e.target as HTMLElement).closest<HTMLElement>('.bubble');
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -246,18 +246,25 @@ export function Canvas() {
     if (outside(e)) return;
     // pointer capture retargets dblclick to the canvas, so hit-test the point instead
     const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-    if (hit?.closest('.sidebar, .hover-card')) return;
+    if (hit?.closest('.inline-actions, .hover-card, .sidebar')) return;
     const bubble = hit?.closest<HTMLElement>('.bubble');
     if (!bubble) return fitTo();
+    // double-click opens the details sidebar
     const id = bubble.dataset.id!;
-    const { actions, items: its } = actionsForSelection([id]);
-    const primary = actions.find((a) => a.primary && !a.disabled) ?? actions.find((a) => !a.disabled);
-    primary?.run(its);
+    select([id]);
+    inspect(id);
+    // keep the bubble in view: pan it out from under the sidebar
+    const p = positionOf(id);
+    if (p) {
+      const free = window.innerWidth - SIDEBAR_W - 32;
+      const sx = toScreen(p.x!, p.y!).x;
+      if (sx > free - 60) animateTo({ ...cam.current, x: cam.current.x - (sx - free / 2) });
+    }
   };
 
   const onContextMenu = (e: React.MouseEvent) => {
     if (outside(e)) return;
-    if ((e.target as HTMLElement).closest('.chatbox, .hud, .sidebar')) return;
+    if ((e.target as HTMLElement).closest('.chatbox, .hud, .inline-actions, .sidebar')) return;
     e.preventDefault();
     const bubble = (e.target as HTMLElement).closest<HTMLElement>('.bubble');
     const w = toWorld(e.clientX, e.clientY);
@@ -273,7 +280,11 @@ export function Canvas() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       const typing = t.closest('input, textarea, [contenteditable="true"], [role="dialog"]');
-      if (e.key === 'Escape' && !typing) select([]);
+      if (e.key === 'Escape' && !typing) {
+        // first Esc closes the details sidebar, the next one clears the selection
+        if (getState().inspected) inspect(null);
+        else select([]);
+      }
       if (typing) return;
       if (e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) {
         e.preventDefault();
@@ -326,6 +337,23 @@ export function Canvas() {
   const dimming = focus.size > 0 || mentioned.size > 0;
 
   const { x: cx, y: cy, k } = cam.current;
+  const sel = actionsForSelection(selected.filter((id) => !hiddenSet.has(id)));
+
+  // inline actions sit under the selection
+  // inline actions: a vertical list beside the selection (flips left near the right edge)
+  let actionsAt: { x: number; y: number; flip: boolean } | null = null;
+  if (sel.items.length && !dragging) {
+    const b = bounds(sel.items.map((i) => i.id));
+    if (b) {
+      const right = toScreen(b.x1, b.y0);
+      const left = toScreen(b.x0, b.y0);
+      const flip = right.x + 16 + 230 > window.innerWidth - rightSpace();
+      const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + 10;
+      const y = Math.max(TOP_SPACE, Math.min(right.y, window.innerHeight - CHAT_SPACE - height));
+      actionsAt = { x: flip ? left.x - 16 : right.x + 16, y, flip };
+    }
+  }
+
   // hover card next to the bubble
   let hoverCard: React.ReactNode = null;
   const hItem = hoverShown ? itemMap.get(hoverShown) : undefined;
@@ -398,6 +426,7 @@ export function Canvas() {
       )}
 
       {hoverCard}
+      {actionsAt && <InlineActions key={selected.join(',')} actions={sel.actions} items={sel.items} x={actionsAt.x} y={actionsAt.y} flip={actionsAt.flip} />}
 
       {marquee && (
         <div

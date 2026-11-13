@@ -25,6 +25,8 @@ export interface State {
   focusTick: number;
   hiddenKinds: Kind[];
   dialog: Dialog;
+  /** item shown in the details sidebar (opened by double-click) */
+  inspected: string | null;
 }
 
 let state: State = {
@@ -36,6 +38,7 @@ let state: State = {
   focusTick: 0,
   hiddenKinds: [],
   dialog: null,
+  inspected: null,
 };
 
 const listeners = new Set<() => void>();
@@ -77,6 +80,7 @@ export const setHovered = (id: string | null) => {
 export const setDraft = (draft: string) => setState((s) => ({ ...s, draft }));
 export const focusChat = () => setState((s) => ({ ...s, focusTick: s.focusTick + 1 }));
 export const openDialog = (dialog: Dialog) => setState((s) => ({ ...s, dialog }));
+export const inspect = (id: string | null) => setState((s) => ({ ...s, inspected: id }));
 export const closeDialog = () => setState((s) => ({ ...s, dialog: null }));
 
 export const toggleKind = (kind: Kind) =>
@@ -84,6 +88,7 @@ export const toggleKind = (kind: Kind) =>
     ...s,
     hiddenKinds: s.hiddenKinds.includes(kind) ? s.hiddenKinds.filter((k) => k !== kind) : [...s.hiddenKinds, kind],
     selected: s.selected.filter((id) => s.items.find((i) => i.id === id)?.kind !== kind),
+    inspected: s.inspected && s.items.find((i) => i.id === s.inspected)?.kind === kind ? null : s.inspected,
   }));
 
 export const patchItem = (id: string, patch: Partial<Item>) =>
@@ -106,6 +111,7 @@ export const removeItems = (ids: string[]) => {
     items: s.items.filter((i) => !gone.has(i.id)),
     links: s.links.filter((l) => !gone.has(l.from) && !gone.has(l.to)),
     selected: s.selected.filter((id) => !gone.has(id)),
+    inspected: s.inspected && gone.has(s.inspected) ? null : s.inspected,
   }));
 };
 

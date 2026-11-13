@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { Item, Segment } from '../model';
 import { KIND_RADIUS } from '../model';
-import { KIND_ACCENT, KIND_ICON, TONE_COLOR } from '../visual';
+import { KIND_ICON, TONE_COLOR } from '../visual';
 
 export interface BubbleProps {
   item: Item;
@@ -58,7 +58,6 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
 
 export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, mentioned, isNew }: BubbleProps) {
   const r = KIND_RADIUS[item.kind];
-  const accent = KIND_ACCENT[item.kind];
   const tone = item.status[0]?.tone;
   const waiting = item.flags?.waitingForInput;
   const cls = [
@@ -79,11 +78,11 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
     <div
       className={cls}
       data-id={item.id}
-      style={{ transform: `translate(${x - r}px, ${y - r}px)`, width: r * 2, height: r * 2, ['--accent' as string]: accent, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'] }}
+      style={{ transform: `translate(${x - r}px, ${y - r}px)`, width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'] }}
     >
       <div className="bubble-float">
         <div className="bubble-disc">
-          <span className="bubble-icon">{KIND_ICON[item.kind](item.kind === 'project' ? 22 : item.kind === 'build' || item.kind === 'plan' ? 14 : 16)}</span>
+          <span className="bubble-icon">{KIND_ICON[item.kind](item.kind === 'project' ? 28 : item.kind === 'build' || item.kind === 'plan' ? 18 : 22)}</span>
           {item.kind === 'project' ? (
             <span className="bubble-short bubble-short-project">{item.title}</span>
           ) : (
