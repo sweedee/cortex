@@ -1,10 +1,12 @@
 import { memo } from 'react';
-import type { Item, Segment } from '../model';
-import { KIND_RADIUS } from '../model';
-import { KIND_ICON, TONE_COLOR } from '../visual';
+import type { Item, Segment } from '../domain';
+import { getKind, type ItemView } from '../kinds/registry';
+import { TONE_COLOR } from '../tones';
 
 export interface BubbleProps {
   item: Item;
+  /** ring, short text, badge… derived by the kind module (same object until the item changes) */
+  view: ItemView;
   x: number;
   y: number;
   selected: boolean;
@@ -64,10 +66,13 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
   );
 }
 
-export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent }: BubbleProps) {
-  const r = KIND_RADIUS[item.kind];
-  const tone = item.status[0]?.tone;
-  const waiting = item.flags?.waitingForInput;
+/** icon size inside the disc, by bubble size */
+const iconSize = (r: number) => (r >= 50 ? 28 : r <= 28 ? 18 : 22);
+
+export const Bubble = memo(function Bubble({ item, view, x, y, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent }: BubbleProps) {
+  const mod = getKind(item.kind);
+  const r = mod.radius;
+  const tone = view.ring[0]?.tone;
   const cls = [
     'bubble',
     `kind-${item.kind}`,
@@ -78,7 +83,7 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
     hit && 'is-hit',
     hitActive && 'is-hit-active',
     item.archived && 'is-archived',
-    waiting && 'is-waiting',
+    view.waiting && 'is-waiting',
     tone === 'critical' && 'is-critical',
     isNew && 'is-new',
   ]
@@ -93,21 +98,26 @@ export const Bubble = memo(function Bubble({ item, x, y, selected, lit, dimmed, 
     >
       <div className="bubble-float">
         <div className="bubble-disc" style={fill ? { background: fill } : undefined}>
-          <span className="bubble-icon">{KIND_ICON[item.kind](item.kind === 'project' ? 28 : item.kind === 'build' || item.kind === 'plan' ? 18 : 22)}</span>
-          {item.kind === 'project' ? (
+          <span className="bubble-icon">{mod.icon(iconSize(r))}</span>
+          {mod.titleInside ? (
             <span className="bubble-short bubble-short-project">{item.title}</span>
           ) : (
-            item.short && <span className="bubble-short">{item.short}</span>
+            view.short && <span className={`bubble-short ${r <= 28 ? 'is-small' : ''}`}>{view.short}</span>
           )}
         </div>
-        <Ring r={r} segments={item.status} />
+        <Ring r={r} segments={view.ring} />
+        {view.badge && (
+          <span className={`bubble-badge tone-${view.badge.tone}`} style={{ top: r * 2 - 2 }}>
+            {view.badge.label}
+          </span>
+        )}
         {item.notice && !item.notice.read && !item.archived && (
           <span className={`bubble-notice tone-${item.notice.tone}`} style={{ left: r + r * 0.7071 - 7, top: r - r * 0.7071 - 7 }}>
             <span className="bubble-notice-pulse" />
           </span>
         )}
-        {item.kind !== 'project' && (
-          <div className="bubble-caption" style={{ top: r * 2 + 10 }}>
+        {!mod.titleInside && (
+          <div className="bubble-caption" style={{ top: r * 2 + (view.badge ? 20 : 10) }}>
             <span className="bubble-title">{item.title}</span>
           </div>
         )}

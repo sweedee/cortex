@@ -1,34 +1,29 @@
 /**
- * Tiny global store (useSyncExternalStore). Positions live in the simulation (layout.ts),
- * not here, so moving bubbles does not re-render the whole tree.
+ * Global UI + world state (zustand). Positions live in the simulation (layout.ts), not
+ * here, so moving bubbles does not re-render the whole tree.
+ *
+ * The exported functions are the API; components read with `useStore(selector)`.
+ * The store knows nothing about individual kinds: what it needs from them (ring tones and
+ * search text for the filter, hierarchy levels) is provided by the kind registry through
+ * `provideKindInfo` (kinds/registry.ts), so kind modules can import the store without an
+ * import cycle.
  */
-import { useSyncExternalStore } from 'react';
-import type { Item, Kind, Link, Notice, StatusGroup } from './model';
-import { rootsOf, STATUS_GROUPS } from './model';
+import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
+import type { ColorBy, DataOf, Filter, Item, ItemOf, Kind, Link, NewItem, Notice, Prefs, Segment } from './domain';
+import { DEFAULT_PREFS, rootsOf, STATUS_GROUPS } from './domain';
 import { notifyPermitted } from './native';
 import { SEED_ITEMS, SEED_LINKS } from './seed';
+
+export type { ColorBy, Filter } from './domain';
 
 export type Dialog =
   | { type: 'add'; kind: Kind; at: { x: number; y: number } }
   | { type: 'session'; itemId: string }
-  | { type: 'plan'; itemId: string }
+  | { type: 'record'; itemId: string }
   | { type: 'log'; itemId: string }
   | { type: 'confirm'; title: string; body: string; confirm: string; danger?: boolean; onConfirm: () => void }
   | null;
-
-export interface Filter {
-  hiddenKinds: Kind[];
-  /** status buckets to keep; empty = any status */
-  status: StatusGroup[];
-  /** project ids whose items to keep; empty = every project */
-  projects: string[];
-  /** free text on handle, title and subtitle */
-  query: string;
-  /** only items with an unread notification */
-  unreadOnly: boolean;
-  /** show archived items (faded) next to the live ones */
-  showArchived: boolean;
-}
 
 export const EMPTY_FILTER: Filter = { hiddenKinds: [], status: [], projects: [], query: '', unreadOnly: false, showArchived: false };
 
@@ -66,17 +61,7 @@ export interface State {
   soundOn: boolean;
 }
 
-export type ColorBy = 'none' | 'project' | 'ticket';
-
-const stored = (k: string) => {
-  try {
-    return localStorage.getItem(k);
-  } catch {
-    return null;
-  }
-};
-
-let state: State = {
+const initial = (): State => ({
   items: SEED_ITEMS,
   links: SEED_LINKS,
   selected: [],
@@ -88,24 +73,42 @@ let state: State = {
   search: null,
   dialog: null,
   inspected: null,
-  colorBy: 'project',
-  desktopNotify: stored('cortex.desktopNotify') === '1' && notifyPermitted(),
-  soundOn: stored('cortex.soundOn') !== '0',
-};
+  colorBy: DEFAULT_PREFS.colorBy,
+  desktopNotify: false,
+  soundOn: DEFAULT_PREFS.soundOn,
+});
 
-const listeners = new Set<() => void>();
-export const getState = () => state;
+/** The zustand store itself (for `subscribe(selector, listener)` and tests). */
+export const appStore = create<State>()(subscribeWithSelector(initial));
+
+export const getState = () => appStore.getState();
+/** Replace the state with `fn(state)` (returning the same object is a no-op). */
 export const setState = (fn: (s: State) => State) => {
-  state = fn(state);
-  listeners.forEach((l) => l());
+  const cur = appStore.getState();
+  const next = fn(cur);
+  if (next !== cur) appStore.setState(next, true);
 };
-/** Listen to every state change (persistence uses it). */
-export const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => listeners.delete(l);
-};
+/** Listen to every state change. */
+export const subscribe = (l: (s: State, prev: State) => void) => appStore.subscribe(l);
+/** Read the store in a component. The selector must return stable values (cache derived ones). */
 export function useStore<T>(sel: (s: State) => T): T {
-  return useSyncExternalStore(subscribe, () => sel(state));
+  return appStore(sel);
+}
+
+// ---- kind info (provided by the registry) ----------------------------------------------------
+
+export interface KindInfo {
+  level: (kind: Kind) => number;
+  /** ring and search text of every item; cache on (items, links) identity */
+  status: (items: Item[], links: Link[]) => Map<string, { ring: Segment[]; text: string }>;
+}
+let kindInfo: KindInfo = {
+  level: () => 0,
+  status: (items) => new Map(items.map((i) => [i.id, { ring: [], text: `${i.handle} ${i.title}` }])),
+};
+export function provideKindInfo(info: KindInfo) {
+  kindInfo = info;
+  visCache = null;
 }
 
 // ---- visibility (filter) ------------------------------------------------------------------
@@ -113,20 +116,21 @@ export function useStore<T>(sel: (s: State) => T): T {
 let visCache: { items: Item[]; links: Link[]; filter: Filter; ids: Set<string> } | null = null;
 
 /** Ids of the items the filter lets through. Cached, so it is safe to use as a store selector. */
-export function visibleSet(s: State = state): Set<string> {
+export function visibleSet(s: State = getState()): Set<string> {
   if (visCache && visCache.items === s.items && visCache.links === s.links && visCache.filter === s.filter) return visCache.ids;
   const f = s.filter;
   const q = f.query.trim().toLowerCase();
   const groups = STATUS_GROUPS.filter((g) => f.status.includes(g.id));
-  const roots = f.projects.length ? rootsOf(s.items, s.links, 'project') : null;
+  const roots = f.projects.length ? rootsOf(s.items, s.links, 'project', kindInfo.level) : null;
+  const info = groups.length || q ? kindInfo.status(s.items, s.links) : null;
   const ids = new Set<string>();
   for (const i of s.items) {
     if (i.archived && !f.showArchived) continue;
     if (f.hiddenKinds.includes(i.kind)) continue;
-    if (groups.length && !groups.some((g) => g.test(i))) continue;
-    if (roots && !(f.projects.includes(i.id) || roots.get(i.id)?.some((r) => f.projects.includes(r)))) continue;
+    if (groups.length && !groups.some((g) => g.test(info!.get(i.id)?.ring ?? []))) continue;
+    if (roots && !(f.projects.includes(i.id) || i.projectId && f.projects.includes(i.projectId) || roots.get(i.id)?.some((r) => f.projects.includes(r)))) continue;
     if (f.unreadOnly && !(i.notice && !i.notice.read)) continue;
-    if (q && ![i.handle, i.title, i.subtitle ?? ''].some((t) => t.toLowerCase().includes(q))) continue;
+    if (q && !(info!.get(i.id)?.text ?? `${i.handle} ${i.title}`).toLowerCase().includes(q)) continue;
     ids.add(i.id);
   }
   visCache = { items: s.items, links: s.links, filter: f, ids };
@@ -148,13 +152,13 @@ const prune = (s: State): State => {
 export const setFilter = (patch: Partial<Filter>) => setState((s) => prune({ ...s, filter: { ...s.filter, ...patch } }));
 export const resetFilter = () => setState((s) => prune({ ...s, filter: EMPTY_FILTER }));
 export const toggleKind = (kind: Kind) => {
-  const h = state.filter.hiddenKinds;
+  const h = getState().filter.hiddenKinds;
   setFilter({ hiddenKinds: h.includes(kind) ? h.filter((k) => k !== kind) : [...h, kind] });
 };
 
 // ---- helpers ------------------------------------------------------------------
 
-export const itemById = (id: string) => state.items.find((i) => i.id === id);
+export const itemById = (id: string) => getState().items.find((i) => i.id === id);
 
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 /** at most this many bubbles get auto-mentioned; a big marquee or Ctrl+A should not flood the draft */
@@ -199,7 +203,7 @@ const toggleAll = (cur: string[], ids: string[]) => {
 };
 
 export const setHovered = (id: string | null) => {
-  if (state.hovered !== id) setState((s) => ({ ...s, hovered: id }));
+  if (getState().hovered !== id) setState((s) => ({ ...s, hovered: id }));
 };
 
 /** Draft edits. `user` edits that add own text turn the auto-mentions into regular ones. */
@@ -217,7 +221,7 @@ export const setDraft = (draft: string, user = false) =>
     return { ...s, draft, autoIds: rest.trim() ? [] : s.autoIds };
   });
 export const setSearch = (search: Search | null) => {
-  const cur = state.search;
+  const cur = getState().search;
   if (cur === search) return;
   if (cur && search && cur.active === search.active && cur.ids.length === search.ids.length && cur.ids.every((id, i) => id === search.ids[i])) return;
   setState((s) => ({ ...s, search }));
@@ -228,18 +232,45 @@ export const setColorBy = (colorBy: ColorBy) => setState((s) => ({ ...s, colorBy
 export const inspect = (id: string | null) => setState((s) => ({ ...s, inspected: id }));
 export const closeDialog = () => setState((s) => ({ ...s, dialog: null }));
 
-export const patchItem = (id: string, patch: Partial<Item>) =>
-  setState((s) => ({ ...s, items: s.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
+// ---- items ----------------------------------------------------------------------------
+
+/** Merge common fields into an item (not `data`; use `patchData` for that). Bumps `updatedAt`. */
+export const patchItem = (id: string, patch: Partial<Omit<Item, 'id' | 'kind' | 'data'>>) =>
+  setState((s) => ({ ...s, items: s.items.map((i) => (i.id === id ? ({ ...i, ...patch, updatedAt: Date.now() } as Item) : i)) }));
+
+/** Merge into an item's typed `data` (and optionally common fields). */
+export function patchData<K extends Kind>(item: ItemOf<K> | string, patch: Partial<DataOf<K>>, common: Partial<Omit<Item, 'id' | 'kind' | 'data'>> = {}) {
+  const id = typeof item === 'string' ? item : item.id;
+  setState((s) => ({
+    ...s,
+    items: s.items.map((i) => (i.id === id ? ({ ...i, ...common, data: { ...i.data, ...patch }, updatedAt: Date.now() } as Item) : i)),
+  }));
+}
+
+/** Put whole items back (undo); items that no longer exist are ignored. */
+export const restoreItems = (snapshot: Item[]) => {
+  const byId = new Map(snapshot.map((i) => [i.id, i]));
+  setState((s) => prune({ ...s, items: s.items.map((i) => byId.get(i.id) ?? i) }));
+};
 
 let seq = 0;
 export const newId = (p: string) => `${p}-${Date.now().toString(36)}-${++seq}`;
 
-export const addItem = (item: Item, links: Omit<Link, 'id'>[] = []) =>
+/** Stamp id and timestamps on a new item. */
+export function makeItem(n: NewItem): Item {
+  const now = Date.now();
+  return { ...n, id: n.id || newId(n.kind), createdAt: now, updatedAt: now } as Item;
+}
+
+export const addItem = (item: Item | NewItem, links: Omit<Link, 'id'>[] = []) => {
+  const it = 'createdAt' in item ? (item as Item) : makeItem(item);
   setState((s) => ({
     ...s,
-    items: [...s.items, item],
+    items: [...s.items, it],
     links: [...s.links, ...links.map((l) => ({ ...l, id: newId('l') }))],
   }));
+  return it;
+};
 
 export const removeItems = (ids: string[]) => {
   const gone = new Set(ids);
@@ -258,12 +289,15 @@ export const removeItems = (ids: string[]) => {
 };
 
 /** Archive (or restore) items. Archived items leave the canvas unless the filter shows them. */
-export const setArchived = (ids: string[], archived: boolean, patch: Partial<Item> = {}) => {
+export const setArchived = (ids: string[], archived: boolean) => {
   const set = new Set(ids);
+  const now = Date.now();
   setState((s) =>
     prune({
       ...s,
-      items: s.items.map((i) => (set.has(i.id) ? { ...i, ...patch, archived, notice: archived && i.notice ? { ...i.notice, read: true } : i.notice } : i)),
+      items: s.items.map((i) =>
+        set.has(i.id) ? ({ ...i, archived: archived || undefined, notice: archived && i.notice ? { ...i.notice, read: true } : i.notice, updatedAt: now } as Item) : i,
+      ),
     }),
   );
 };
@@ -274,6 +308,13 @@ export const addLink = (from: string, to: string, label: string) =>
       ? s
       : { ...s, links: [...s.links, { id: newId('l'), from, to, label }] },
   );
+
+/** Remember where the user dropped bubbles (persisted; the layout pins them there). */
+export function setPinned(pos: Map<string, { x: number; y: number }>) {
+  if (!pos.size) return;
+  setState((s) => ({ ...s, items: s.items.map((i) => (pos.has(i.id) ? ({ ...i, pos: pos.get(i.id) } as Item) : i)) }));
+}
+export const clearPinned = () => setState((s) => (s.items.some((i) => i.pos) ? { ...s, items: s.items.map((i) => (i.pos ? ({ ...i, pos: undefined } as Item) : i)) } : s));
 
 // ---- notifications ----------------------------------------------------------------------
 
@@ -290,33 +331,41 @@ export const onNotice = (l: NoticeListener) => {
   noticeListeners.add(l);
   return () => noticeListeners.delete(l);
 };
-/** Attach a fresh (unread) notice to an item; desktop notifications listen to this. */
-export function notify(id: string, notice: Omit<Notice, 'read'>, patch: Partial<Item> = {}) {
-  patchItem(id, { ...patch, notice: { ...notice, read: false } });
+/** Attach a fresh (unread) notice to an item; desktop notifications and chimes listen to this. */
+export function notify(id: string, notice: Pick<Notice, 'text' | 'tone'> & { at?: number }) {
+  patchItem(id, { notice: { at: Date.now(), ...notice, read: false } });
   const item = itemById(id);
   if (item) noticeListeners.forEach((l) => l(item, item.notice!));
 }
 
-// prefs live in localStorage for now; Phase 0b moves them into the workspace file
-const storePref = (k: string, on: boolean) => {
-  try {
-    localStorage.setItem(k, on ? '1' : '0');
-  } catch {
-    /* private mode */
-  }
-};
-export const setDesktopNotify = (on: boolean) => {
-  storePref('cortex.desktopNotify', on);
-  setState((s) => ({ ...s, desktopNotify: on }));
-};
-export const setSoundOn = (on: boolean) => {
-  storePref('cortex.soundOn', on);
-  setState((s) => ({ ...s, soundOn: on }));
-};
+// ---- prefs ------------------------------------------------------------------------------
+
+export const setDesktopNotify = (on: boolean) => setState((s) => ({ ...s, desktopNotify: on }));
+export const setSoundOn = (on: boolean) => setState((s) => ({ ...s, soundOn: on }));
+
+/** The persisted prefs of a state (memoised per field identity, so it can feed a selector). */
+export const prefsOf = (s: State): Prefs => ({ desktopNotify: s.desktopNotify, soundOn: s.soundOn, colorBy: s.colorBy, filter: s.filter });
 
 /** Replace the whole world (workspace load / reset); drops selection and other pointers into the old one. */
-export const replaceWorld = (items: Item[], links: Link[]) =>
-  setState((s) => ({ ...s, items, links, selected: [], autoIds: [], hovered: null, inspected: null, search: null, dialog: null }));
+export const replaceWorld = (items: Item[], links: Link[], prefs?: Prefs) =>
+  setState((s) => ({
+    ...s,
+    items,
+    links,
+    selected: [],
+    autoIds: [],
+    hovered: null,
+    inspected: null,
+    search: null,
+    dialog: null,
+    ...(prefs && {
+      // desktop notifications also need the OS / browser permission
+      desktopNotify: prefs.desktopNotify && notifyPermitted(),
+      soundOn: prefs.soundOn,
+      colorBy: prefs.colorBy,
+      filter: prefs.filter ?? EMPTY_FILTER,
+    }),
+  }));
 
 // ---- chat box ---------------------------------------------------------------------------
 

@@ -8,11 +8,13 @@ import { ChatIcon } from '@dynatrace/strato-icons';
 import { Text } from '@dynatrace/strato-components/typography';
 import { showToast } from '@dynatrace/strato-components/notifications';
 import { KINDS_ADDABLE } from '../actions';
+import type { ItemOf, Kind } from '../domain';
+import { answerQuestion } from '../kinds/agent';
+import { buildFailed } from '../kinds/build';
+import { getKind, kindIcon, kindLabel, KINDS, useViews } from '../kinds/registry';
 import { place } from '../layout';
-import type { Item, Kind } from '../model';
-import { KIND_LABEL } from '../model';
-import { addItem, closeDialog, insertSkill, itemById, newId, patchItem, select, useStore } from '../store';
-import { KIND_ICON, TONE_CHIP } from '../visual';
+import { addItem, closeDialog, insertSkill, itemById, makeItem, select, useStore } from '../store';
+import { TONE_CHIP } from '../tones';
 
 export function Dialogs() {
   const dialog = useStore((s) => s.dialog);
@@ -22,8 +24,8 @@ export function Dialogs() {
       return <AddDialog key={dialog.kind + dialog.at.x} kind={dialog.kind} at={dialog.at} />;
     case 'session':
       return <SessionSheet id={dialog.itemId} />;
-    case 'plan':
-      return <PlanDialog id={dialog.itemId} />;
+    case 'record':
+      return <RecordDialog id={dialog.itemId} />;
     case 'log':
       return <LogDialog id={dialog.itemId} />;
     case 'confirm':
@@ -57,22 +59,18 @@ export function Dialogs() {
 
 // ---- add / import -----------------------------------------------------------------------
 
-/** Guess what a pasted reference is. */
+/** Guess what a pasted reference is (the first kind whose `addable.detect` matches). */
 function detect(v: string): Kind | null {
-  if (/^[A-Z][A-Z0-9]+-\d+$/.test(v) || /\/browse\//.test(v)) return 'ticket';
-  if (/\/pull\/\d+|#\d+$/.test(v)) return 'pr';
-  if (/^PLAN-.*\.md$/i.test(v)) return 'plan';
-  if (/^(feat|fix|chore|spike)\//.test(v)) return 'worktree';
-  return null;
+  return v ? (KINDS.find((k) => getKind(k).addable?.detect?.(v)) ?? null) : null;
 }
 
 function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: number } }) {
   const items = useStore((s) => s.items);
-  const projects = items.filter((i) => i.kind === 'project');
+  const projects = items.filter((i): i is ItemOf<'project'> => i.kind === 'project');
   const [kind, setKind] = useState<Kind>(initial);
   const [value, setValue] = useState('');
   const [project, setProject] = useState<string | null>(projects[0]?.id ?? null);
-  const meta = KINDS_ADDABLE.find((k) => k.kind === kind)!;
+  const meta = getKind(kind).addable!;
   const guessed = detect(value.trim());
   const field = useRef<HTMLDivElement>(null);
   // Strato inputs have no autoFocus prop: focus the field once the modal is in place
@@ -80,27 +78,25 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
     const t = setTimeout(() => field.current?.querySelector<HTMLElement>('input, textarea')?.focus(), 80);
     return () => clearTimeout(t);
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- refocus only when the field type flips
-  }, [kind === 'agent']);
+  }, [!!meta.multiline]);
 
   const submit = () => {
     const v = value.trim();
     if (!v) return;
-    const id = newId(kind);
-    const proj = project ? itemById(project) : undefined;
-    const item = build(kind, v, proj);
-    item.id = id;
-    place.seed(id, at);
-    addItem(item, proj && kind !== 'project' ? [{ from: id, to: proj.id, label: kind === 'ticket' ? 'in project' : 'belongs to' }] : []);
+    const proj = projects.find((p) => p.id === project && kind !== 'project');
+    const item = makeItem({ ...meta.create(v, proj), ...(proj && { projectId: proj.id }) });
+    place.seed(item.id, at);
+    addItem(item, proj ? [{ from: item.id, to: proj.id, label: kind === 'ticket' ? 'in project' : 'belongs to' }] : []);
     closeDialog();
-    select([id]);
-    showToast({ type: 'success', title: `${KIND_LABEL[kind]} added`, message: item.title, lifespan: 2500 });
+    select([item.id]);
+    showToast({ type: 'success', title: `${kindLabel(kind)} added`, message: item.title, lifespan: 2500 });
   };
 
   return (
     <Modal
       title={
         <Flex alignItems="center" gap={8}>
-          {KIND_ICON[kind](20)}
+          {kindIcon(kind, 20)}
           <span>{meta.label.replace('…', '')}</span>
         </Flex>
       }
@@ -120,15 +116,15 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
         <Flex gap={6} flexWrap="wrap">
           {KINDS_ADDABLE.map((k) => (
             <Button key={k.kind} size="condensed" variant={k.kind === kind ? 'accent' : 'default'} color={k.kind === kind ? 'primary' : 'neutral'} onClick={() => setKind(k.kind)}>
-              <Button.Prefix>{KIND_ICON[k.kind](14)}</Button.Prefix>
-              {KIND_LABEL[k.kind]}
+              <Button.Prefix>{kindIcon(k.kind, 14)}</Button.Prefix>
+              {kindLabel(k.kind)}
             </Button>
           ))}
         </Flex>
         <div ref={field}>
         <FormField>
-          <Label>{kind === 'agent' ? 'Prompt' : 'Reference'}</Label>
-          {kind === 'agent' ? (
+          <Label>{meta.multiline ? 'Text' : 'Reference'}</Label>
+          {meta.multiline ? (
             <TextArea rows={3} value={value} onChange={setValue} placeholder={meta.hint} />
           ) : (
             <TextInput
@@ -146,7 +142,7 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
         </div>
         {guessed && guessed === kind && value && (
           <Text textStyle="small" className="subdued">
-            Looks like a {KIND_LABEL[guessed].toLowerCase()}, switched type for you.
+            Looks like a {kindLabel(guessed).toLowerCase()}, switched type for you.
           </Text>
         )}
         {kind !== 'project' && (
@@ -166,43 +162,19 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
   );
 }
 
-function build(kind: Kind, v: string, proj?: Item): Item {
-  const cluster = kind === 'project' ? undefined : proj?.cluster;
-  switch (kind) {
-    case 'ticket': {
-      const key = v.match(/[A-Z][A-Z0-9]+-\d+/)?.[0] ?? v;
-      return { id: '', kind, handle: key, short: key.split('-')[1], title: `Imported ticket ${key}`, subtitle: 'Story · Medium · To Do', status: [{ tone: 'neutral', label: 'To Do' }], cluster };
-    }
-    case 'pr': {
-      const num = v.match(/(\d+)\s*$/)?.[1] ?? '?';
-      return { id: '', kind, handle: `PR-${num}`, short: `#${num}`, title: `Pull request #${num}`, subtitle: `${proj?.title ?? 'repo'} · open → main`, status: [{ tone: 'pending', label: 'Review pending' }, { tone: 'running', label: 'Checks running' }], flags: { mergeable: false }, cluster };
-    }
-    case 'project': {
-      const name = v.split('/').pop()!;
-      return { id: '', kind, handle: name, title: name, subtitle: v, status: [{ tone: 'neutral', label: 'not built yet' }], cluster: undefined };
-    }
-    case 'worktree':
-      return { id: '', kind, handle: `wt/${v.split('/').pop()}`, title: v, subtitle: `~/wt/${proj?.title ?? 'repo'}/${v.split('/').pop()}`, status: [{ tone: 'success', label: 'fresh from main' }], facts: [['Ahead / behind', '0 / 0'], ['Dirty files', '0'], ['Base', 'main']], cluster };
-    case 'agent':
-      return { id: '', kind, handle: `agent/${Math.random().toString(36).slice(2, 6)}`, title: v.length > 40 ? v.slice(0, 40) + '…' : v, subtitle: 'claude-opus-5-5 · just started', status: [{ tone: 'running', label: 'Running' }], flags: { running: true }, cluster };
-    case 'plan':
-      return { id: '', kind, handle: v, title: v, subtitle: 'Draft · empty', status: [{ tone: 'pending', label: 'Draft' }], facts: [['Steps', '0'], ['Author', 'you'], ['Approved', 'no']], cluster };
-    case 'build':
-      return { id: '', kind, handle: `build-${Math.floor(Math.random() * 900 + 1900)}`, short: '…', title: v, subtitle: 'watching', status: [{ tone: 'running', label: 'Running' }], flags: { running: true }, cluster };
-  }
-}
-
 // ---- agent session viewer ----------------------------------------------------------------
 
+/** Prototype transcript (phase 1 streams the real one from the claude CLI); the question card is real data. */
 function SessionSheet({ id }: { id: string }) {
   const item = useStore((s) => s.items.find((i) => i.id === id));
+  const views = useViews();
   const [answer, setAnswer] = useState('');
-  if (!item) return null;
-  const waiting = item.flags?.waitingForInput;
+  if (!item || item.kind !== 'agent') return null;
+  const ring = views.get(item.id)?.ring ?? [];
+  const question = item.data.status === 'waiting' ? item.data.pendingQuestion?.questions[0] : undefined;
 
   const reply = (text: string) => {
-    patchItem(item.id, { flags: { ...item.flags, waitingForInput: false, running: true }, status: [{ tone: 'running', label: 'Running · continuing with your answer' }], notice: undefined });
-    showToast({ type: 'success', title: 'Answer sent', message: text, lifespan: 2500 });
+    answerQuestion(item, text);
     closeDialog();
   };
 
@@ -210,9 +182,9 @@ function SessionSheet({ id }: { id: string }) {
     <Sheet
       title={
         <Flex alignItems="center" gap={8}>
-          {KIND_ICON.agent(20)}
+          {kindIcon('agent', 20)}
           <span>{item.title}</span>
-          {item.status.map((s, i) => (
+          {ring.map((s, i) => (
             <Chip key={i} size="condensed" color={TONE_CHIP[s.tone]}>
               {s.label}
             </Chip>
@@ -245,18 +217,19 @@ function SessionSheet({ id }: { id: string }) {
         </Turn>
         <Tool name="Edit">src/dispatcher/retry.ts · +84 −0</Tool>
         <Tool name="Bash">npm test -- dispatcher · 41 passed</Tool>
-        {waiting ? (
+        {question ? (
           <div className="question-card">
-            <div className="question-head">Claude is asking</div>
-            <div className="question-text">Dedup window — should it be a fixed 30 s, or configurable per alert rule?</div>
-            <Flex gap={8} flexWrap="wrap">
-              <Button variant="emphasized" onClick={() => reply('Fixed 30 s for now')}>
-                Fixed 30 s for now
-              </Button>
-              <Button variant="emphasized" onClick={() => reply('Configurable per rule, default 30 s')}>
-                Configurable per rule (default 30 s)
-              </Button>
-            </Flex>
+            <div className="question-head">{question.header ? `Claude is asking · ${question.header}` : 'Claude is asking'}</div>
+            <div className="question-text">{question.question}</div>
+            {question.options.length > 0 && (
+              <Flex gap={8} flexWrap="wrap">
+                {question.options.map((o) => (
+                  <Button key={o.label} variant="emphasized" onClick={() => reply(o.label)}>
+                    {o.description ? `${o.label} (${o.description})` : o.label}
+                  </Button>
+                ))}
+              </Flex>
+            )}
             <Flex gap={8} alignItems="center">
               <TextInput value={answer} onChange={setAnswer} placeholder="Or type an answer…" />
               <Button variant="accent" color="primary" disabled={!answer.trim()} onClick={() => reply(answer)}>
@@ -265,7 +238,7 @@ function SessionSheet({ id }: { id: string }) {
             </Flex>
           </div>
         ) : (
-          <Turn who="claude">{item.status[0].label}…</Turn>
+          <Turn who="claude">{ring[0]?.label ?? 'Idle'}…</Turn>
         )}
       </div>
     </Sheet>
@@ -302,14 +275,16 @@ const PLAN_MD = (title: string) => `## ${title}
 
 **Risks.** Clock skew between regions; window must be ≥ max skew.`;
 
-function PlanDialog({ id }: { id: string }) {
+/** Prototype content (phase 2 renders the markdown file at `data.path`). */
+function RecordDialog({ id }: { id: string }) {
   const item = itemById(id);
-  if (!item) return null;
+  if (!item || item.kind !== 'record') return null;
+  const plan = item.data.recordType === 'plan';
   return (
     <Modal
       title={
         <Flex alignItems="center" gap={8}>
-          {KIND_ICON.plan(20)}
+          {kindIcon('record', 20)}
           <span>{item.title}</span>
         </Flex>
       }
@@ -318,14 +293,16 @@ function PlanDialog({ id }: { id: string }) {
       onDismiss={closeDialog}
       footer={
         <Flex justifyContent="flex-end" gap={8}>
-          <Button
-            onClick={() => {
-              closeDialog();
-              insertSkill('grill-plan', [item.id]);
-            }}
-          >
-            Grill it
-          </Button>
+          {plan && (
+            <Button
+              onClick={() => {
+                closeDialog();
+                insertSkill('grill-plan', [item.id]);
+              }}
+            >
+              Grill it
+            </Button>
+          )}
           <Button
             variant="accent"
             color="primary"
@@ -339,6 +316,9 @@ function PlanDialog({ id }: { id: string }) {
         </Flex>
       }
     >
+      <Text textStyle="small" className="subdued">
+        {item.data.path}
+      </Text>
       <Markdown>{PLAN_MD(item.title)}</Markdown>
     </Modal>
   );
@@ -346,8 +326,8 @@ function PlanDialog({ id }: { id: string }) {
 
 function LogDialog({ id }: { id: string }) {
   const item = itemById(id);
-  if (!item) return null;
-  const failed = item.status[0].tone === 'critical';
+  if (!item || item.kind !== 'build') return null;
+  const failed = buildFailed(item);
   const log = failed
     ? `[e2e] Running 38 specs with 4 workers
 [e2e]  ✓ dashboards/Toolbar.spec.ts (6)

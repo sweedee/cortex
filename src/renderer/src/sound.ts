@@ -3,7 +3,7 @@
  * attention (two rising notes), failure (two falling, darker notes) and success (a bright
  * three-note arpeggio). Plays for every new notice unless muted in the notifications menu.
  */
-import type { Tone } from './model';
+import type { Tone } from './domain';
 
 export type Chime = 'attention' | 'failure' | 'success';
 

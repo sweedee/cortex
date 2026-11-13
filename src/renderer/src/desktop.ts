@@ -6,12 +6,12 @@
  */
 import { showToast } from '@dynatrace/strato-components/notifications';
 import { camera } from './layout';
-import type { Item, Notice } from './model';
+import type { Notice } from './domain';
 import { native, requestNotifyPermission } from './native';
 import { chimeFor, playChime } from './sound';
 import { getState, itemById, onNotice, select, setDesktopNotify, setSoundOn } from './store';
 
-function show(item: Item, notice: Notice) {
+function show(item: { id: string; handle: string }, notice: Pick<Notice, 'text'>) {
   void native.notify.desktop({ title: `Cortex · @${item.handle}`, body: notice.text, tag: `${item.id}:${notice.text}`, itemId: item.id });
 }
 
@@ -39,7 +39,7 @@ export async function toggleDesktop() {
     return showToast({ type: 'warning', title: 'Desktop notifications are blocked', message: 'Allow notifications for this site in the browser settings.', lifespan: 4000 });
   }
   setDesktopNotify(true);
-  show({ id: 'test', handle: 'cortex', kind: 'project', title: 'Cortex', status: [] }, { text: 'Desktop notifications are on. You get one when something needs you while Cortex is in the background.', tone: 'primary', ago: 0 });
+  show({ id: 'test', handle: 'cortex' }, { text: 'Desktop notifications are on. You get one when something needs you while Cortex is in the background.' });
 }
 
 /** Mute / unmute the chimes; unmuting plays one so you hear what you get. */

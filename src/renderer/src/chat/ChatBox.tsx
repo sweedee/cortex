@@ -7,14 +7,21 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { KeyboardShortcut } from '@dynatrace/strato-components/content';
 import { AiIcon, ArrowUpIcon, XmarkIcon } from '@dynatrace/strato-icons';
 import { actionsForItem, actionsForSelection, sendPrompt, type Action } from '../actions';
-import { KIND_LABEL, type Item } from '../model';
+import type { Item } from '../domain';
+import { skillIcon } from '../kinds/icons';
+import { kindIcon, kindLabel } from '../kinds/registry';
 import { mentionedIds, select, setDraft, setSearch, useStore, useVisible } from '../store';
-import { accentOf, KIND_ICON, NEUTRAL_ACCENT, skillIcon, stripes, useItemColors } from '../visual';
+import { accentOf, NEUTRAL_ACCENT, stripes, useItemColors } from '../visual';
 import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
 
 export const SKILLS: { name: string; desc: string }[] = [
   { name: 'plan-ticket', desc: 'Explore the code and write a plan file' },
+  { name: 'brainstorm', desc: 'Explore options for a ticket into a brainstorm record' },
+  { name: 'write-plan', desc: 'Turn a brainstorm into a plan record' },
+  { name: 'create-ticket', desc: 'Draft a Jira ticket for a project' },
+  { name: 'rebase', desc: 'Rebase a branch and resolve what comes up' },
+  { name: 'fix-tests', desc: 'Find why tests fail and fix them' },
   { name: 'implement', desc: 'Implement a ticket or plan in its worktree' },
   { name: 'implement-plan', desc: 'Work through an approved plan step by step' },
   { name: 'self-review', desc: 'Critical review of the branch before a PR' },
@@ -240,7 +247,7 @@ export function ChatBox() {
           <span className="chat-actions-for">
             {sel.items.length === 1 ? (
               <>
-                {KIND_ICON[sel.items[0].kind](14)}
+                {kindIcon(sel.items[0].kind, 14)}
                 <span>{sel.items[0].handle}</span>
               </>
             ) : (
@@ -264,8 +271,8 @@ export function ChatBox() {
           <div className="chat-context">
             <span className="chat-context-label">Context</span>
             {mentioned.map((m) => (
-              <button key={m.id} className="ctx-chip" style={{ ['--accent' as string]: stripes(colors.get(m.id) ?? [NEUTRAL_ACCENT], 180) }} onClick={() => camera.focus([m.id])} title={`${KIND_LABEL[m.kind]} · ${m.title}`}>
-                {KIND_ICON[m.kind](12)}
+              <button key={m.id} className="ctx-chip" style={{ ['--accent' as string]: stripes(colors.get(m.id) ?? [NEUTRAL_ACCENT], 180) }} onClick={() => camera.focus([m.id])} title={`${kindLabel(m.kind)} · ${m.title}`}>
+                {kindIcon(m.kind, 12)}
                 <span>{m.title}</span>
               </button>
             ))}
@@ -362,7 +369,7 @@ export function ChatBox() {
                     onMouseEnter={() => setActive(i)}
                     style={{ ['--accent' as string]: accentOf(colors, o.id) }}
                   >
-                    <span className="chat-option-icon">{KIND_ICON[o.kind](14)}</span>
+                    <span className="chat-option-icon">{kindIcon(o.kind, 14)}</span>
                     <span className="chat-option-main">@{o.handle}</span>
                     <span className="chat-option-sub">{o.title}</span>
                   </div>

@@ -3,6 +3,7 @@
  * from inside the page (the real preload → IPC → handler path), print the results, quit.
  * Lets a headless run verify the bridge without anyone looking at the window.
  */
+import { writeFile } from 'node:fs/promises';
 import { app, type BrowserWindow } from 'electron';
 
 const PROBE = `(async () => {
@@ -12,7 +13,7 @@ const PROBE = `(async () => {
   const step = async (name, fn) => { try { out[name] = await fn(); } catch (e) { out[name] = 'ERROR: ' + e.message; } };
   await step('app.info', () => c.app.info());
   await step('workspace.path', () => c.workspace.path());
-  await step('workspace.load', async () => { const d = await c.workspace.load(); return d ? { items: d.items?.length, links: d.links?.length } : null; });
+  await step('workspace.load', async () => { const d = await c.workspace.load(); return d ? { version: d.version, items: d.items?.length, links: d.links?.length, prefs: d.prefs } : null; });
   await step('exec.run git --version', async () => (await c.exec.run({ cmd: 'git', args: ['--version'], cwd: ${JSON.stringify(process.cwd())} })).stdout.trim());
   for (const cmd of ['gh', 'claude']) await step('exec.run ' + cmd + ' --version', async () => (await c.exec.run({ cmd, args: ['--version'], cwd: ${JSON.stringify(process.cwd())} })).stdout.trim().split(/\\r?\\n/)[0]);
   await step('exec.run rm (must be rejected)', () => c.exec.run({ cmd: 'rm', args: [], cwd: ${JSON.stringify(process.cwd())} }));
@@ -31,6 +32,12 @@ export function runSmoke(win: BrowserWindow) {
       try {
         const r: unknown = await win.webContents.executeJavaScript(PROBE);
         console.log('[smoke] ' + JSON.stringify(r, null, 2));
+        // CORTEX_SMOKE_SHOT=<file.png>: also save a screenshot of the window
+        const shot = process.env['CORTEX_SMOKE_SHOT'];
+        if (shot) {
+          await writeFile(shot, (await win.webContents.capturePage()).toPNG());
+          console.log(`[smoke] screenshot: ${shot}`);
+        }
       } catch (err) {
         console.error('[smoke] failed:', err);
       }

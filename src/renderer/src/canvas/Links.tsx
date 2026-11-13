@@ -1,15 +1,17 @@
-import type { Item, Link } from '../model';
+import type { Link } from '../domain';
+import type { ItemView } from '../kinds/registry';
 import { positionOf } from '../layout';
 
 /** Curved connections between bubbles, drawn in world space beneath them. */
 export function Links({
   links,
-  items,
+  views,
   active,
   hidden,
 }: {
   links: Link[];
-  items: Map<string, Item>;
+  /** derived views; links to something running animate */
+  views: Map<string, ItemView>;
   /** ids of links that touch the hovered/selected bubbles */
   active: Set<string>;
   hidden: Set<string>;
@@ -34,7 +36,7 @@ export function Links({
         const cx = (ax + bx) / 2 - (dy / len) * bend;
         const cy = (ay + by) / 2 + (dx / len) * bend;
         const isActive = active.has(l.id);
-        const live = items.get(l.from)?.flags?.running || items.get(l.to)?.flags?.running;
+        const live = views.get(l.from)?.running || views.get(l.to)?.running;
         return (
           <g key={l.id} className={`link ${isActive ? 'is-active' : ''} ${anyActive && !isActive ? 'is-dimmed' : ''} ${live ? 'is-live' : ''}`}>
             <path d={`M${ax},${ay} Q${cx},${cy} ${bx},${by}`} className="link-path" />

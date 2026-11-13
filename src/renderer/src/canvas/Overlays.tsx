@@ -4,21 +4,24 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { ChevronLeftSmallIcon, ChevronRightSmallIcon } from '@dynatrace/strato-icons';
 import { Chip } from '@dynatrace/strato-components/content';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
-import type { Item } from '../model';
-import { KIND_LABEL } from '../model';
+import type { Item } from '../domain';
 import { actionsForItem, type Action } from '../actions';
+import { ArchiveIcon } from '../kinds/icons';
+import { factsOf, kindIcon, kindLabel, useCtx, useViews } from '../kinds/registry';
 import { select } from '../store';
-import { accentOf, ArchiveIcon, KIND_ICON, NEUTRAL_ACCENT, stripes, TONE_CHIP, useItemColors } from '../visual';
-
-const ago = (m: number) => (m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`);
+import { agoText, TONE_CHIP } from '../tones';
+import { accentOf, NEUTRAL_ACCENT, stripes, useItemColors } from '../visual';
 
 export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: number; flip: boolean }) {
   const colors = useItemColors();
+  const view = useViews().get(item.id);
+  const ctx = useCtx();
+  const facts = factsOf(item, ctx);
   return (
     <div className={`hover-card ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y, ['--accent' as string]: stripes(colors.get(item.id) ?? [NEUTRAL_ACCENT], 180) }}>
       <div className="hover-card-kind">
-        {KIND_ICON[item.kind](14)}
-        <span>{KIND_LABEL[item.kind]}</span>
+        {kindIcon(item.kind, 14)}
+        <span>{kindLabel(item.kind)}</span>
         {item.archived && (
           <span className="archived-tag">
             <ArchiveIcon size={12} /> archived
@@ -27,9 +30,14 @@ export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: numb
         <span className="hover-card-handle">@{item.handle}</span>
       </div>
       <div className="hover-card-title">{item.title}</div>
-      {item.subtitle && <div className="hover-card-sub">{item.subtitle}</div>}
+      {view?.subtitle && <div className="hover-card-sub">{view.subtitle}</div>}
       <div className="hover-card-status">
-        {item.status.map((s, i) => (
+        {view?.badge && (
+          <Chip size="condensed" color={TONE_CHIP[view.badge.tone]} variant="emphasized">
+            {view.badge.label}
+          </Chip>
+        )}
+        {view?.ring.map((s, i) => (
           <Chip key={i} size="condensed" color={TONE_CHIP[s.tone]} variant={s.tone === 'neutral' || s.tone === 'pending' ? undefined : 'emphasized'}>
             {s.label}
           </Chip>
@@ -39,12 +47,12 @@ export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: numb
         <div className={`hover-card-notice tone-${item.notice.tone}`}>
           <span className="dot" />
           <span>{item.notice.text}</span>
-          <span className="when">{ago(item.notice.ago)}</span>
+          <span className="when">{agoText(item.notice.at)}</span>
         </div>
       )}
-      {item.facts && (
+      {facts.length > 0 && (
         <dl className="hover-card-facts">
-          {item.facts.map(([k, v]) => (
+          {facts.map(([k, v]) => (
             <div key={k}>
               <dt>{k}</dt>
               <dd>{v}</dd>
@@ -108,7 +116,7 @@ export function InlineActions({
             >
               {flip && <ChevronLeftSmallIcon />}
               <span className="rel-row-icon" style={{ ['--accent' as string]: accentOf(colors, r.id) }}>
-                {KIND_ICON[r.kind](12)}
+                {kindIcon(r.kind, 12)}
               </span>
               <span className="rel-row-handle">{r.handle}</span>
               {!flip && <ChevronRightSmallIcon />}
@@ -116,7 +124,7 @@ export function InlineActions({
             {isOpen && (
               <div className={`rel-flyout ${flip ? 'is-flipped' : ''} ${open.up ? 'is-up' : ''}`}>
                 <span className="rel-flyout-title">
-                  {KIND_ICON[r.kind](12)}
+                  {kindIcon(r.kind, 12)}
                   <span>{r.title}</span>
                 </span>
                 {actionsForItem(r).map((a) => (

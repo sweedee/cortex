@@ -19,10 +19,14 @@ import {
   XmarkIcon,
   ZoomToFitIcon,
 } from '@dynatrace/strato-icons';
+import { useAppInfo } from '../data/app';
 import { toggleDesktop, toggleSound } from '../desktop';
 import { camera } from '../layout';
 import { asset } from '../native';
-import { KIND_LABEL, KINDS, STATUS_GROUPS, type Item } from '../model';
+import { STATUS_GROUPS, type Item } from '../domain';
+import { ArchiveIcon } from '../kinds/icons';
+import { KINDS, kindIcon, kindLabel, useViews } from '../kinds/registry';
+import { agoShort, TONE_COLOR } from '../tones';
 import {
   activeFilterCount,
   clearNotices,
@@ -37,14 +41,13 @@ import {
   useVisible,
   type ColorBy,
 } from '../store';
-import { accentOf, ArchiveIcon, KIND_ICON, TONE_COLOR, useItemColors } from '../visual';
+import { accentOf, useItemColors } from '../visual';
 
 const COLOR_BY: [ColorBy, string][] = [
   ['none', 'Gray'],
   ['project', 'Project'],
   ['ticket', 'Ticket'],
 ];
-const ago = (m: number) => (m < 1 ? 'now' : m < 60 ? `${m}m` : `${Math.round(m / 60)}h`);
 
 export function Hud() {
   const items = useStore((s) => s.items);
@@ -57,7 +60,7 @@ export function Hud() {
 
   const notices = items
     .filter((i) => i.notice && !i.archived)
-    .sort((a, b) => Number(!!a.notice!.read) - Number(!!b.notice!.read) || a.notice!.ago - b.notice!.ago);
+    .sort((a, b) => Number(!!a.notice!.read) - Number(!!b.notice!.read) || b.notice!.at - a.notice!.at);
   const unread = notices.filter((i) => !i.notice!.read).length;
   const nFilters = activeFilterCount(filter);
   const live = items.filter((i) => !i.archived);
@@ -113,7 +116,7 @@ export function Hud() {
                     <span>{i.notice!.text}</span>
                   </span>
                   <Menu.Suffix>
-                    <span className="notice-ago">{ago(i.notice!.ago)}</span>
+                    <span className="notice-ago">{agoShort(i.notice!.at)}</span>
                   </Menu.Suffix>
                 </Menu.Item>
               ))}
@@ -146,6 +149,7 @@ export function Hud() {
                 </Menu.Suffix>
               </Menu.Item>
             </Menu.Group>
+            <AppVersion />
           </Menu.Content>
         </Menu>
       </div>
@@ -162,10 +166,12 @@ export function Hud() {
         {KINDS.map((k) => {
           const n = live.filter((i) => i.kind === k).length;
           const off = filter.hiddenKinds.includes(k);
+          // 11 kinds: the legend only lists the ones on the canvas (the filter panel has all)
+          if (!n && !off) return null;
           return (
-            <Tooltip key={k} text={`${off ? 'Show' : 'Hide'} ${KIND_LABEL[k].toLowerCase()}s`}>
+            <Tooltip key={k} text={`${off ? 'Show' : 'Hide'} ${kindLabel(k).toLowerCase()}s`}>
               <button className={`legend-item ${off ? 'is-off' : ''}`} onClick={() => toggleKind(k)}>
-                {KIND_ICON[k](14)}
+                {kindIcon(k, 14)}
                 <span>{n}</span>
               </button>
             </Tooltip>
@@ -209,11 +215,26 @@ export function Hud() {
   );
 }
 
+/** Footer of the notifications menu: which build is running (via the `useAppInfo` query). */
+function AppVersion() {
+  const { data } = useAppInfo();
+  if (!data) return null;
+  return (
+    <Menu.Group>
+      <Menu.Label>
+        Cortex {data.version}
+        {data.electron ? ` · Electron ${data.electron}` : ''} · {data.platform}
+      </Menu.Label>
+    </Menu.Group>
+  );
+}
+
 /** Filter popover above the legend: text, type, status, project, notifications, archive. */
 function FilterPanel({ onClose }: { onClose: () => void }) {
   const items = useStore((s) => s.items);
   const f = useStore((s) => s.filter);
   const colors = useItemColors();
+  const views = useViews();
   const ref = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
@@ -269,8 +290,8 @@ function FilterPanel({ onClose }: { onClose: () => void }) {
           const on = !f.hiddenKinds.includes(k);
           return (
             <button key={k} className={`filter-chip ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={() => toggleKind(k)}>
-              {KIND_ICON[k](13)}
-              {KIND_LABEL[k]}
+              {kindIcon(k, 13)}
+              {kindLabel(k)}
               <span className="filter-n">{live.filter((i) => i.kind === k).length}</span>
             </button>
           );
@@ -281,7 +302,7 @@ function FilterPanel({ onClose }: { onClose: () => void }) {
       <div className="filter-chips">
         {STATUS_GROUPS.map((g) => {
           const on = f.status.includes(g.id);
-          const n = live.filter(g.test).length;
+          const n = live.filter((i) => g.test(views.get(i.id)?.ring ?? [])).length;
           return (
             <button key={g.id} className={`filter-chip ${on ? 'is-on' : ''}`} aria-pressed={on} disabled={!n && !on} onClick={() => setFilter({ status: toggle(f.status, g.id) })}>
               <span className="filter-dot" style={{ background: TONE_COLOR[g.tone] }} />
@@ -325,7 +346,7 @@ function FilterPanel({ onClose }: { onClose: () => void }) {
               <div key={a.id} className="archive-row">
                 <button className="archive-main" onClick={() => reveal(a)} title="Show on the canvas">
                   <span className="rel-row-icon" style={{ ['--accent' as string]: accentOf(colors, a.id) }}>
-                    {KIND_ICON[a.kind](12)}
+                    {kindIcon(a.kind, 12)}
                   </span>
                   <span className="archive-text">
                     <span className="archive-handle">{a.handle}</span>

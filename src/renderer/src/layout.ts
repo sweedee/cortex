@@ -13,15 +13,21 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force';
-import type { Item, Kind, Link } from './model';
-import { KIND_LEVEL, KIND_RADIUS } from './model';
+import type { Item, Link } from './domain';
+import { clearPinned, setPinned } from './store';
 
 export interface Node extends SimulationNodeDatum {
   id: string;
   r: number;
-  kind: Kind;
+  /** hierarchy level of the kind (0 = project) */
+  level: number;
+  /** level-0 items (projects) anchor their cluster */
+  anchor: boolean;
   cluster?: string;
 }
+
+/** Size and hierarchy of an item; the canvas passes the kind registry's numbers. */
+export type Metrics = (item: Item) => { r: number; level: number };
 type SimLink = SimulationLinkDatum<Node> & { id: string };
 
 /** Where each project's cluster gravitates to. New clusters are placed on a ring. */
@@ -49,7 +55,6 @@ const seeded = new Map<string, { x: number; y: number }>();
  * closer together the lower level they are (a build hugs its PR, a ticket sits further
  * from its project), and low-level bubbles push others away less.
  */
-const LEVEL = KIND_LEVEL;
 /**
  * Spacing falls off exponentially with depth: each level down the hierarchy keeps
  * FALLOFF times the distance of the level above (project-ticket 190, ticket-worktree
@@ -66,7 +71,7 @@ const collidePad = (level: number) => Math.max(30, decay(level, 52));
 /** low-level bubbles push the others away less */
 const charge = (level: number) => (level === 0 ? -800 : -decay(level, 300));
 
-const linkLevel = (l: SimLink) => Math.max(LEVEL[(l.source as Node).kind], LEVEL[(l.target as Node).kind]);
+const linkLevel = (l: SimLink) => Math.max((l.source as Node).level, (l.target as Node).level);
 
 const sim = forceSimulation<Node>([])
   .alphaDecay(0.025)
@@ -74,10 +79,10 @@ const sim = forceSimulation<Node>([])
   .force(
     'charge',
     forceManyBody<Node>()
-      .strength((n) => charge(LEVEL[n.kind]))
+      .strength((n) => charge(n.level))
       .distanceMax(800),
   )
-  .force('collide', forceCollide<Node>((n) => n.r + collidePad(LEVEL[n.kind])).strength(0.85))
+  .force('collide', forceCollide<Node>((n) => n.r + collidePad(n.level)).strength(0.85))
   .force(
     'link',
     forceLink<Node, SimLink>([])
@@ -85,8 +90,11 @@ const sim = forceSimulation<Node>([])
       .distance((l) => (l.source as Node).r + (l.target as Node).r + linkGap(linkLevel(l)))
       .strength((l) => linkStrength(linkLevel(l))),
   )
-  .force('x', forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.kind === 'project' ? 0.2 : 0.04)))
-  .force('y', forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.kind === 'project' ? 0.2 : 0.04)));
+  .force('x', forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.anchor ? 0.2 : 0.04)))
+  .force('y', forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.anchor ? 0.2 : 0.04)));
+
+// idle until syncLayout gives it nodes (d3 would otherwise start its timer at import)
+sim.stop();
 
 const tickListeners = new Set<() => void>();
 let frame = 0;
@@ -116,7 +124,7 @@ export function useLayoutTick() {
 export const positionOf = (id: string) => nodes.get(id);
 
 /** Keep the simulation in sync with the store's items and links. */
-export function syncLayout(items: Item[], links: Link[]) {
+export function syncLayout(items: Item[], links: Link[], metrics: Metrics) {
   let changed = false;
   const alive = new Set(items.map((i) => i.id));
   // oxlint-disable-next-line unicorn/no-useless-spread -- copy: we delete while iterating
@@ -124,17 +132,24 @@ export function syncLayout(items: Item[], links: Link[]) {
   for (const it of items) {
     if (nodes.has(it.id)) continue;
     changed = true;
-    const s = seeded.get(it.id);
+    const { r, level } = metrics(it);
+    // projects anchor their own cluster; everything else gravitates to its project's
+    const cluster = it.projectId ?? (level === 0 ? it.id : undefined);
+    const pinned = it.pos;
+    const s = pinned ?? seeded.get(it.id);
     const linked = links.find((l) => l.from === it.id || l.to === it.id);
-    const anchor = s ?? (linked && nodes.get(linked.from === it.id ? linked.to : linked.from)) ?? clusterCenter(it.cluster);
+    const anchor = s ?? (linked && nodes.get(linked.from === it.id ? linked.to : linked.from)) ?? clusterCenter(cluster);
     const jitter = s ? 0 : 160;
     nodes.set(it.id, {
       id: it.id,
-      kind: it.kind,
-      r: KIND_RADIUS[it.kind],
-      cluster: it.cluster,
+      r,
+      level,
+      anchor: level === 0,
+      cluster,
       x: (anchor.x ?? 0) + (Math.random() - 0.5) * jitter,
       y: (anchor.y ?? 0) + (Math.random() - 0.5) * jitter,
+      // dropped there by the user (saved with the item)
+      ...(pinned && { fx: pinned.x, fy: pinned.y }),
     });
   }
   const simLinks: SimLink[] = links
@@ -149,7 +164,9 @@ let lastLinkCount = 0;
 
 // ---- dragging ----------------------------------------------------------------------
 
+let dragged: string[] = [];
 export function dragStart(ids: string[]) {
+  dragged = ids;
   ids.forEach((id) => {
     const n = nodes.get(id);
     if (n) ((n.fx = n.x), (n.fy = n.y));
@@ -162,12 +179,20 @@ export function dragBy(ids: string[], dx: number, dy: number) {
     if (n) ((n.fx = (n.fx ?? n.x ?? 0) + dx), (n.fy = (n.fy ?? n.y ?? 0) + dy));
   });
 }
-/** Dropped bubbles stay where you put them (until "Auto-arrange"). */
+/** Dropped bubbles stay where you put them (until "Auto-arrange"); the spot is saved with the item. */
 export function dragEnd() {
   sim.alphaTarget(0);
+  const pos = new Map<string, { x: number; y: number }>();
+  for (const id of dragged) {
+    const n = nodes.get(id);
+    if (n?.fx != null && n.fy != null) pos.set(id, { x: Math.round(n.fx), y: Math.round(n.fy) });
+  }
+  dragged = [];
+  setPinned(pos);
 }
 export function unpinAll() {
   nodes.forEach((n) => ((n.fx = null), (n.fy = null)));
+  clearPinned();
   sim.alpha(0.9).restart();
 }
 export const isPinned = (id: string) => nodes.get(id)?.fx != null;

@@ -6,7 +6,8 @@ import { Bubble } from './Bubble';
 import { Links } from './Links';
 import { HoverCard, InlineActions } from './Overlays';
 import { SIDEBAR_W } from '../overlays/Sidebar';
-import { KIND_RADIUS } from '../model';
+import { kindIcon, levelOf, radiusOf, useViews } from '../kinds/registry';
+import type { Metrics } from '../layout';
 import {
   bounds,
   camera,
@@ -22,7 +23,9 @@ import {
 import { resetToDemo } from '../persist';
 import { actionsForItem, actionsForSelection, KINDS_ADDABLE, relatedItems, removeSelected } from '../actions';
 import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore, useVisible, visibleSet } from '../store';
-import { accentOf, groupFill, KIND_ICON, useItemColors } from '../visual';
+import { accentOf, groupFill, useItemColors } from '../visual';
+
+const metrics: Metrics = (it) => ({ r: radiusOf(it.kind), level: levelOf(it.kind) });
 
 type Cam = { x: number; y: number; k: number };
 type MenuState = { sx: number; sy: number; wx: number; wy: number; itemId?: string } | null;
@@ -44,6 +47,7 @@ export function Canvas() {
   const visible = useVisible();
   const search = useStore((s) => s.search);
   const colors = useItemColors();
+  const views = useViews();
   useLayoutTick();
 
   const cam = useRef<Cam>({ x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 });
@@ -60,7 +64,7 @@ export function Canvas() {
   // ---- layout sync ------------------------------------------------------------------
   const booted = useRef(false);
   useLayoutEffect(() => {
-    syncLayout(items, links);
+    syncLayout(items, links, metrics);
     if (!booted.current) {
       booted.current = true;
       warmUp();
@@ -371,7 +375,7 @@ export function Canvas() {
   if (hItem && !dragging && !menu && !selected.includes(hItem.id)) {
     const p = positionOf(hItem.id);
     if (p) {
-      const r = KIND_RADIUS[hItem.kind] * k;
+      const r = radiusOf(hItem.kind) * k;
       const s = toScreen(p.x!, p.y!);
       const flip = s.x + r + 300 > window.innerWidth - rightSpace();
       hoverCard = <HoverCard item={hItem} x={flip ? s.x - r - 18 : s.x + r + 18} y={s.y} flip={flip} />;
@@ -406,7 +410,7 @@ export function Canvas() {
     >
       <Backdrop cam={cam} />
       <div className="world" style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}>
-        <Links links={links} items={itemMap} active={activeLinks} hidden={hiddenSet} />
+        <Links links={links} views={views} active={activeLinks} hidden={hiddenSet} />
         {items.map((it) => {
           if (hiddenSet.has(it.id)) return null;
           const p = positionOf(it.id);
@@ -415,6 +419,7 @@ export function Canvas() {
             <Bubble
               key={it.id}
               item={it}
+              view={views.get(it.id)!}
               x={p.x}
               y={p.y!}
               selected={selected.includes(it.id)}
@@ -497,7 +502,7 @@ export function Canvas() {
                     {menuRelated.map((r) => (
                       <Menu.Sub key={r.id}>
                         <Menu.SubTrigger textValue={r.handle}>
-                          <Menu.Prefix>{KIND_ICON[r.kind](16)}</Menu.Prefix>
+                          <Menu.Prefix>{kindIcon(r.kind, 16)}</Menu.Prefix>
                           {r.handle}
                         </Menu.SubTrigger>
                         <Menu.SubContent>
@@ -546,7 +551,7 @@ export function Canvas() {
                   <Menu.Label>Add to canvas</Menu.Label>
                   {KINDS_ADDABLE.map((k) => (
                     <Menu.Item key={k.kind} onSelect={() => openDialog({ type: 'add', kind: k.kind, at: { x: menu.wx, y: menu.wy } })}>
-                      <Menu.Prefix>{KIND_ICON[k.kind](16)}</Menu.Prefix>
+                      <Menu.Prefix>{kindIcon(k.kind, 16)}</Menu.Prefix>
                       {k.label}
                     </Menu.Item>
                   ))}
