@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "import", "vitest"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "ignorePatterns": ["out/**", "dist/**", "release/**", "node_modules/**"],
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "no-unused-expressions": "off",
+    "react/immutability": "off",
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }]
+  }
+}

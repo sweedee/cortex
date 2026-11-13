@@ -9,17 +9,24 @@ import { Dialogs } from './overlays/Dialogs';
 import { Hud } from './overlays/Hud';
 import { Sidebar } from './overlays/Sidebar';
 import './desktop';
+import { loadWorkspace, startAutosave } from './persist';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AppRoot>
-      <Canvas />
-      <Hud />
-      <Sidebar />
-      <ChatBox />
-      <Dialogs />
-      <ToastContainer />
-    </AppRoot>
-  </StrictMode>,
-);
+async function boot() {
+  // load before the first render, so the layout warms up on the stored world, not the seed
+  await loadWorkspace();
+  startAutosave();
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <AppRoot>
+        <Canvas />
+        <Hud />
+        <Sidebar />
+        <ChatBox />
+        <Dialogs />
+        <ToastContainer />
+      </AppRoot>
+    </StrictMode>,
+  );
+}
+void boot();

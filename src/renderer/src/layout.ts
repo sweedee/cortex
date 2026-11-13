@@ -119,6 +119,7 @@ export const positionOf = (id: string) => nodes.get(id);
 export function syncLayout(items: Item[], links: Link[]) {
   let changed = false;
   const alive = new Set(items.map((i) => i.id));
+  // oxlint-disable-next-line unicorn/no-useless-spread -- copy: we delete while iterating
   for (const id of [...nodes.keys()]) if (!alive.has(id)) (nodes.delete(id), (changed = true));
   for (const it of items) {
     if (nodes.has(it.id)) continue;

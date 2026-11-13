@@ -1,5 +1,6 @@
 /** Floating pixel particles in brand colours and the faint logo mark, with a little parallax. */
 import { useEffect, useRef } from 'react';
+import { asset } from '../native';
 
 /** particle grid size in css px */
 const PX = 2;
@@ -84,7 +85,7 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
   return (
     <div className="backdrop" aria-hidden>
       <div className="backdrop-glow" />
-      <img ref={logo} className="backdrop-logo" src="/brand/cortex-mark.svg" alt="" draggable={false} />
+      <img ref={logo} className="backdrop-logo" src={asset('brand/cortex-mark.svg')} alt="" draggable={false} />
       <canvas ref={ref} className="backdrop-particles" />
     </div>
   );

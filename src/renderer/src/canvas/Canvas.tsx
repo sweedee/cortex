@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from '@dynatrace/strato-components/navigation';
-import { DeleteIcon, PinOffIcon, ZoomToFitIcon, ChatIcon, LinkIcon } from '@dynatrace/strato-icons';
+import { DeleteIcon, PinOffIcon, ZoomToFitIcon, ChatIcon, LinkIcon, ResetIcon } from '@dynatrace/strato-icons';
 import { Backdrop } from './Backdrop';
 import { Bubble } from './Bubble';
 import { Links } from './Links';
@@ -19,6 +19,7 @@ import {
   useLayoutTick,
   warmUp,
 } from '../layout';
+import { resetToDemo } from '../persist';
 import { actionsForItem, actionsForSelection, KINDS_ADDABLE, relatedItems, removeSelected } from '../actions';
 import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore, useVisible, visibleSet } from '../store';
 import { accentOf, groupFill, KIND_ICON, useItemColors } from '../visual';
@@ -569,6 +570,29 @@ export function Canvas() {
                       <LinkIcon />
                     </Menu.Prefix>
                     Paste a link…
+                  </Menu.Item>
+                </Menu.Group>
+                <Menu.Group>
+                  <Menu.Item
+                    onSelect={() =>
+                      openDialog({
+                        type: 'confirm',
+                        title: 'Reset workspace to demo data?',
+                        body: 'Replaces every bubble and link on the canvas with the demo world. The saved workspace is overwritten.',
+                        confirm: 'Reset',
+                        danger: true,
+                        onConfirm: () => {
+                          resetToDemo();
+                          unpinAll();
+                          setTimeout(() => fitTo(), 50);
+                        },
+                      })
+                    }
+                  >
+                    <Menu.Prefix>
+                      <ResetIcon />
+                    </Menu.Prefix>
+                    Reset workspace to demo data
                   </Menu.Item>
                 </Menu.Group>
               </>

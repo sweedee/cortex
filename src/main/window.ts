@@ -1,7 +1,6 @@
 import { app, BrowserWindow, screen, shell, type Rectangle, type WebContents } from 'electron';
-import { readFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { atomicWrite } from './lib/atomicWrite';
 
 /** matches `--canvas-bg` in the renderer, so there is no white flash before first paint */
 const BACKGROUND = '#07080f';
@@ -66,10 +65,17 @@ export function createMainWindow(): BrowserWindow {
 
   // ---- remember bounds ----
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // synchronous (tiny file): the last write happens on close, right before the process exits
   const persist = () => {
     if (win.isDestroyed()) return;
     const state: WindowState = { bounds: win.getNormalBounds(), maximized: win.isMaximized() };
-    void atomicWrite(stateFile(), JSON.stringify(state)).catch(() => {});
+    try {
+      const tmp = `${stateFile()}.tmp`;
+      writeFileSync(tmp, JSON.stringify(state));
+      renameSync(tmp, stateFile());
+    } catch (err) {
+      console.warn('[window] could not save bounds:', (err as Error).message);
+    }
   };
   const later = () => {
     clearTimeout(timer);
@@ -97,6 +103,17 @@ export function createMainWindow(): BrowserWindow {
     prefs.sandbox = true;
   });
   win.webContents.on('did-attach-webview', (_e, wc) => externalLinks(wc));
+
+  // surface renderer problems in the terminal (dev runs are often headless / unattended)
+  win.webContents.on('preload-error', (_e, path, err) => console.error(`[preload] ${path}: ${err.message}`));
+  win.webContents.on('render-process-gone', (_e, d) => console.error(`[renderer] gone: ${d.reason} (${d.exitCode})`));
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => console.error(`[renderer] failed to load ${url}: ${desc} (${code})`));
+  win.webContents.on('did-finish-load', () => console.log(`[renderer] loaded ${win.webContents.getURL()}`));
+  if (!app.isPackaged) {
+    win.webContents.on('console-message', (e) => {
+      if (e.level === 'warning' || e.level === 'error') console.log(`[renderer:${e.level}] ${e.message} (${e.sourceId}:${e.lineNumber})`);
+    });
+  }
 
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
   if (!app.isPackaged && devUrl) void win.loadURL(devUrl);

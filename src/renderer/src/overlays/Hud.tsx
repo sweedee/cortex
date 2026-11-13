@@ -14,11 +14,14 @@ import {
   PlusIcon,
   ResetIcon,
   UndoIcon,
+  VolumeIcon,
+  VolumeOffIcon,
   XmarkIcon,
   ZoomToFitIcon,
 } from '@dynatrace/strato-icons';
-import { toggleDesktop } from '../desktop';
+import { toggleDesktop, toggleSound } from '../desktop';
 import { camera } from '../layout';
+import { asset } from '../native';
 import { KIND_LABEL, KINDS, STATUS_GROUPS, type Item } from '../model';
 import {
   activeFilterCount,
@@ -48,6 +51,7 @@ export function Hud() {
   const filter = useStore((s) => s.filter);
   const colorBy = useStore((s) => s.colorBy);
   const desktopNotify = useStore((s) => s.desktopNotify);
+  const soundOn = useStore((s) => s.soundOn);
   const visible = useVisible();
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -61,7 +65,7 @@ export function Hud() {
   return (
     <>
       <div className="hud hud-brand">
-        <img src="/brand/cortex-mark.svg" alt="" width={22} height={22} />
+        <img src={asset('brand/cortex-mark.svg')} alt="" width={22} height={22} />
         <div>
           <div className="hud-title">Cortex</div>
           <div className="hud-sub">canvas · experimental</div>
@@ -132,6 +136,13 @@ export function Hud() {
                 Desktop notifications
                 <Menu.Suffix>
                   <span className={`menu-toggle ${desktopNotify ? 'is-on' : ''}`}>{desktopNotify ? 'On' : 'Off'}</span>
+                </Menu.Suffix>
+              </Menu.Item>
+              <Menu.Item onSelect={() => toggleSound()}>
+                <Menu.Prefix>{soundOn ? <VolumeIcon /> : <VolumeOffIcon />}</Menu.Prefix>
+                Sound
+                <Menu.Suffix>
+                  <span className={`menu-toggle ${soundOn ? 'is-on' : ''}`}>{soundOn ? 'On' : 'Muted'}</span>
                 </Menu.Suffix>
               </Menu.Item>
             </Menu.Group>

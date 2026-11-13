@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Item, Kind, Link, Notice, StatusGroup } from './model';
 import { rootsOf, STATUS_GROUPS } from './model';
+import { notifyPermitted } from './native';
 import { SEED_ITEMS, SEED_LINKS } from './seed';
 
 export type Dialog =
@@ -61,6 +62,8 @@ export interface State {
   colorBy: ColorBy;
   /** send OS notifications for new notices (needs browser permission) */
   desktopNotify: boolean;
+  /** play a chime for new notices */
+  soundOn: boolean;
 }
 
 export type ColorBy = 'none' | 'project' | 'ticket';
@@ -86,7 +89,8 @@ let state: State = {
   dialog: null,
   inspected: null,
   colorBy: 'project',
-  desktopNotify: stored('cortex.desktopNotify') === '1' && typeof Notification !== 'undefined' && Notification.permission === 'granted',
+  desktopNotify: stored('cortex.desktopNotify') === '1' && notifyPermitted(),
+  soundOn: stored('cortex.soundOn') !== '0',
 };
 
 const listeners = new Set<() => void>();
@@ -95,7 +99,8 @@ export const setState = (fn: (s: State) => State) => {
   state = fn(state);
   listeners.forEach((l) => l());
 };
-const subscribe = (l: () => void) => {
+/** Listen to every state change (persistence uses it). */
+export const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
 };
@@ -292,14 +297,26 @@ export function notify(id: string, notice: Omit<Notice, 'read'>, patch: Partial<
   if (item) noticeListeners.forEach((l) => l(item, item.notice!));
 }
 
-export const setDesktopNotify = (on: boolean) => {
+// prefs live in localStorage for now; Phase 0b moves them into the workspace file
+const storePref = (k: string, on: boolean) => {
   try {
-    localStorage.setItem('cortex.desktopNotify', on ? '1' : '0');
+    localStorage.setItem(k, on ? '1' : '0');
   } catch {
     /* private mode */
   }
+};
+export const setDesktopNotify = (on: boolean) => {
+  storePref('cortex.desktopNotify', on);
   setState((s) => ({ ...s, desktopNotify: on }));
 };
+export const setSoundOn = (on: boolean) => {
+  storePref('cortex.soundOn', on);
+  setState((s) => ({ ...s, soundOn: on }));
+};
+
+/** Replace the whole world (workspace load / reset); drops selection and other pointers into the old one. */
+export const replaceWorld = (items: Item[], links: Link[]) =>
+  setState((s) => ({ ...s, items, links, selected: [], autoIds: [], hovered: null, inspected: null, search: null, dialog: null }));
 
 // ---- chat box ---------------------------------------------------------------------------
 

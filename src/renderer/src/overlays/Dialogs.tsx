@@ -79,6 +79,7 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
   useEffect(() => {
     const t = setTimeout(() => field.current?.querySelector<HTMLElement>('input, textarea')?.focus(), 80);
     return () => clearTimeout(t);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- refocus only when the field type flips
   }, [kind === 'agent']);
 
   const submit = () => {

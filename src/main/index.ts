@@ -2,9 +2,13 @@
 import { app, BrowserWindow } from 'electron';
 import type { EventChannel, EventChannels } from '../shared/ipc';
 import { registerIpc } from './ipc';
+import { runSmoke } from './smoke';
 import { createMainWindow } from './window';
 
 let win: BrowserWindow | null = null;
+
+// an isolated profile (tests, smoke runs, a second dev instance): CORTEX_USER_DATA=<dir>
+if (process.env['CORTEX_USER_DATA']) app.setPath('userData', process.env['CORTEX_USER_DATA']);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -30,6 +34,7 @@ if (!app.requestSingleInstanceLock()) {
       // a reload starts a fresh renderer that knows none of the old watch ids
       win.webContents.on('did-navigate', () => ipc.closeWatchers());
       win.on('closed', () => (win = null));
+      if (process.env['CORTEX_SMOKE'] === '1') runSmoke(win);
     };
     open();
     app.on('activate', () => {
