@@ -142,8 +142,9 @@ describe('refresher mappings', () => {
     const st = { branch: 'feat/x', head: 'abc', upstream: null, ahead: 0, behind: 0, dirty: true, files: [{ path: 'a', index: '.', worktree: 'M', kind: 'changed' as const }] };
     const p = worktreeGitPatch(st, { ahead: 2, behind: 5 }, 7);
     expect(p).toEqual({ git: { ahead: 2, behind: 5, dirty: true, changedFiles: 1, checkedAt: 7 }, branch: 'feat/x' });
-    expect(changes({ git: { ahead: 2, behind: 5, dirty: true, changedFiles: 1, checkedAt: 1 }, branch: 'feat/x' }, p)).toBe(false);
-    expect(changes({ git: { ahead: 2, behind: 4, dirty: true, changedFiles: 1 }, branch: 'feat/x' }, p)).toBe(true);
+    const wt = { path: 'C:/wt', baseBranch: 'main', branch: 'feat/x' };
+    expect(changes({ ...wt, git: { ahead: 2, behind: 5, dirty: true, changedFiles: 1, checkedAt: 1 } }, p)).toBe(false);
+    expect(changes({ ...wt, git: { ahead: 2, behind: 4, dirty: true, changedFiles: 1 } }, p)).toBe(true);
   });
 });
 
