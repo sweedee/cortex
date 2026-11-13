@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { EXEC_ALLOWLIST, type InvokeChannel, type Req } from './ipc';
+import { integrationSchemas } from './integrationSchemas';
 
 const isAbsolute = (p: string) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(p);
 /** an absolute path on any platform (C:\…, \\server\…, /…), no NUL bytes */
@@ -71,6 +72,7 @@ export const schemas = {
   'fs:watch': z.object({ dir: absPath }),
   'fs:unwatch': z.object({ watchId: z.string() }),
   'app:info': z.undefined(),
+  ...integrationSchemas,
 } satisfies { [C in InvokeChannel]: z.ZodType };
 
 /** Compile-time check: every schema parses to (a subtype of) the channel's request type. */

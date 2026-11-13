@@ -74,6 +74,7 @@ function browserFallback(): CortexApi {
       onChanged: noop,
     },
     app: { info: async () => ({ platform: 'browser', userData: '', version: 'dev' }) },
+    ...integrationFallbacks(),
   };
 }
 
@@ -94,4 +95,23 @@ export async function requestNotifyPermission(): Promise<'granted' | 'denied' | 
   if (typeof Notification === 'undefined') return 'unsupported';
   const p = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
   return p === 'granted' ? 'granted' : 'denied';
+}
+
+// ---- Phase 1 integrations: browser fallbacks ------------------------------------------------
+
+/** git / gh / jira / claude / apps / tests need the desktop app; lists are empty, actions reject. */
+function integrationFallbacks(): Pick<CortexApi, 'integrations' | 'git' | 'gh' | 'jira' | 'claude' | 'apps' | 'tests' | 'on'> {
+  const group = <K extends string>(name: string, methods: readonly K[]) =>
+    Object.fromEntries(methods.map((m) => [m, needsDesktop(`${name}.${m}`)])) as Record<K, () => Promise<never>>;
+  const empty = () => Promise.resolve([] as never[]);
+  return {
+    integrations: group('integrations', ['config']),
+    git: group('git', ['isRepo', 'currentBranch', 'remoteRepo', 'worktreeList', 'worktreeAdd', 'worktreeRemove', 'status', 'diff', 'diffStat', 'log', 'fetch', 'rebase', 'rebaseAbort']),
+    gh: group('gh', ['prList', 'prView', 'prCreate', 'prMerge', 'prComment', 'prUpdateBranch', 'prDiff', 'prChecks', 'runView', 'runRerun', 'renovatePrs']),
+    jira: group('jira', ['search', 'view', 'transition', 'create', 'comment', 'edit']),
+    claude: { ...group('claude', ['start', 'send', 'answer', 'permission', 'interrupt', 'stop', 'remove', 'transcript', 'session']), list: empty },
+    apps: { ...group('apps', ['start', 'stop', 'restart', 'log', 'remove']), list: empty },
+    tests: { ...group('tests', ['run', 'stop', 'log']), list: empty },
+    on: () => () => {},
+  };
 }
