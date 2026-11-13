@@ -77,11 +77,168 @@ which returns an unsubscribe function.
 3. Register a handler with `handle(ctx, 'group:name', fn)` in `src/main/ipc/*`.
 4. Forward it in `src/preload/index.ts` and add a fallback in `src/renderer/src/native.ts`.
 
-## Persistence (Phase 0a, interim)
+## Renderer
 
-`persist.ts` loads `{version: 0, items, links}` before the first render (seed when empty) and saves it
-500 ms after changes (and on unload). Main only stores JSON; schema validation and migrations belong to
-the renderer (Phase 0b). Notification / sound toggles are still in localStorage.
+```
+src/renderer/src/
+  domain/      pure model: zod schemas (source of truth), inferred types, migrations, graph helpers
+  kinds/       kind registry: registry.ts, types.ts (KindModule), common.tsx (shared actions + helpers),
+               icons.tsx, and one folder per kind: project ticket worktree record pr agent app build
+               deployment todo testrun
+  sidebar/     sidebar building blocks (SidebarSection, SummarySection, FactsSection, ConnectionsSection,
+               DefaultSidebar); overlays/Sidebar.tsx is the shell
+  data/        TanStack Query: queryClient.ts, queryKeys.ts, one file of hooks per integration
+  store.ts     zustand store + the function API (select, patchItem, patchData, notify, insertSkill, …)
+  persist.ts   workspace load (migrate + validate) and debounced autosave
+  layout.ts    d3-force simulation; positions live here, not in the store
+  actions.tsx  selection-level actions, chat send
+  visual.ts    group colours; tones.ts: tone → colour maps, "x min ago"
+  canvas/ overlays/ chat/   UI; they reach kinds only through kinds/registry.ts
+```
+
+Import direction (keep it acyclic): `domain` ← `store` ← `kinds/common`, `sidebar` ← `kinds/<kind>` ←
+`kinds/registry` ← UI. The store and `layout.ts` never import the registry: what the store needs to know
+about kinds (ring tones and search text for the filter, hierarchy levels) is handed to it with
+`provideKindInfo()` when `kinds/registry.ts` is imported (`main.tsx` does that first; tests that use the
+filter import it too). Kind modules must not import `kinds/registry` or `visual.ts`; to reach another kind
+use `ctx.kind(k)`.
+
+### Domain model
+
+Everything on the canvas is an `Item`: a discriminated union on `kind`
+(`domain/schemas.ts` → `ItemSchema`, types in `domain/types.ts`, `ItemOf<'pr'>`, `DataOf<'pr'>`).
+
+Common fields: `id`, `kind`, `handle` (what `@` mentions), `title`, `projectId?` (owning project, also the
+layout cluster), `archived?`, `notice? {text, tone, at, read?}`, `createdAt`, `updatedAt`, `pos? {x, y}`
+(where the user dropped the bubble; pinned until *Auto-arrange*).
+
+| kind | `data` (cached for the ring / hover card only) |
+|---|---|
+| project | `repo` (owner/name), `baseDir?`, `worktreesDir?`, `defaultBranch`, `startCommand?`, `testCommand?`, `stats? {mainChecks, openPrs, renovatePrs}` |
+| ticket | `key`, `status` (Jira name), `statusCategory` (new / indeterminate / done), `type`, `priority?`, `assignee?`, `sprint?`, `points?`, `branch?` |
+| worktree | `path`, `branch`, `baseBranch`, `ticketKey?`, `git? {ahead, behind, dirty, changedFiles, checkedAt?}` |
+| record | `recordType` (plan / brainstorm / grill / verification), `path` (`<baseDir>/records/<ticket-branch>/<name>.md`), `ticketBranch?`, `ticketKey?`, `status` (draft / approved / done), `steps? {done, total}`, `author?` |
+| pr | `repo`, `number`, `headBranch`, `baseBranch`, `state` (open / closed / merged), `isDraft`, `author?`, `reviewDecision?`, `reviews? {approved, requested}`, `mergeable?`, `checks? {state, passed?, failed?, pending?}`, `additions?`, `deletions?`, `stackedOn?` (PR item id) |
+| agent | `sessionId?`, `cwd`, `model?`, `status` (running / waiting / idle / done / failed), `skill?`, `pendingQuestion? {toolUseId, questions[{question, header?, options[{label, description?}], multiSelect?}]}`, `lastActivity?`, `startedAt?`, `endedAt?`, `usage? {contextPct, costUsd, turns}` |
+| app | `command`, `cwd`, `url?`, `port?`, `procId?`, `state` (starting / running / stopped / crashed), `worktreeId?` |
+| build | `repo`, `name`, `url`, `runId?`, `number?`, `state` (queued / in_progress / completed), `conclusion?`, `prNumber?`, `branch`, `stage?`, `trigger?`, `durationSec?` |
+| deployment | `url`, `stage` (dev / staging / prod / custom), `stageLabel?`, `health?` (mocked), `version?` |
+| todo | `body` (markdown), `done` |
+| testrun | `command`, `cwd`, `procId?`, `state` (idle / running / passed / failed / stopped), `summary? {passed, failed, skipped}`, `outputTail?` (max 8000 chars), `worktreeId?`, `startedAt?`, `endedAt?` |
+
+Rule: items only cache what the canvas needs to draw. Diffs, transcripts, full Jira issues, PR details and
+logs come from TanStack Query hooks and are never persisted. Visuals (ring, subtitle, facts, short text,
+badge) are *derived* from `data` by the kind module; nothing display-only is stored.
+
+Mutate with the store API: `patchData(item | id, partialData, commonPatch?)` for `data`,
+`patchItem(id, commonPatch)` for common fields, `addItem(newItem, links)` (stamps id and timestamps via
+`makeItem`), `notify(id, {text, tone})`, `setArchived`, `removeItems`, `restoreItems(snapshot)` (undo).
+
+### Kind registry
+
+`kinds/types.ts` defines `KindModule<K>`:
+
+| field | |
+|---|---|
+| `kind`, `label`, `icon(size)` | identity |
+| `radius`, `level` | bubble size; hierarchy (0 = project … 4 = build / testrun), drives layout spacing and colour roll-up |
+| `ring(item, ctx)` → `Segment[]` | status ring, derived from `data` (+ related items via `ctx`); filters and status buckets use it |
+| `facts(item, ctx)` → `[k, v][]`, `subtitle(item, ctx)`, `short?(item)` | hover card / sidebar text; the subtitle is also searched |
+| `badge?(item)` → `{label, tone}` | chip under the bubble (deployment stage) |
+| `titleInside?`, `waiting?(item)` | title inside the disc (projects); pulse when the user is needed |
+| `actions(items, ctx)` → `Action[]` | kind actions (today always one item); `primaryAction?(item, ctx)` overrides which one is primary |
+| `complete?(item)` → data patch | present = the kind gets *Mark done* (patch, then archive) |
+| `Sidebar?` | details body; default `DefaultSidebar` |
+| `addable?` `{label, hint, multiline?, detect?(input), create(input, project)}` | canvas *Add* menu, add dialog, paste detection |
+
+`ctx` (`KindCtx`, cached per items/links change): `items`, `links`, `get(id)`, `getAs(id, kind)`,
+`linked(id, kind?)`, `inProject(projectId, kind?)`, `projectOf(item)`, `kind(k)`.
+
+Registry helpers (`kinds/registry.ts`): `getKind`, `kindIcon`, `kindLabel`, `levelOf`, `radiusOf`,
+`ctxOf` / `useCtx`, `viewsOf` / `useViews` (per-item `{ring, short, badge, subtitle, waiting, running}`,
+cached), `factsOf`, `sidebarOf`, `actionsForItem` (kind actions + *Mark done* + *Archive*; archived items
+get *Unarchive* + view / external actions only).
+
+Action building blocks (`kinds/common.tsx`): `skill(id, label, skillName)` inserts `/skill @item` into the
+chat box (AI actions), `external(id, label, url)` (mock toast until wired), `placeholder(id, label, icon)`
+("not implemented yet" toast), `toast`, `archive`, and the shared `completeAction`, `archiveAction`,
+`unarchiveAction`, `removeAction`.
+
+#### How to add a kind
+
+1. `domain/schemas.ts`: add the name to `KINDS`, a `<Kind>DataSchema`, an entry in `ItemSchemas` and in
+   `ItemSchema`. A new kind needs no migration; an incompatible change to an existing data shape does
+   (bump `WORKSPACE_VERSION`, see below).
+2. `domain/types.ts`: export the data type (optional).
+3. `kinds/<kind>/index.tsx`: export a `KindModule<'<kind>'>`. Build actions inside `actions()`; import only
+   from `domain`, `store`, `layout`, `native`, `data`, `tones`, `kinds/common`, `kinds/icons`, `sidebar`.
+4. `kinds/registry.ts`: add it to `MODULES` (typecheck fails until every kind has a module).
+5. Add a seed example and run `npm test` (the registry test checks every kind and every seed item).
+
+#### Per-kind work (phase 3)
+
+Each kind's actions and sidebar live entirely in `kinds/<kind>/` (add files there: `Sidebar.tsx`,
+`actions.tsx`, hooks). Compose sidebars from the `sidebar/` sections. Shared hot spots, change only with
+care and in small, separate commits: `domain/schemas.ts` (data shapes), `kinds/types.ts`,
+`kinds/registry.ts`, `kinds/common.tsx`, `kinds/icons.tsx`, `store.ts`, `sidebar/index.tsx`,
+`data/queryKeys.ts`, `seed.ts`, `index.css`.
+
+### Store
+
+zustand (`create` + `subscribeWithSelector`) in `store.ts`; components read with `useStore(selector)`
+(selectors must return stable values: cache derived ones, like `visibleSet`, `viewsOf` and `ctxOf` do).
+Everything else uses the exported functions. Positions stay in `layout.ts`; only dropped positions are
+written to the items (`pos`) on drag end.
+
+### Workspace file and migrations
+
+`<userData>/workspace.json`:
+
+```jsonc
+{
+  "version": 1,
+  "items": [ /* Item */ ],
+  "links": [ { "id": "l1", "from": "t-4821", "to": "p-ingest", "label": "in project" } ],
+  "prefs": { "desktopNotify": false, "soundOn": true, "colorBy": "project", "filter": { /* Filter */ } },
+  "camera": { "x": 0, "y": 0, "k": 1 }   // optional, reserved
+}
+```
+
+`persist.ts` loads it before the first render: `parseWorkspace(raw)` (`domain/migrations.ts`) runs
+`migrate()` (step by step: `MIGRATIONS[n]` turns version n into n+1), then validates with zod.
+
+- Single invalid items and dangling links are dropped (console warning + toast); an outdated
+  `prefs.filter` is dropped.
+- A file that is not a workspace, or comes from a newer app version: demo data, a copy is written as
+  `workspace.invalid-<time>.json`, warning toast. Unreadable JSON: main falls back to `.bak` first.
+- A migrated file is saved right away (the old one becomes `.bak`).
+- Autosave: 500 ms after a change of items, links or prefs, and on unload.
+
+v0 (phase 0a): `{version: 0, items, links}` with display-only items (`status`, `facts`, `subtitle`,
+`flags`, `cluster`, `notice.ago`); prefs in localStorage. v0 → v1 parses those strings into typed `data`,
+`plan` → `record`, `cluster` → `projectId`, `notice.ago` → `notice.at`, and carries the localStorage prefs
+over. Fixture: `domain/fixtures/workspace-v0.json`.
+
+Adding a version: bump `WORKSPACE_VERSION`, add `MIGRATIONS[old]`, a fixture of the old format and a test.
+Never edit an existing step.
+
+## Remote data (TanStack Query)
+
+Live data from integrations is read with TanStack Query; the `QueryClient` (`data/queryClient.ts`) is
+provided in `main.tsx`. Pattern:
+
+- **Keys** only from the factory in `data/queryKeys.ts`: `[integration, resource, ...params]`
+  (`qk.gh.pr(repo, n)`), so invalidation can target an integration (`qk.gh.all`), a resource or one entity.
+- **One file of hooks per integration** in `data/` (`data/gh.ts`, `data/git.ts`, …), each hook wrapping a
+  `native.*` call: `useQuery({ queryKey: qk.git.status(path), queryFn: () => … })`. Example:
+  `data/app.ts` → `useAppInfo()` (shown in the notifications menu).
+- **Invalidate after actions**: an action that changes something remote calls
+  `queryClient.invalidateQueries({ queryKey: … })` when it is done.
+- **Poll running things** with `refetchInterval` (a running build, agent or test run), e.g.
+  `refetchInterval: (q) => (q.state.data?.state === 'running' ? 5_000 : false)`.
+- **Write back what the ring needs**: when a query result changes a cached field (PR checks, git stats),
+  `patchData()` the item so the canvas (and the next start) shows it; everything else stays in the cache.
+- Defaults: `staleTime` 30 s, no refetch on window focus, one retry.
 
 ## Where things live
 
@@ -92,4 +249,4 @@ the renderer (Phase 0b). Notification / sound toggles are still in localStorage.
 | Build output | `out/main`, `out/preload/index.cjs`, `out/renderer` |
 | Static assets | `public/` (renderer `publicDir`); reference them with `asset('brand/…')` from `native.ts`, not `/brand/…`, so they resolve under `file://` too |
 | Separate profile | `CORTEX_USER_DATA=<dir>` |
-| Headless bridge check | `CORTEX_SMOKE=1 npm run dev` (`src/main/smoke.ts`) |
+| Headless bridge check | `CORTEX_SMOKE=1 npm run dev` (`src/main/smoke.ts`); `CORTEX_SMOKE_SHOT=<file.png>` also saves a screenshot |

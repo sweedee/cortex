@@ -343,7 +343,7 @@ export function notify(id: string, notice: Pick<Notice, 'text' | 'tone'> & { at?
 export const setDesktopNotify = (on: boolean) => setState((s) => ({ ...s, desktopNotify: on }));
 export const setSoundOn = (on: boolean) => setState((s) => ({ ...s, soundOn: on }));
 
-/** The persisted prefs of a state (memoised per field identity, so it can feed a selector). */
+/** The persisted prefs of a state (a new object each call: don't use it as a `useStore` selector). */
 export const prefsOf = (s: State): Prefs => ({ desktopNotify: s.desktopNotify, soundOn: s.soundOn, colorBy: s.colorBy, filter: s.filter });
 
 /** Replace the whole world (workspace load / reset); drops selection and other pointers into the old one. */
