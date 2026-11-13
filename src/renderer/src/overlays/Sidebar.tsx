@@ -8,7 +8,7 @@
  * the window) for webviews and diffs; kind sidebars can ask for it via `useSidebarLayout()`.
  */
 import { MaximizeIcon, MinimizeIcon, XmarkIcon } from '@dynatrace/strato-icons';
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ComponentType } from 'react';
 import { kindIcon, kindLabel, sidebarOf, useCtx } from '../kinds/registry';
 import type { SidebarProps } from '../kinds/types';
 import { DefaultSidebar, SidebarLayoutContext } from '../sidebar';
@@ -32,7 +32,10 @@ export function Sidebar() {
   const stored = useStore((s) => s.settings.sidebarWidth);
   const ctx = useCtx();
   const [drag, setDrag] = useState<number | null>(null);
-  const [wide, setWide] = useState(false);
+  // expanded for this item (a newly inspected item starts narrow again)
+  const [wideFor, setWideFor] = useState<string | null>(null);
+  const wide = !!inspected && wideFor === inspected;
+  const setWide = useCallback((w: boolean | ((cur: boolean) => boolean)) => setWideFor((cur) => ((typeof w === 'function' ? w(cur === inspected) : w) ? inspected : null)), [inspected]);
   const [, setVw] = useState(0);
 
   // re-clamp on window resize
@@ -41,12 +44,11 @@ export function Sidebar() {
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
-  // a new item starts narrow again
-  useEffect(() => setWide(false), [inspected]);
-
   const width = drag ?? (wide ? wideW() : clampW(stored));
-  currentW = width;
-  const layout = useMemo(() => ({ wide, setWide, width }), [wide, width]);
+  useLayoutEffect(() => {
+    currentW = inspected ? width : 0;
+  }, [inspected, width]);
+  const layout = useMemo(() => ({ wide, setWide: (w: boolean) => setWide(w), width }), [wide, setWide, width]);
 
   if (!inspected || !item) return null;
   const Body = (sidebarOf(item.kind) ?? DefaultSidebar) as ComponentType<SidebarProps>;

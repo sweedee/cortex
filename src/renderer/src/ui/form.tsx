@@ -76,14 +76,15 @@ export function FormHost() {
 
 function FormDialog({ form }: { form: OpenForm }) {
   const { spec } = form;
-  const [values, setValues] = useState<FormValues>(() => initialValues(spec.fields, spec.values));
+  const [first] = useState<FormValues>(() => initialValues(spec.fields, spec.values));
+  const [values, setValues] = useState<FormValues>(first);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const body = useRef<HTMLDivElement>(null);
-  const latest = useRef(values);
-  latest.current = values;
+  // the newest values, also between a change and the next render (derive / submit read it)
+  const latest = useRef(first);
 
   // Strato inputs have no autoFocus: focus the first field once the modal is in place
   useEffect(() => {
