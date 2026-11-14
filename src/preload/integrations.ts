@@ -33,6 +33,7 @@ export function integrationsApi(invoke: Invoke, on: On, eventChannels: readonly 
       prMerge: (repo, number, method, opts = {}) => invoke('gh:prMerge', { repo, number, method, deleteBranch: opts.deleteBranch }),
       prComment: (repo, number, body) => invoke('gh:prComment', { repo, number, body }),
       prUpdateBranch: (repo, number, opts = {}) => invoke('gh:prUpdateBranch', { repo, number, rebase: opts.rebase }),
+      prEdit: (req) => invoke('gh:prEdit', req),
       prDiff: (repo, number) => invoke('gh:prDiff', { repo, number }),
       prChecks: (repo, number) => invoke('gh:prChecks', { repo, number }),
       runView: (repo, runId) => invoke('gh:runView', { repo, runId }),

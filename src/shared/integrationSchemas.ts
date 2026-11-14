@@ -58,6 +58,9 @@ export const integrationSchemas = {
   'gh:prMerge': z.object({ repo, number: prNo, method: z.enum(['merge', 'squash', 'rebase']), deleteBranch: z.boolean().optional() }),
   'gh:prComment': z.object({ repo, number: prNo, body: text.min(1).optional() }),
   'gh:prUpdateBranch': z.object({ repo, number: prNo, rebase: z.boolean().optional() }),
+  'gh:prEdit': z
+    .object({ repo, number: prNo, base: ref.optional(), title: str(1000).optional(), body: text.optional() })
+    .refine((r) => r.base !== undefined || r.title !== undefined || r.body !== undefined, 'nothing to edit'),
   'gh:prDiff': z.object({ repo, number: prNo }),
   'gh:prChecks': z.object({ repo, number: prNo }),
   'gh:runView': z.object({ repo, runId: prNo }),

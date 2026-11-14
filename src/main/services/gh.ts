@@ -14,6 +14,7 @@ import {
   type GhRun,
   type GhUpdateBranchResult,
 } from '../../shared/integrations/github';
+import type { GhPrEditRequest } from '../../shared/ipc';
 import { CliError, defaultRunner, parseJson, runOk, type Runner } from './cli';
 
 export interface PrListFilter {
@@ -104,6 +105,15 @@ export class GhService {
     if (r.code === 0) return { ok: true, message };
     if (isConflictMessage(message)) return { ok: false, conflicts: true, message };
     throw new CliError('gh', args, r);
+  }
+
+  /** `gh pr edit`: change the base branch (retarget a stacked PR), title and / or body */
+  async prEdit(req: GhPrEditRequest): Promise<void> {
+    const args = ['pr', 'edit', String(req.number), '--repo', req.repo];
+    if (req.base !== undefined) args.push('--base', req.base);
+    if (req.title !== undefined) args.push('--title', req.title);
+    if (req.body !== undefined) args.push('--body', req.body);
+    await this.gh(args);
   }
 
   prDiff(repo: string, number: number): Promise<string> {

@@ -73,6 +73,16 @@ describe('GhService (fake runner)', () => {
     ]);
   });
 
+  it('edits base / title / body', async () => {
+    const { gh, calls } = fake(() => ok(''));
+    await gh.prEdit({ repo: 'o/r', number: 5, base: 'main' });
+    await gh.prEdit({ repo: 'o/r', number: 5, title: 'T', body: 'B' });
+    expect(calls).toEqual([
+      ['pr', 'edit', '5', '--repo', 'o/r', '--base', 'main'],
+      ['pr', 'edit', '5', '--repo', 'o/r', '--title', 'T', '--body', 'B'],
+    ]);
+  });
+
   it('turns update-branch conflicts into a result, other failures into errors', async () => {
     let reply = ok('✓ PR branch updated');
     const { gh, calls } = fake(() => reply);

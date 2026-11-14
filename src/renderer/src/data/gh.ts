@@ -1,7 +1,7 @@
 /** GitHub (`native.gh.*`): PRs, checks, runs, Renovate, and the write ops. */
 import { useQuery } from '@tanstack/react-query';
 import { rollupBuckets, summarizePr, type GhMergeMethod } from '../../../shared/integrations/github';
-import type { GhPrCreateRequest } from '../../../shared/ipc';
+import type { GhPrCreateRequest, GhPrEditRequest } from '../../../shared/ipc';
 import { native } from '../native';
 import { getState } from '../store';
 import { invalidate, pollWhile, ready } from './ops';
@@ -75,6 +75,11 @@ export const ghOps = {
     const r = await native.gh.prUpdateBranch(repo, number, opts);
     await invalidate(qk.gh.pr(repo, number));
     return r;
+  },
+  /** `gh pr edit` (e.g. retarget a stacked PR onto `base` after its parent merged). */
+  async prEdit(req: GhPrEditRequest) {
+    await native.gh.prEdit(req);
+    await invalidate(qk.gh.pr(req.repo, req.number), qk.gh.prs(req.repo));
   },
   async runRerun(repo: string, runId: number, opts?: { failedOnly?: boolean }) {
     await native.gh.runRerun(repo, runId, opts);

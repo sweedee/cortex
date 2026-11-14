@@ -28,6 +28,7 @@ export function registerIntegrations(ctx: IpcContext, s: Services) {
   handle(ctx, 'gh:prMerge', ({ repo, number, method, deleteBranch }) => gh.prMerge(repo, number, method, { deleteBranch }));
   handle(ctx, 'gh:prComment', ({ repo, number, body }) => gh.prComment(repo, number, body));
   handle(ctx, 'gh:prUpdateBranch', ({ repo, number, rebase }) => gh.prUpdateBranch(repo, number, { rebase }));
+  handle(ctx, 'gh:prEdit', (req) => gh.prEdit(req));
   handle(ctx, 'gh:prDiff', ({ repo, number }) => gh.prDiff(repo, number));
   handle(ctx, 'gh:prChecks', ({ repo, number }) => gh.prChecks(repo, number));
   handle(ctx, 'gh:runView', ({ repo, runId }) => gh.runView(repo, runId));

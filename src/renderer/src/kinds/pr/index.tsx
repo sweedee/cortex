@@ -1,9 +1,9 @@
-import { AiIcon, CheckmarkIcon, CycleIcon } from '@dynatrace/strato-icons';
+import { AiIcon, CheckmarkIcon, CycleIcon, ArrowDownRightIcon } from '@dynatrace/strato-icons';
 import { external, skill } from '../common';
 import { PullRequestIcon } from '../icons';
 import type { Action, KindModule } from '../types';
-import { openMerge, rebasePr, triggerAiReview } from './actions';
-import { ghBlocked, isMergeable, mergeBlocked, prRing, prUrl } from './logic';
+import { openMerge, rebasePr, retargetPr, triggerAiReview } from './actions';
+import { ghBlocked, hasConflicts, isMergeable, mergeBlocked, needsRetarget, prRing, prUrl } from './logic';
 import { PrSidebar } from './Sidebar';
 
 export { isMergeable, prRing } from './logic';
@@ -33,7 +33,22 @@ export const pr: KindModule<'pr'> = {
 
   actions: ([p], ctx) => {
     const blocked = ghBlocked(p.data);
-    const conflicted = p.data.mergeable === 'CONFLICTING';
+    const conflicted = hasConflicts(p.data);
+    const parent = ctx.getAs(p.data.stackedOn, 'pr');
+    const retarget: Action[] =
+      parent && needsRetarget(p.data, parent.data)
+        ? [
+            {
+              id: 'retarget',
+              label: `Retarget onto ${parent.data.baseBranch}`,
+              type: 'direct',
+              icon: <ArrowDownRightIcon />,
+              primary: !blocked,
+              disabled: blocked,
+              run: () => void retargetPr(p, parent.data.baseBranch),
+            },
+          ]
+        : [];
     const merge: Action = {
       id: 'merge',
       label: 'Merge…',
@@ -54,6 +69,7 @@ export const pr: KindModule<'pr'> = {
       run: () => void rebasePr(p),
     };
     return [
+      ...retarget,
       merge,
       rebase,
       {

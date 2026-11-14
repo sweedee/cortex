@@ -4,17 +4,17 @@
  */
 import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
-import { DeleteIcon, ExternalLinkIcon } from '@dynatrace/strato-icons';
+import { DeleteIcon, ArrowDownRightIcon } from '@dynatrace/strato-icons';
 import { ghOps } from '../../data/gh';
 import { gitOps } from '../../data/git';
 import { isRealPath, type ItemOf } from '../../domain';
 import { native } from '../../native';
 import { getState, insertSkill, itemById, patchData, removeItems } from '../../store';
 import { openForm } from '../../ui/form';
-import { errorText, openUrl, runTask } from '../../ui/task';
+import { errorText, runTask } from '../../ui/task';
 import { archive, toast } from '../common';
 import type { KindCtx } from '../types';
-import { MERGE_METHODS, mergeArgs, mergeWarnings, prUrl, retargetPlan, stackChildren, worktreeOf } from './logic';
+import { hasConflicts, MERGE_METHODS, mergeArgs, mergeWarnings, retargetPlan, stackChildren, worktreeOf } from './logic';
 
 type Pr = ItemOf<'pr'>;
 
@@ -79,20 +79,20 @@ function afterMerge(p: Pr, ctx: KindCtx, deletedBranch: boolean) {
       const id = showToast({
         type: 'warning',
         title: `#${r.child.data.number} still targets ${p.data.headBranch}`,
-        message: `It was stacked on #${p.data.number}. Change its base to ${r.newBase} on GitHub.`,
-        lifespan: 15_000,
+        message: `It was stacked on #${p.data.number}, which is merged now.`,
+        lifespan: 20_000,
         actions: (
           <Button
             size="condensed"
             onClick={() => {
               dismissToast(id);
-              void openUrl(prUrl(r.child.data));
+              void retargetPr(r.child, r.newBase);
             }}
           >
             <Button.Prefix>
-              <ExternalLinkIcon />
+              <ArrowDownRightIcon />
             </Button.Prefix>
-            Open #{r.child.data.number}
+            Retarget onto {r.newBase}
           </Button>
         ),
       });
@@ -143,12 +143,20 @@ export async function removeWorktree(wt: ItemOf<'worktree'>, ctx: KindCtx) {
   });
 }
 
+/** `gh pr edit --base`: point a stacked PR at its merged parent's base branch. */
+export async function retargetPr(child: Pr, base: string) {
+  const ok = await runTask(`Retargeting #${child.data.number} onto ${base}`, ghOps.prEdit({ repo: child.data.repo, number: child.data.number, base }), { success: `#${child.data.number} now targets ${base}` });
+  if (ok === undefined) return;
+  const cur = itemById(child.id);
+  if (cur?.kind === 'pr') patchData<'pr'>(cur, { baseBranch: base });
+}
+
 // ---- rebase --------------------------------------------------------------------------------
 
 const rebaseSkill = (p: Pr) => insertSkill('rebase', [p.id]);
 
 export async function rebasePr(p: Pr) {
-  if (p.data.mergeable === 'CONFLICTING') {
+  if (hasConflicts(p.data)) {
     rebaseSkill(p);
     toast(`#${p.data.number} has conflicts`, 'Inserted /rebase into the chat box: Claude resolves them in the worktree.', 'warning');
     return;

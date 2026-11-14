@@ -27,6 +27,12 @@ describe('pr ring', () => {
     expect(isMergeable(p)).toBe(true);
     expect(prRing(p)).toHaveLength(1);
   });
+  it('mergeStateStatus DIRTY counts as conflicting', () => {
+    const p = withData(seed('pr-469'), { mergeable: 'UNKNOWN', mergeStateStatus: 'DIRTY', checks: { state: 'success' } });
+    expect(isMergeable(p)).toBe(false);
+    expect(prRing(p).some((s) => s.label === 'Merge conflict')).toBe(true);
+    expect(action(real(p), 'rebase')).toMatchObject({ type: 'skill', skill: 'rebase' });
+  });
   it('draft wins over the review state, like summarizePr', () => {
     expect(prRing(withData(seed('pr-469'), { isDraft: true }))[0]).toMatchObject({ tone: 'neutral', label: 'Draft' });
   });
@@ -51,6 +57,15 @@ describe('pr actions', () => {
     const conflicted = action(real(seed('pr-477'), { mergeable: 'CONFLICTING' }), 'rebase');
     expect(conflicted).toMatchObject({ type: 'skill', skill: 'rebase', primary: true });
     expect(action(real(seed('pr-469')), 'rebase')).toMatchObject({ type: 'direct' });
+  });
+  it('a child of a merged parent gets "Retarget onto <base>" (primary)', () => {
+    const parent = makeItem({ id: 'pr-parent', kind: 'pr', handle: 'PR-1', title: 'parent', data: { repo: 'octo/repo', number: 1, headBranch: 'feat/a', baseBranch: 'main', state: 'merged', isDraft: false } }) as ItemOf<'pr'>;
+    const child = makeItem({ id: 'pr-child', kind: 'pr', handle: 'PR-2', title: 'child', data: { repo: 'octo/repo', number: 2, headBranch: 'feat/b', baseBranch: 'feat/a', state: 'open', isDraft: false, stackedOn: 'pr-parent' } }) as ItemOf<'pr'>;
+    const c = makeCtx([parent, child], []);
+    const acts = prKind.actions([child], c);
+    expect(acts[0]).toMatchObject({ id: 'retarget', label: 'Retarget onto main', primary: true });
+    const retargeted = { ...child, data: { ...child.data, baseBranch: 'main' } };
+    expect(prKind.actions([retargeted], makeCtx([parent, retargeted], [])).some((a) => a.id === 'retarget')).toBe(false);
   });
   it('no placeholders left', () => {
     for (const id of ['pr-482', 'pr-477', 'pr-469']) for (const a of prKind.actions([real(seed(id))], ctx)) expect(a.run.toString()).not.toMatch(/not implemented/);

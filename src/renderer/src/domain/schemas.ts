@@ -159,6 +159,8 @@ export const PrDataSchema = z.object({
   /** approvals / requested reviewers, for the hover card */
   reviews: z.object({ approved: count, requested: count }).optional(),
   mergeable: z.enum(['MERGEABLE', 'CONFLICTING', 'UNKNOWN']).optional(),
+  /** GitHub's mergeStateStatus (DIRTY = conflicts, BEHIND, BLOCKED, CLEAN, …); unknown values are dropped */
+  mergeStateStatus: z.enum(['BEHIND', 'BLOCKED', 'CLEAN', 'DIRTY', 'DRAFT', 'HAS_HOOKS', 'UNKNOWN', 'UNSTABLE']).optional().catch(undefined),
   checks: ChecksSchema.optional(),
   additions: count.optional(),
   deletions: count.optional(),

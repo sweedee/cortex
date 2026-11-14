@@ -19,6 +19,7 @@ import { errorText, openUrl } from '../../ui/task';
 import { DiffViewer, Markdown, WebPanel } from '../../components/viewers';
 import { toast } from '../common';
 import type { KindCtx, SidebarProps } from '../types';
+import { retargetPr } from './actions';
 import { planBuildSync } from './builds';
 import { isRealRepo, needsRetarget, prUrl } from './logic';
 import './pr.css';
@@ -316,7 +317,10 @@ function Stack({ pr, ctx }: { pr: Pr; ctx: KindCtx }) {
       {parent && row(parent, 'stacked on')}
       {parent && needsRetarget(pr.data, parent.data) && (
         <div className="pr-state is-warning">
-          #{parent.data.number} is merged, but this PR still targets {pr.data.baseBranch}. Change its base to {parent.data.baseBranch} on GitHub.
+          #{parent.data.number} is merged, but this PR still targets {pr.data.baseBranch}.{' '}
+          <Button size="condensed" variant="emphasized" onClick={() => void retargetPr(pr, parent.data.baseBranch)}>
+            Retarget onto {parent.data.baseBranch}
+          </Button>
         </div>
       )}
       {children.map((c) => row(c, 'stacked on this'))}

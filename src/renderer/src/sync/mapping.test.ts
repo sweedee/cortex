@@ -129,6 +129,11 @@ describe('refresher mappings', () => {
     });
   });
 
+  it('gh pr view → mergeStateStatus is kept (DIRTY = conflicts)', () => {
+    const pr = { state: 'OPEN', isDraft: false, headRefName: 'b', baseRefName: 'main', reviewDecision: '', mergeable: 'UNKNOWN', mergeStateStatus: 'DIRTY' } as unknown as GhPullRequest;
+    expect(prPatch(pr)).toMatchObject({ mergeable: 'UNKNOWN', mergeStateStatus: 'DIRTY', checks: { state: 'none' } });
+  });
+
   it('jira view → ticket cache + title', () => {
     const issue = {
       key: 'CTX-1',

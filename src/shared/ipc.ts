@@ -271,6 +271,16 @@ export interface GhPrCreateRequest {
   repo?: string;
 }
 
+/** `gh pr edit`: at least one of base / title / body */
+export interface GhPrEditRequest {
+  repo: string;
+  number: number;
+  /** new base branch (retarget) */
+  base?: string;
+  title?: string;
+  body?: string;
+}
+
 export interface JiraCreateIssueRequest {
   project: string;
   type: string;
@@ -313,6 +323,8 @@ export interface InvokeChannels {
   /** without `body`: the configured AI-review trigger (`@claude review`) */
   'gh:prComment': [{ repo: string; number: number; body?: string }, { url?: string }];
   'gh:prUpdateBranch': [{ repo: string; number: number; rebase?: boolean }, GhUpdateBranchResult];
+  /** `gh pr edit`: retarget (`base`) and / or change title / body */
+  'gh:prEdit': [GhPrEditRequest, void];
   'gh:prDiff': [{ repo: string; number: number }, string];
   'gh:prChecks': [{ repo: string; number: number }, GhCheck[]];
   'gh:runView': [{ repo: string; runId: number }, GhRun];
@@ -390,6 +402,7 @@ export interface CortexApi {
     /** without `body`: the configured AI-review trigger comment */
     prComment(repo: string, number: number, body?: string): Promise<{ url?: string }>;
     prUpdateBranch(repo: string, number: number, opts?: { rebase?: boolean }): Promise<GhUpdateBranchResult>;
+    prEdit(req: GhPrEditRequest): Promise<void>;
     prDiff(repo: string, number: number): Promise<string>;
     prChecks(repo: string, number: number): Promise<GhCheck[]>;
     runView(repo: string, runId: number): Promise<GhRun>;

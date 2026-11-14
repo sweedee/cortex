@@ -160,6 +160,7 @@ export function prPatch(pr: GhPullRequest): Partial<PrData> {
     reviewDecision: pr.reviewDecision || undefined,
     reviews: { approved: latest.filter((r) => r.state === 'APPROVED').length, requested: (pr.reviewRequests ?? []).length },
     mergeable: pr.mergeable,
+    mergeStateStatus: pr.mergeStateStatus || undefined,
     checks: checks.length ? { state: n.failed ? 'failure' : n.pending ? 'pending' : 'success', ...n } : { state: 'none' },
     additions: pr.additions,
     deletions: pr.deletions,

@@ -15,7 +15,10 @@ export const prUrl = (d: Pick<PrData, 'repo' | 'number'>) => `https://github.com
 /** Checks are fine for merging: green, or there are none. */
 const checksOk = (d: PrData) => !d.checks || d.checks.state === 'success' || d.checks.state === 'none';
 
-export const isMergeable = ({ data: d }: Pr) => d.state === 'open' && !d.isDraft && d.reviewDecision === 'APPROVED' && d.mergeable === 'MERGEABLE' && checksOk(d);
+/** Merge conflicts: `mergeable` CONFLICTING, or GitHub's mergeStateStatus DIRTY. */
+export const hasConflicts = (d: Pick<PrData, 'mergeable' | 'mergeStateStatus'>) => d.mergeable === 'CONFLICTING' || d.mergeStateStatus === 'DIRTY';
+
+export const isMergeable = ({ data: d }: Pr) => d.state === 'open' && !d.isDraft && d.reviewDecision === 'APPROVED' && d.mergeable === 'MERGEABLE' && !hasConflicts(d) && checksOk(d);
 
 /**
  * Status ring. Mirrors the refresher's `prPatch` / `summarizePr` (draft wins over the review
@@ -32,7 +35,7 @@ export function prRing(pr: Pr): Segment[] {
   else if (d.reviewDecision === 'APPROVED') out.push({ tone: 'success', label: d.reviews ? `Approved (${d.reviews.approved} / ${d.reviews.requested})` : 'Approved' });
   else if (d.reviewDecision === 'CHANGES_REQUESTED') out.push({ tone: 'warning', label: 'Changes requested' });
   else out.push({ tone: 'pending', label: d.reviews ? `Review pending (${d.reviews.requested} reviewer${d.reviews.requested === 1 ? '' : 's'})` : 'Review pending' });
-  if (d.mergeable === 'CONFLICTING') out.push({ tone: 'warning', label: 'Merge conflict' });
+  if (hasConflicts(d)) out.push({ tone: 'warning', label: 'Merge conflict' });
   if (d.checks?.state === 'failure') out.push({ tone: 'critical', label: d.checks.failed ? `${d.checks.failed} check${d.checks.failed === 1 ? '' : 's'} failing` : 'Checks failing' });
   else if (d.checks?.state === 'pending') out.push({ tone: 'running', label: 'Checks running' });
   return out;
@@ -57,7 +60,7 @@ export function mergeWarnings(d: PrData): string[] {
   if (d.checks?.state === 'failure') w.push(d.checks.failed ? `${d.checks.failed} check${d.checks.failed === 1 ? ' is' : 's are'} failing` : 'checks are failing');
   else if (d.checks?.state === 'pending') w.push('checks are still running');
   if (d.reviewDecision !== 'APPROVED') w.push(d.reviewDecision === 'CHANGES_REQUESTED' ? 'changes were requested' : 'it is not approved');
-  if (d.mergeable === 'CONFLICTING') w.push('it has merge conflicts');
+  if (hasConflicts(d)) w.push('it has merge conflicts');
   return w;
 }
 
@@ -82,8 +85,8 @@ export const stackChildren = (items: Item[], prId: string): Pr[] =>
 
 /**
  * After the parent merged: GitHub retargets stacked PRs to the parent's base by itself when the
- * parent's head branch is deleted. Otherwise the child still points at the old branch and has to
- * be retargeted by hand (there is no `gh pr edit --base` channel yet).
+ * parent's head branch is deleted. Otherwise the child still points at the old branch and is
+ * retargeted with `gh pr edit --base` (the "Retarget onto …" toast / action).
  */
 export function retargetPlan(parent: PrData, children: Pr[], deletedBranch: boolean) {
   return children
@@ -91,7 +94,7 @@ export function retargetPlan(parent: PrData, children: Pr[], deletedBranch: bool
     .map((c) => ({ child: c, newBase: parent.baseBranch, automatic: deletedBranch }));
 }
 
-/** The child of a merged parent still targets the parent's head branch. */
+/** The child of a merged parent still targets the parent's head branch (→ "Retarget onto <parent base>"). */
 export const needsRetarget = (child: PrData, parent: PrData | undefined) => !!parent && parent.state === 'merged' && child.state === 'open' && child.baseBranch === parent.headBranch;
 
 /** The worktree a PR comes from: a linked one, else one in the project on the head branch. */
