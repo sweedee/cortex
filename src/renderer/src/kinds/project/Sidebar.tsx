@@ -4,14 +4,15 @@ import { useMemo } from 'react';
 import { useRenovatePrs, usePrList } from '../../data/gh';
 import { useWorktrees } from '../../data/git';
 import type { ItemOf, Tone } from '../../domain';
-import { ConnectionsSection, SidebarSection, SummarySection } from '../../sidebar';
+import { ConnectionsSection, SummarySection } from '../../sidebar';
 import { patchData } from '../../store';
 import { agoShort } from '../../tones';
 import { openInEditor, openPath, openUrl } from '../../ui/task';
+import { plural } from '../common';
 import { stageLabel, STAGE_TONE } from '../deployment/model';
 import { openDeploymentForm } from '../deployment/form';
 import type { SidebarProps } from '../types';
-import { focusItem, IconBtn, InlineText, mono, Note, QueryNote, ToneChip, ValueRow } from './parts';
+import { focusItem, IconBtn, InlineText, mono, Note, QueryNote, Section, ToneChip, ValueRow } from './parts';
 import { summarizeOpenPrs } from './prSummary';
 import { openProjectSettings } from './settings';
 import { addWorktreeBubble, openNewWorktree, ticketForBranch } from './worktreeFlow';
@@ -27,7 +28,7 @@ function Setup({ item }: { item: Project }) {
   const real = !d.repo.startsWith('unknown/');
   const baseOk = hasBaseDir(d);
   return (
-    <SidebarSection
+    <Section
       label="Repository"
       actions={
         <Button size="condensed" onClick={() => void openProjectSettings(item)}>
@@ -73,7 +74,7 @@ function Setup({ item }: { item: Project }) {
         <InlineText key={d.testCommand ?? ""} label="Test command" value={d.testCommand ?? ''} placeholder="npm test" onCommit={(v) => patchData<'project'>(item, { testCommand: v || undefined })} />
       </ValueRow>
       {!baseOk && <Note>{SET_BASE_HINT}</Note>}
-    </SidebarSection>
+    </Section>
   );
 }
 
@@ -84,7 +85,7 @@ function Tickets({ item, ctx }: SidebarProps<'project'>) {
     .sort((a, b) => Number(a.data.statusCategory === 'done') - Number(b.data.statusCategory === 'done') || a.data.key.localeCompare(b.data.key));
   const mod = ctx.kind('ticket');
   return (
-    <SidebarSection label={`Tickets · ${tickets.length}`}>
+    <Section label={`Tickets · ${tickets.length}`}>
       {tickets.length === 0 && <Note>No tickets on the canvas for this project. Use “Create ticket” or import one from the Add menu.</Note>}
       {tickets.map((t) => (
         <button key={t.id} className="sidebar-row" onClick={() => focusItem(t.id)} title={t.title}>
@@ -94,7 +95,7 @@ function Tickets({ item, ctx }: SidebarProps<'project'>) {
           <ToneChip tone={mod.ring(t, ctx)[0]?.tone ?? 'neutral'}>{t.data.status}</ToneChip>
         </button>
       ))}
-    </SidebarSection>
+    </Section>
   );
 }
 
@@ -105,7 +106,7 @@ function PullRequests({ item }: { item: Project }) {
   const sum = useMemo(() => (open.data ? summarizeOpenPrs(open.data) : undefined), [open.data]);
   const renovateCount = renovate.data?.length ?? sum?.renovate;
   return (
-    <SidebarSection label={sum ? `Open pull requests · ${sum.total}` : 'Open pull requests'}>
+    <Section label={sum ? `Open pull requests · ${sum.total}` : 'Open pull requests'}>
       <QueryNote q={open} what="pull requests" offlineHint={repo ? 'Pull requests need the desktop app.' : 'Set the GitHub repo in Settings… to see its pull requests.'} />
       {sum && (
         <>
@@ -132,10 +133,10 @@ function PullRequests({ item }: { item: Project }) {
       )}
       {renovateCount != null && (
         <div style={{ marginTop: 8, fontSize: 12.5 }}>
-          Renovate: <ToneChip tone={renovateCount > 0 ? 'warning' : 'neutral'}>{renovateCount} PR{renovateCount === 1 ? '' : 's'}</ToneChip>
+          Renovate: <ToneChip tone={renovateCount > 0 ? 'warning' : 'neutral'}>{plural(renovateCount, 'PR')}</ToneChip>
         </div>
       )}
-    </SidebarSection>
+    </Section>
   );
 }
 
@@ -146,7 +147,7 @@ function Worktrees({ item, ctx }: SidebarProps<'project'>) {
   const untracked = disk.data ? untrackedWorktrees(disk.data, item.data.baseDir, onCanvas.map((w) => w.data.path)) : [];
   const wtMod = ctx.kind('worktree');
   return (
-    <SidebarSection
+    <Section
       label={`Worktrees · ${onCanvas.length} on canvas${disk.data ? `, ${untracked.length} not added` : ''}`}
       actions={
         <Button size="condensed" onClick={() => void openNewWorktree(item)}>
@@ -187,7 +188,7 @@ function Worktrees({ item, ctx }: SidebarProps<'project'>) {
         </div>
       ))}
       {baseOk && disk.data && onCanvas.length === 0 && untracked.length === 0 && <Note>No worktrees besides the main checkout.</Note>}
-    </SidebarSection>
+    </Section>
   );
 }
 
@@ -195,7 +196,7 @@ function Deployments({ item, ctx }: SidebarProps<'project'>) {
   const deployments = ctx.inProject(item.id, 'deployment').filter((d) => !d.archived);
   const mod = ctx.kind('deployment');
   return (
-    <SidebarSection
+    <Section
       label={`Deployments · ${deployments.length}`}
       actions={
         <Button size="condensed" onClick={() => void openDeploymentForm({ project: item })}>
@@ -217,7 +218,7 @@ function Deployments({ item, ctx }: SidebarProps<'project'>) {
           <IconBtn label={`Open ${dep.data.url}`} onClick={() => void openUrl(dep.data.url)}><ExternalLinkIcon /></IconBtn>
         </div>
       ))}
-    </SidebarSection>
+    </Section>
   );
 }
 
