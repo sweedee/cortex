@@ -6,6 +6,10 @@
 import { writeFile } from 'node:fs/promises';
 import { app, type BrowserWindow } from 'electron';
 
+/** a tiny HTTP server on a random port that prints its URL like a dev server (phase 3d app e2e) */
+const SMOKE_APP_CMD = `node -e "const s=require('http').createServer((q,r)=>r.end('<h1>hi from the smoke app</h1>'));s.listen(0,'127.0.0.1',()=>console.log('  Local: http://localhost:'+s.address().port+'/'))"`;
+const SMOKE_CRASH_CMD = `node -e "console.log('boom: config missing');process.exit(2)"`;
+
 const PROBE = `(async () => {
   const c = window.cortex;
   if (!c) return { error: 'window.cortex missing' };
@@ -64,6 +68,101 @@ const PROBE = `(async () => {
       const session = await c.claude.session(id);
       return { cwd: a2.data.cwd, sessionId: !!a2.data.sessionId, asked, done: { status: a2.data.status, lastActivity: a2.data.lastActivity, notice: a2.notice && a2.notice.text, usage: a2.data.usage }, promptSent: session.messages[0] && session.messages[0].text };
     });
+    // phase 3d: the agent harness sidebar and the app kind, driven through the DOM / item actions
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => [...document.querySelectorAll(sel)];
+    const untilDom = (fn, ms = 15000) => until(fn, (v) => !!v, ms);
+    const button = (root, text) => [...root.querySelectorAll('button')].find((b) => b.textContent.trim().includes(text));
+    const typeInto = (el, text) => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, text); el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const key = (el, k) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    let harnessAgent;
+    if (wt && ${JSON.stringify(/fake-claude/.test(process.env['CORTEX_CLAUDE_BIN'] ?? ''))}) await step('e2e: agent harness (permission card → allow, composer follow-up → question card → submit, Esc interrupts)', async () => {
+      const id = await d.sendPrompt('bash something for @wt/smoke', [wt.id]);
+      harnessAgent = id;
+      await until(() => d.itemById(id), (a) => a && a.data.status === 'waiting' && a.data.pendingPermissions);
+      d.select([id]);
+      d.inspect(id);
+      const perm = await untilDom(() => $('.ah-perm'));
+      const permText = perm.textContent;
+      button(perm, 'Allow').click();
+      await until(() => d.itemById(id), (a) => a.data.status === 'done');
+      const row = await untilDom(() => $('.ah-tool-row:not(:disabled)'));
+      row.click();
+      const detail = (await untilDom(() => $('.ah-tool-detail'))).textContent;
+      const ta = $('.ah-composer textarea');
+      typeInto(ta, 'ask once more');
+      await sleep(50);
+      key(ta, 'Enter');
+      const card = await untilDom(() => $('.ah-ask[role="form"]'));
+      const options = $$('.ah-ask[role="form"] .ah-ask-opt').map((b) => b.textContent);
+      [...card.querySelectorAll('.ah-ask-opt')].find((b) => b.textContent.includes('Queue')).click();
+      await sleep(50);
+      button(card, 'Submit').click();
+      await until(() => d.itemById(id), (a) => a.data.status === 'done' && /Queue/.test(a.data.lastActivity || ''));
+      await untilDom(() => $$('.ah-md').some((e) => /You chose Queue/.test(e.textContent)));
+      typeInto($('.ah-composer textarea'), 'slow down');
+      await sleep(50);
+      key($('.ah-composer textarea'), 'Enter');
+      await until(() => d.itemById(id), (a) => a.data.status === 'running');
+      await untilDom(() => $('.ah-working'));
+      key($('.ah-composer textarea'), 'Escape');
+      const after = await until(() => d.itemById(id), (a) => a.data.status === 'idle');
+      return { permText, detail, options, answered: $('.ah-ask.is-done') && $('.ah-ask.is-done').textContent, afterEsc: { status: after.data.status, lastActivity: after.data.lastActivity }, blocks: $$('.ah-scroll > *').length, statusLine: $('.ah-status').textContent };
+    });
+    const portState = async (port) => (await c.exec.run({ cmd: 'node', args: ['-e', "require('net').connect(" + port + ",'127.0.0.1').on('connect',function(){console.log('open');process.exit(0)}).on('error',function(){console.log('closed')})"], cwd: repo })).stdout.trim();
+    const pidState = async (pid) => (await c.exec.run({ cmd: 'node', args: ['-e', 'try{process.kill(' + pid + ',0);console.log("alive")}catch(e){console.log("gone")}'], cwd: repo })).stdout.trim();
+    let smokeApp;
+    await step('e2e: app start → URL → preview → restart → stop (process tree gone) · crash', async () => {
+      const a = d.addItem({ kind: 'app', handle: 'app/smoke', title: 'smoke server', data: { command: ${JSON.stringify(SMOKE_APP_CMD)}, cwd: repo, state: 'stopped' } });
+      smokeApp = a.id;
+      const seen = [];
+      const off = c.on('app:state', (s) => { if (s.id === a.id) seen.push(s.status); });
+      d.runAction(a.id, 'start');
+      const r1 = await until(() => d.itemById(a.id), (x) => x.data.state === 'running' && x.data.url);
+      const pid1 = (await c.apps.list()).find((s) => s.id === a.id).pid;
+      const port1 = r1.data.port;
+      const open1 = await portState(port1);
+      d.inspect(a.id);
+      const wv = await untilDom(() => $('webview'));
+      const preview = { src: wv.getAttribute('src'), partition: wv.getAttribute('partition') };
+      d.runAction(a.id, 'restart');
+      const r2 = await until(() => d.itemById(a.id), (x) => x.data.state === 'running' && x.data.port && x.data.port !== port1);
+      const pid2 = (await c.apps.list()).find((s) => s.id === a.id).pid;
+      const afterRestart = { oldPort: await portState(port1), oldPid: await pidState(pid1), newPort: await portState(r2.data.port) };
+      d.runAction(a.id, 'stop');
+      await until(() => d.itemById(a.id), (x) => x.data.state === 'stopped');
+      await sleep(300);
+      const afterStop = { port: await portState(r2.data.port), pid: await pidState(pid2) };
+      off();
+      const b = d.addItem({ kind: 'app', handle: 'app/crashy', title: 'crashy', data: { command: ${JSON.stringify(SMOKE_CRASH_CMD)}, cwd: repo, state: 'stopped' } });
+      d.runAction(b.id, 'start');
+      const cr = await until(() => d.itemById(b.id), (x) => x.data.state === 'crashed');
+      d.inspect(b.id);
+      const crashUi = (await untilDom(() => $('.ap-critical') && $$('.ap-tail').some((e) => /boom/.test(e.textContent)) && $('.ap-empty'))).textContent;
+      return { url: r1.data.url, open1, preview, states: seen, afterRestart, afterStop, crash: { state: cr.data.state, notice: cr.notice && cr.notice.text, ui: crashUi.slice(0, 160) } };
+    });
+    // what the screenshot shows: CORTEX_SMOKE_FINAL=app → the running app's preview; agent (default) → the agent harness; an item id → that item
+    if (${JSON.stringify(process.env['CORTEX_SMOKE_FINAL'] ?? 'agent')} === 'app' && smokeApp) {
+      await step('e2e: final view = app preview', async () => {
+        d.runAction(smokeApp, 'start');
+        await until(() => d.itemById(smokeApp), (x) => x.data.state === 'running' && x.data.url);
+        d.select([smokeApp]);
+        d.inspect(smokeApp);
+        await untilDom(() => $('webview'));
+        await sleep(2500);
+        return d.itemById(smokeApp).data.url;
+      });
+    } else {
+      // 'agent' = the harness of the agent driven above; any other value = that item id (e.g. a seed item)
+      const final = ${JSON.stringify(process.env['CORTEX_SMOKE_FINAL'] ?? 'agent')};
+      const target = final === 'agent' ? harnessAgent : final;
+      if (target && d.itemById(target)) {
+        d.select([target]);
+        d.inspect(target);
+        await sleep(1500);
+      }
+    }
   }
   out.rootRendered = !!document.querySelector('#root')?.children.length;
   return out;

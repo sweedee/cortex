@@ -5,7 +5,8 @@
  */
 import { sendPrompt } from './actions';
 import { chooseOption } from './kinds/agent/session';
-import { addItem, addLink, getState, itemById } from './store';
+import { actionsForItem } from './kinds/registry';
+import { addItem, addLink, getState, inspect, itemById, select } from './store';
 import { refreshDue } from './sync';
 
 declare global {
@@ -14,4 +15,13 @@ declare global {
   }
 }
 
-if (import.meta.env.DEV) window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue };
+/** Run one of an item's actions by id (what a click in the action list does). */
+function runAction(id: string, actionId: string) {
+  const item = itemById(id);
+  const action = item && actionsForItem(item).find((a) => a.id === actionId);
+  if (!item || !action) throw new Error(`no action ${actionId} on ${id}`);
+  if (action.disabled) throw new Error(`action ${actionId} is disabled: ${action.disabled}`);
+  action.run([item]);
+}
+
+if (import.meta.env.DEV) window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue, inspect, select, runAction };
