@@ -128,5 +128,11 @@ export async function stopAgent(a: Agent) {
 
 export async function interruptAgent(a: Agent) {
   if (!a.data.localId) return;
-  await runTask(`Interrupting ${a.title}`, claudeOps.interrupt(a.data.localId), { success: 'Interrupted', message: 'The session stays open; send a follow-up from the chat box.' });
+  // a single control message, no need for a progress toast
+  try {
+    const sent = await claudeOps.interrupt(a.data.localId);
+    toast(sent ? 'Interrupted' : 'Nothing to interrupt', sent ? 'The session stays open; send a follow-up.' : 'The session has no running process.', 'info');
+  } catch (e) {
+    toast('Could not interrupt', errorText(e), 'critical');
+  }
 }

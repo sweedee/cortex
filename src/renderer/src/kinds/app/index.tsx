@@ -1,7 +1,10 @@
-import { CycleIcon, DesktopIcon, PlayIcon, StopIcon } from '@dynatrace/strato-icons';
+import { CycleIcon, DesktopIcon, PlayIcon, StopIcon, TerminalIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { external, placeholder } from '../common';
-import type { KindModule } from '../types';
+import { inspect } from '../../store';
+import { external, openInEditorAction } from '../common';
+import type { Action, KindModule } from '../types';
+import { cannotStart, isLive, restartApp, startApp, stopApp } from './ops';
+import { AppSidebar, showAppTab } from './Sidebar';
 
 export function appRing({ data }: ItemOf<'app'>): Segment[] {
   switch (data.state) {
@@ -14,6 +17,57 @@ export function appRing({ data }: ItemOf<'app'>): Segment[] {
     case 'crashed':
       return [{ tone: 'critical', label: 'Crashed' }];
   }
+}
+
+/** The app's actions for its state (exported for tests). */
+export function appActions(a: ItemOf<'app'>): Action[] {
+  const live = isLive(a);
+  const why = cannotStart(a);
+  const showLog: Action = {
+    id: 'log',
+    label: 'Show log',
+    type: 'view',
+    icon: <TerminalIcon />,
+    primary: a.data.state === 'crashed',
+    run: ([x]) => {
+      showAppTab('log');
+      inspect(x.id);
+    },
+  };
+  return [
+    external('open', 'Open in browser', (i) => (i.kind === 'app' ? (i.data.url ?? '') : ''), {
+      primary: a.data.state === 'running' && !!a.data.url,
+      disabled: !live ? 'Not running' : a.data.url ? undefined : 'No URL detected yet',
+    }),
+    {
+      id: 'preview',
+      label: 'Preview',
+      type: 'view',
+      icon: <DesktopIcon />,
+      run: ([x]) => {
+        showAppTab('preview');
+        inspect(x.id);
+      },
+    },
+    ...(live
+      ? [
+          { id: 'restart', label: 'Restart', type: 'direct', icon: <CycleIcon />, disabled: why, run: () => void restartApp(a) } satisfies Action,
+          { id: 'stop', label: 'Stop', type: 'direct', icon: <StopIcon />, danger: true, run: () => void stopApp(a) } satisfies Action,
+        ]
+      : [
+          {
+            id: 'start',
+            label: a.data.state === 'crashed' ? 'Restart' : 'Start',
+            type: 'direct',
+            icon: a.data.state === 'crashed' ? <CycleIcon /> : <PlayIcon />,
+            primary: a.data.state === 'stopped',
+            disabled: why,
+            run: () => void startApp(a),
+          } satisfies Action,
+        ]),
+    showLog,
+    ...(why ? [] : [openInEditorAction('editor', 'Open folder in editor', () => a.data.cwd)]),
+  ];
 }
 
 /** A running instance of a project or worktree (`npm run dev` and friends). */
@@ -38,14 +92,8 @@ export const app: KindModule<'app'> = {
     ];
   },
 
-  actions: ([a]) => {
-    const running = a.data.state === 'running' || a.data.state === 'starting';
-    return [
-      external('open', 'Open', (i) => (i.kind === 'app' ? (i.data.url ?? '') : ''), { primary: running && !!a.data.url, disabled: a.data.url ? undefined : 'No URL known yet' }),
-      running ? placeholder('restart', 'Restart', <CycleIcon />) : placeholder('start', 'Start', <PlayIcon />, { primary: true }),
-      ...(running ? [placeholder('stop', 'Stop', <StopIcon />, { danger: true })] : []),
-    ];
-  },
+  actions: ([a]) => appActions(a),
+  Sidebar: AppSidebar,
 
   addable: {
     label: 'Launch app…',

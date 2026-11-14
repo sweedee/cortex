@@ -1,29 +1,14 @@
-import { AgentIcon, BlockIcon, ChatIcon, CheckmarkIcon, PauseIcon, PlayIcon, StopIcon, ViewIcon } from '@dynatrace/strato-icons';
-import type { AgentData, ItemOf, Segment } from '../../domain';
-import { focusChat, insertSkill, inspect, openDialog, patchData } from '../../store';
-import { skill, toast } from '../common';
-import type { Action, KindModule } from '../types';
-import { chooseOption, decidePermission, interruptAgent, openAnswerForm, stopAgent } from './session';
+import { AgentIcon } from '@dynatrace/strato-icons';
+import type { AgentData } from '../../domain';
+import { focusChat } from '../../store';
+import { toast } from '../common';
+import type { KindModule } from '../types';
+import { agentActions } from './actions';
+import { agentRing } from './ring';
+import { AgentSidebar } from './Sidebar';
 
 export { answerQuestion } from './session';
-
-type Agent = ItemOf<'agent'>;
-
-export function agentRing({ data }: Agent): Segment[] {
-  const act = data.lastActivity;
-  switch (data.status) {
-    case 'running':
-      return [{ tone: 'running', label: act ? `Running · ${act}` : 'Running' }];
-    case 'waiting':
-      return [{ tone: 'warning', label: 'Waiting for your answer' }];
-    case 'idle':
-      return [{ tone: 'neutral', label: act ?? 'Idle' }];
-    case 'done':
-      return [{ tone: 'success', label: act ? `Done · ${act}` : 'Done' }];
-    case 'failed':
-      return [{ tone: 'critical', label: act ? `Failed · ${act}` : 'Failed' }];
-  }
-}
+export { agentRing } from './ring';
 
 const mins = (ms: number) => {
   const m = Math.max(0, Math.round(ms / 60_000));
@@ -52,57 +37,8 @@ export const agent: KindModule<'agent'> = {
     ...(data.cwd ? [['Directory', data.cwd] as [string, string]] : []),
   ],
 
-  actions: ([a]) => {
-    const { status, pendingQuestion, pendingPermissions, localId } = a.data;
-    const waiting = status === 'waiting';
-    const real = !!localId;
-    const options: Action[] = (pendingQuestion?.questions[0]?.options ?? []).map((o, i) => ({
-      id: `answer-${i}`,
-      label: o.label,
-      type: 'direct',
-      icon: <ChatIcon />,
-      run: () => chooseOption(a, o.label),
-    }));
-    const permissions: Action[] = (pendingPermissions ?? []).slice(0, 2).flatMap((p, i): Action[] => [
-      { id: `allow-${i}`, label: `Allow ${p.toolName}`, type: 'direct', icon: <CheckmarkIcon />, primary: i === 0 && !pendingQuestion, run: () => void decidePermission(a, p.requestId, true) },
-      { id: `deny-${i}`, label: `Deny ${p.toolName}`, type: 'direct', icon: <BlockIcon />, danger: true, run: () => void decidePermission(a, p.requestId, false) },
-    ]);
-    const view: Action = {
-      id: 'view',
-      label: waiting && pendingQuestion ? 'Answer' : 'View session',
-      type: 'view',
-      icon: <ViewIcon />,
-      primary: !permissions.length || !!pendingQuestion,
-      run: ([x]) => {
-        if (!real) return openDialog({ type: 'session', itemId: x.id });
-        if (waiting && pendingQuestion) return openAnswerForm(a);
-        inspect(x.id);
-      },
-    };
-    const running = status === 'running';
-    return [
-      view,
-      ...options,
-      ...permissions,
-      skill('continue', 'Continue', 'continue-session', real ? { run: ([x]) => insertSkill(null, [x.id]) } : {}),
-      skill('fork', 'Fork session', 'fork-session'),
-      ...(running && real ? [{ id: 'interrupt', label: 'Interrupt', type: 'direct', icon: <PauseIcon />, run: () => void interruptAgent(a) } satisfies Action] : []),
-      running || (real && waiting)
-        ? ({ id: 'stop', label: 'Stop', type: 'direct', icon: <StopIcon />, danger: true, run: () => void stopAgent(a) } satisfies Action)
-        : ({
-            id: 'resume',
-            label: real ? 'Follow up' : 'Resume',
-            type: 'direct',
-            icon: <PlayIcon />,
-            disabled: waiting ? 'Answer the question first' : undefined,
-            run: () => {
-              if (real) return insertSkill(null, [a.id]);
-              patchData<'agent'>(a, { status: 'running', lastActivity: undefined, endedAt: undefined });
-              toast('Agent resumed', a.title, 'info');
-            },
-          } satisfies Action),
-    ];
-  },
+  actions: ([a]) => agentActions(a),
+  Sidebar: AgentSidebar,
 
   complete: () => ({ status: 'done', pendingQuestion: undefined }),
 

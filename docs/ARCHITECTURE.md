@@ -626,3 +626,52 @@ stack helpers), `actions.tsx` (UI flows), `builds.ts` (checks → build items), 
 - Sidebar: summary, state chip + counts, command, directory, duration (live while running), worktree, the
   failing tests parsed from the output (`failingTests`: vitest, jest, pytest, go; deduped) with *Fix with
   Claude*, and a live `LogView` of `useTestLog(procId)` (follows), falling back to `outputTail`.
+### Kind: agent
+
+`kinds/agent/`: `index.tsx` (module), `ring.ts`, `actions.tsx`, `session.tsx` (talking to main), `transcript.ts`
+(pure view model, tested), `Sidebar.tsx` + `agent.css` (the harness).
+
+- **Actions** (`agentActions`): *View session* / *Answer in session* (opens the sidebar), one action per option of
+  the first open question (a single plain question answers directly; multi-question or multi-select opens the
+  answer form preset with that option, and adds *Answer…*), *Allow* / *Deny* per pending permission, *Interrupt*
+  (running), *Stop* (running / waiting), *Send follow-up* (puts `@agent` into the chat box; disabled while a
+  question is open), *Continue* / *Fork* (AI skills), *Open folder in editor* / *Show folder* (absolute cwd only).
+  Demo agents (no `localId`) keep *Resume* and local stop / answer.
+- **Sidebar** (tabs *Session* | *Details*): transcript from `useClaudeTranscript` replayed through
+  `buildRows()` — the shared reducer's messages plus what it drops (thinking blocks, tool inputs); user / assistant
+  messages (assistant via `Markdown`), consecutive tool calls in one box, each row collapsible (input — Edit as
+  `-`/`+` lines — and result), thinking collapsed. The open AskUserQuestion is an inline card (radio or
+  multi-select checkboxes, *Other…* free text, Submit → `claude:answer`); answered ones collapse to a summary.
+  Permission cards (tool, summary, reason, Allow / Deny → `claude:permission`) from `useClaudeSession`
+  (falls back to the item's cached `pendingPermissions`). Composer: Enter sends (`claudeOps.send`), Shift+Enter
+  new line, Esc interrupts while running; Interrupt / Stop buttons. Status line: status chip, model, context %
+  bar (warning ≥ 80 %, critical ≥ 95 %), turns, cost, last activity. The harness fills the sidebar body (its CSS
+  makes `.sidebar-body` / `.sidebar-tabpanel` flex columns via `:has(.ah)`), so the transcript scrolls and the
+  composer stays at the bottom; it works narrow and wide. Demo agents: an empty state plus their seeded question card.
+- The prototype session dialog (`overlays/Dialogs.tsx` → `SessionSheet`) is no longer opened by anything.
+
+### Kind: app
+
+`kinds/app/`: `index.tsx` (module, `appActions`), `ops.ts` (start / stop / restart, tested helpers),
+`Sidebar.tsx` + `app.css`.
+
+- **Runner id** = the item id (`apps:start {id: item.id, cwd, command}`), stored as `data.procId`; state comes back
+  through `app:state` (sync/live.ts). Ring: starting → running tone, running → success, crashed → critical,
+  stopped → neutral.
+- **Actions**: *Open in browser* (the detected URL; primary when running), *Preview*, *Restart* + *Stop* while
+  live, *Start* when stopped (*Restart* when crashed), *Show log* (opens the Log tab; primary when crashed),
+  *Open folder in editor*. A missing / non-absolute cwd (demo data) disables start with the "Set the project's base
+  checkout in Settings…" hint; demo items stop locally. Restart falls back to a fresh start when main no longer
+  knows the app (Cortex restarted). Start / restart have no progress toast (spawning returns at once); failures
+  toast and revert the optimistic `starting`.
+- **Sidebar** (tabs *Preview* | *Log* | *Details*): Preview = `WebPanel` on the URL (`partition="persist:apps"`,
+  viewport switcher, reload, open externally; the tab goes wide only while it shows the webview); starting =
+  spinner + the last output lines + Cancel; running without a URL = hint + Stop; crashed = the last 20 log lines,
+  Restart, *Show full log*; stopped = command / cwd + Start. Log = `LogView` of `useAppLog` (follow).
+  `showAppTab('log' | 'preview')` switches the tab from actions.
+
+Verified with `CORTEX_SMOKE=1 CORTEX_SMOKE_E2E=1 CORTEX_CLAUDE_BIN=<abs>/src/main/services/__fixtures__/fake-claude.mjs
+npm run dev` (see `src/main/smoke.ts`): agent harness via the DOM (permission → allow, follow-up from the composer,
+question card → submit, Esc interrupt) and an app running a tiny `node -e` HTTP server (URL detected, webview,
+restart frees the old port / pid, stop frees port and pid, a crashing command shows the crash state).
+`CORTEX_SMOKE_FINAL=app | agent | <item id>` picks what `CORTEX_SMOKE_SHOT` captures.
