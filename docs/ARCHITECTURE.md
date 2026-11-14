@@ -92,7 +92,10 @@ src/renderer/src/
                deployment todo testrun
   sidebar/     sidebar building blocks (SidebarSection, SummarySection, FactsSection, ConnectionsSection,
                DefaultSidebar); overlays/Sidebar.tsx is the shell
-  data/        TanStack Query: queryClient.ts, queryKeys.ts, one file of hooks per integration
+  data/        TanStack Query: queryClient.ts, queryKeys.ts, ops.ts, one file of hooks + write ops per integration
+  sync/        live events → items (live.ts), startup reconciliation, background refresher, pure mappings
+  ui/          toolkit for kind modules: form.tsx (openForm), formModel.ts, task.tsx (runTask, openUrl, …)
+  chat/        ChatBox.tsx, prompt.ts (prompt / context expansion, cwd resolution)
   store.ts     zustand store + the function API (select, patchItem, patchData, notify, insertSkill, …)
   persist.ts   workspace load (migrate + validate) and debounced autosave
   layout.ts    d3-force simulation; positions live here, not in the store
@@ -156,6 +159,8 @@ Mutate with the store API: `patchData(item | id, partialData, commonPatch?)` for
 | `Sidebar?` | details body; default `DefaultSidebar` |
 | `addable?` `{label, hint, multiline?, detect?(input), create(input, project)}` | canvas *Add* menu, add dialog, paste detection |
 
+`addable.open?(at)` replaces the add dialog with a custom flow (project → settings form, agent → chat box).
+
 `ctx` (`KindCtx`, cached per items/links change): `items`, `links`, `get(id)`, `getAs(id, kind)`,
 `linked(id, kind?)`, `inProject(projectId, kind?)`, `projectOf(item)`, `kind(k)`.
 
@@ -165,7 +170,8 @@ cached), `factsOf`, `sidebarOf`, `actionsForItem` (kind actions + *Mark done* + 
 get *Unarchive* + view / external actions only).
 
 Action building blocks (`kinds/common.tsx`): `skill(id, label, skillName)` inserts `/skill @item` into the
-chat box (AI actions), `external(id, label, url)` (mock toast until wired), `placeholder(id, label, icon)`
+chat box (AI actions), `external(id, label, url)` (opens in the OS browser), `openPathAction` / `openInEditorAction`
+(folder in the OS / in `code`), `placeholder(id, label, icon)`
 ("not implemented yet" toast), `toast`, `archive`, and the shared `completeAction`, `archiveAction`,
 `unarchiveAction`, `removeAction`.
 
@@ -176,17 +182,17 @@ chat box (AI actions), `external(id, label, url)` (mock toast until wired), `pla
    (bump `WORKSPACE_VERSION`, see below).
 2. `domain/types.ts`: export the data type (optional).
 3. `kinds/<kind>/index.tsx`: export a `KindModule<'<kind>'>`. Build actions inside `actions()`; import only
-   from `domain`, `store`, `layout`, `native`, `data`, `tones`, `kinds/common`, `kinds/icons`, `sidebar`.
+   from `domain`, `store`, `layout`, `native`, `data`, `ui`, `tones`, `kinds/common`, `kinds/icons`, `sidebar`.
 4. `kinds/registry.ts`: add it to `MODULES` (typecheck fails until every kind has a module).
 5. Add a seed example and run `npm test` (the registry test checks every kind and every seed item).
 
 #### Per-kind work (phase 3)
 
 Each kind's actions and sidebar live entirely in `kinds/<kind>/` (add files there: `Sidebar.tsx`,
-`actions.tsx`, hooks). Compose sidebars from the `sidebar/` sections. Shared hot spots, change only with
+`actions.tsx`, hooks). Compose sidebars from the `sidebar/` sections and use the [toolkit](#toolkit-for-kind-modules-phase-3) (forms, `runTask`, data ops). Shared hot spots, change only with
 care and in small, separate commits: `domain/schemas.ts` (data shapes), `kinds/types.ts`,
 `kinds/registry.ts`, `kinds/common.tsx`, `kinds/icons.tsx`, `store.ts`, `sidebar/index.tsx`,
-`data/queryKeys.ts`, `seed.ts`, `index.css`.
+`data/queryKeys.ts`, `data/ops.ts`, `ui/*`, `sync/*`, `seed.ts`, `index.css`.
 
 ### Store
 
@@ -246,8 +252,8 @@ provided in `main.tsx`. Pattern:
 - **Keys** only from the factory in `data/queryKeys.ts`: `[integration, resource, ...params]`
   (`qk.gh.pr(repo, n)`), so invalidation can target an integration (`qk.gh.all`), a resource or one entity.
 - **One file of hooks per integration** in `data/` (`data/gh.ts`, `data/git.ts`, …), each hook wrapping a
-  `native.*` call: `useQuery({ queryKey: qk.git.status(path), queryFn: () => … })`. Example:
-  `data/app.ts` → `useAppInfo()` (shown in the notifications menu).
+  `native.*` call: `useQuery({ queryKey: qk.git.status(path), queryFn: () => … })`. Hooks take possibly-undefined
+  params and only run in the desktop app with every param set (`ready()` in `data/ops.ts`). The list is below.
 - **Invalidate after actions**: an action that changes something remote calls
   `queryClient.invalidateQueries({ queryKey: … })` when it is done.
 - **Poll running things** with `refetchInterval` (a running build, agent or test run), e.g.
@@ -255,6 +261,111 @@ provided in `main.tsx`. Pattern:
 - **Write back what the ring needs**: when a query result changes a cached field (PR checks, git stats),
   `patchData()` the item so the canvas (and the next start) shows it; everything else stays in the cache.
 - Defaults: `staleTime` 30 s, no refetch on window focus, one retry.
+
+### Data hooks and write ops (phase 2b)
+
+Reads are hooks; writes are plain async functions in a `<service>Ops` object (kind actions run outside
+React) that invalidate what they change. In a component, `useOp(ghOps.prMerge)` gives a mutation
+(`m.mutate([repo, n, 'squash'])`, `m.isPending`, `m.error`).
+
+| file | hooks | ops |
+|---|---|---|
+| `data/git.ts` | `useGitStatus(dir)`, `useGitDiff(dir, base?)`, `useGitDiffStat(dir, base?)`, `useGitLog(dir, {range, limit})`, `useCurrentBranch(dir)`, `useRemoteRepo(dir)`, `useWorktrees(repoDir)` | `gitOps.worktreeAdd(repoDir, path, branch, base?, {newBranch})`, `worktreeRemove(repoDir, path, {force})`, `fetch(dir)`, `rebase(dir, onto)`, `rebaseAbort(dir)`, `detect(dir)` → `{repo, branch}` \| null |
+| `data/gh.ts` | `usePr(repo, n)`, `usePrSummary(repo, n)`, `usePrDiff(repo, n)`, `usePrChecks(repo, n)` (polls while pending), `usePrList(repo, filter)`, `useRenovatePrs(repo)`, `useRun(repo, runId)` (polls until completed) | `ghOps.prCreate(req)`, `prMerge(repo, n, method, {deleteBranch})`, `prComment(repo, n, body)`, `requestAiReview(repo, n)` (uses the `aiReviewComment` setting), `prUpdateBranch(repo, n, {rebase})`, `runRerun(repo, runId, {failedOnly})` |
+| `data/jira.ts` | `useJiraIssue(key)`, `useJiraIssueSummary(key)`, `useJiraSearch(jql, limit?)` | `jiraOps.transition(key, status)`, `create(req)`, `comment(key, body)`, `edit(req)` |
+| `data/claude.ts` | `useClaudeSessions()`, `useClaudeSession(localId)` (messages, status, usage), `useClaudeTranscript(localId)` (raw events, appended live) | `claudeOps.start(req)`, `send(localId, text)`, `answer(localId, toolUseId, answers)`, `permission(localId, requestId, decision)`, `interrupt`, `stop`, `remove` |
+| `data/apps.ts` | `useApps()`, `useAppLog(id)` (appended live) | `appOps.start(req)`, `stop(id)`, `restart(id)`, `remove(id)` |
+| `data/tests.ts` | `useTestRuns()`, `useTestLog(id)` (appended live) | `testOps.run(req)`, `stop(id)` |
+| `data/app.ts` | `useAppInfo()`, `useIntegrationConfig()` | |
+
+Keys (`data/queryKeys.ts`) nest so prefixes invalidate groups: `qk.gh.pr(repo, n)` covers its diff and checks,
+`qk.gh.prs(repo)` every PR list, `qk.git.dir(dir)` status / diff / log of one checkout, `qk.jira.searches()`
+every search, `qk.claude.session(id)` its transcript.
+
+Ids: an agent's session id in main is `data.localId` (the chat box uses the item id); apps and test runs use the
+item id as runner id and store it as `data.procId`. Live sync matches events by these.
+
+### Live sync, reconciliation, background refresh (`sync/`)
+
+`startSync()` (main.tsx, desktop only):
+
+- **Live events** (`sync/live.ts`): `claude:state` → the agent with that `localId` (status, `pendingQuestion`,
+  `pendingPermissions`, activity, usage, error); `app:state` / `test:state` → the app / test run with that `procId`
+  (state, url / port; state, summary, `outputTail`). Mappings are pure (`sync/mapping.ts`). Notices on
+  transitions: agent asks / needs permission → warning, agent finished → success, agent failed / app crashed /
+  tests failed → critical, tests passed → success. `claude:event` / `app:output` / `test:output` are appended to
+  the transcript / log caches; the session query is refetched (debounced) on state changes.
+  Agent status mapping: claude `idle` (turn done, process alive) → `done`, interrupted → `idle`; process gone
+  mid-turn → `idle`.
+- **Reconcile** at start: items that were really started (`localId` / `procId`) and say they run, but main does
+  not know them (the app restarted), become idle / stopped; known ones take main's state, without notices.
+  Demo items (no ids) are left alone.
+- **Refresher** (`sync/refresher.ts`): every `settings.refreshSec` (default 60 s; 15 s for open PRs with pending
+  checks), only while the window is visible: worktree → `git status` + ahead / behind `origin/<base>`; open PR →
+  `gh pr view` (state, review, mergeable, checks with counts); ticket → `jira view` (status, category, assignee,
+  sprint, points, title); project → open / Renovate PR counts. Results also seed the query caches; unchanged
+  values don't touch the store. Non-absolute paths (`~/…` demo data) are skipped; failures log once and back off
+  exponentially per item and per gh repo (up to 30 intervals).
+
+### Chat box → Claude Code
+
+`sendPrompt(text, mentionedIds)` (`actions.tsx`, logic in `chat/prompt.ts`):
+
+1. Exactly one mentioned agent with a session (`localId`) → `claude:send` to it (follow-up).
+2. Otherwise a new session: cwd = `resolveCwd(mentions)`: a mentioned worktree > a worktree linked to (or with the
+   ticket key of) a mention > a mentioned app / test run / agent dir > the project's `baseDir`; absolute paths only.
+   None → a small form: pick a configured project or any folder (native picker).
+3. Prompt = `buildPrompt`: the draft as typed (a leading `/skill` stays the slash command) + a context block, one
+   line per mention, e.g. `- @CTX-4821 = Jira ticket CTX-4821 "Retry …" (In Progress, Story, branch feat/…)`.
+4. An agent item is created (`localId` = item id, linked `about` the mentions and `belongs to` the project), then
+   `claude:start {localId, cwd, prompt, title, model, permissionMode}` with `settings.model` (unset = CLI default)
+   and `settings.permissionMode` (`default`). The draft clears once sent; a toast offers *Open*.
+
+Agent actions (`kinds/agent/session.tsx`): one per option of the first open question (a single plain question
+answers right away via `claude:answer`; several questions or multi-select open a form with all of them), *Allow* /
+*Deny* per pending tool permission (`claude:permission`), *Interrupt*, *Stop*, *Follow up* (puts `@agent` into the
+chat box). Demo agents keep local mock behaviour.
+
+## Toolkit for kind modules (phase 3)
+
+Everything a kind module needs besides `data/*`:
+
+```ts
+// ui/form.tsx: a modal form, rendered by <FormHost/> (mounted once); stacks over other dialogs
+openForm({
+  title: string, description?: string, submitLabel?: string, danger?: boolean,
+  fields: { name, label, type: 'text'|'textarea'|'select'|'checkbox'|'directory'|'file'|'radio',
+            options?: (string | {value, label, hint?})[], required?, default?, hint?, placeholder?,
+            validate?: (value, values) => string | undefined, when?: (values) => boolean,
+            filters?: {name, extensions}[] /* file */, rows? /* textarea */ }[],
+  values?: Partial<FormValues>,                         // initial values
+  onChange?: (name, values) => Partial<FormValues> | void | Promise<…>,   // derived fields
+  onSubmit: (values: FormValues) => void | Promise<void>,  // throw → error shown, dialog stays open
+}): Promise<FormValues | null>                          // null = cancelled
+// FormValues = Record<string, string | boolean>; str(values, name) reads a string.
+// directory / file fields have a "Browse…" button (native pickers). Validation runs on submit, then live.
+
+// ui/task.tsx
+runTask(label, promiseOrFn, { success?, message?, quiet? }): Promise<T | undefined>  // spinner toast → success / critical
+errorText(e)                // readable message of a failed native call
+openUrl(url) / openPath(path) / openInEditor(path)   // report failures as a toast instead of throwing
+
+// kinds/common.tsx (action builders)
+skill(id, label, skillName, extra?) · external(id, label, (item) => url, extra?)
+openPathAction(id, label, (item) => path, extra?) · openInEditorAction(id, label, (item) => path, extra?)
+placeholder(id, label, icon) · toast(title, message?, type?) · archive(items)
+
+// sidebar/index.tsx
+<SidebarTabs rememberAs="pr" initial="details" tabs={[{ id, label, render: () => node, wide?: boolean, badge? }]} />
+useSidebarLayout() → { wide, setWide(boolean), width }   // a webview / diff tab can go wide
+SidebarSection, SummarySection, FactsSection, ConnectionsSection, DefaultSidebar
+
+// kinds/project: openProjectSettings(project?, at?) → the project's real paths / commands
+// store: settings (model, permissionMode, aiReviewComment, refreshSec, sidebarWidth), setSettings(patch)
+```
+
+The sidebar shell (`overlays/Sidebar.tsx`) is resizable (drag the left edge; persisted as `settings.sidebarWidth`)
+and has an expand button (about 60 % of the window); a tab with `wide: true` expands it while active.
 
 ## Where things live
 
@@ -265,7 +376,7 @@ provided in `main.tsx`. Pattern:
 | Build output | `out/main`, `out/preload/index.cjs`, `out/renderer` |
 | Static assets | `public/` (renderer `publicDir`); reference them with `asset('brand/…')` from `native.ts`, not `/brand/…`, so they resolve under `file://` too |
 | Separate profile | `CORTEX_USER_DATA=<dir>` |
-| Headless bridge check | `CORTEX_SMOKE=1 npm run dev` (`src/main/smoke.ts`); `CORTEX_SMOKE_SHOT=<file.png>` also saves a screenshot; `CORTEX_SMOKE_GH_REPO=owner/name` adds a read-only `gh pr list` |
+| Headless bridge check | `CORTEX_SMOKE=1 npm run dev` (`src/main/smoke.ts`); `CORTEX_SMOKE_SHOT=<file.png>` also saves a screenshot; `CORTEX_SMOKE_GH_REPO=owner/name` adds a read-only `gh pr list`; `CORTEX_SMOKE_E2E=1` (dev only, via `window.__cortexDebug` from `debug.ts`) adds a project on this repo + a forced refresh, and chat → agent → question → answer when `CORTEX_CLAUDE_BIN` is the fake CLI |
 | Jira mock data | `<userData>/jira-mock.json` (seeded on first use) |
 | Claude session metadata | `<userData>/claude-sessions.json` |
 
@@ -388,7 +499,8 @@ elicitation) are answered with an error response so the CLI never hangs.
 
 Cost: `total_cost_usd` is cumulative per process, so each result adds its delta (`usage.processCostUsd`).
 Session metadata (`localId`, Claude `session_id`, cwd, title, model, permission mode, cost) is stored in
-`<userData>/claude-sessions.json`. Binary: `CORTEX_CLAUDE_BIN` (tests inject `node <fake script>`).
+`<userData>/claude-sessions.json`. Binary: `CORTEX_CLAUDE_BIN` (tests inject `node <fake script>`); a `.js` / `.mjs` path runs with Electron's node,
+e.g. `CORTEX_CLAUDE_BIN=src/main/services/__fixtures__/fake-claude.mjs` for a free end-to-end run.
 
 ### Apps and test runs — the user's command line, through the shell
 

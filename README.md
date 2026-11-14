@@ -63,9 +63,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for processes, IPC channels and
   - `sidebar/` — details sidebar sections (kind sidebars compose them)
   - `data/` — TanStack Query client, query keys, query hooks per integration
   - `seed.ts` — the demo world
-  - `actions.tsx` — selection-level actions, sending a prompt
+  - `actions.tsx` — selection-level actions, sending a prompt (starts / continues a Claude Code session)
+  - `sync/` — live events from main → bubbles, startup reconciliation, background refresh of git / gh / jira
+  - `ui/` — form dialog (`openForm`), `runTask` toasts, open-URL / folder helpers
   - `store.ts` — zustand store and its function API; `persist.ts` — workspace load (migrate + validate) / autosave; `layout.ts` — d3-force layout + camera API
   - `desktop.ts`, `sound.ts` — OS notifications and chimes for new notices
   - `canvas/*` — canvas, bubbles, links, particles/logo backdrop, hover card, inline actions
-  - `chat/ChatBox.tsx` — chat box with @mention / /skill autocomplete
+  - `chat/` — chat box with @mention / /skill autocomplete; `prompt.ts` builds the prompt and picks the working dir
   - `overlays/*` — HUD and dialogs (Strato components)
