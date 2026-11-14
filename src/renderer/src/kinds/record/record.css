@@ -1,0 +1,29 @@
+/* Record sidebar: viewer / editor chrome. */
+.rec-note {
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-subdued);
+}
+.rec-error {
+  color: var(--dt-colors-text-critical-default);
+  overflow-wrap: anywhere;
+}
+.rec-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.rec-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.rec-md {
+  max-height: 60vh;
+  overflow-y: auto;
+}
