@@ -43,6 +43,21 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 
 "AI" = insert a skill into the chat box (skills need not exist yet). "UI" = dialog / direct action.
 
+## Current state (2026-11-14)
+
+**All phases done on `app` @ `f7b5f69`.** 255 tests, typecheck/lint/build green. Real-repo click-through (`src/main/smokeRepo.ts`) passes 14/14 in dev and built app:
+`GH_HOST=smoke.invalid CORTEX_SMOKE=1 CORTEX_SMOKE_REPO=1 CORTEX_SMOKE_OUT=<tmp> CORTEX_CLAUDE_BIN=<abs>/src/main/services/__fixtures__/fake-claude.mjs CORTEX_USER_DATA=<tmp>/profile npm run dev`
+
+Docs: `README.md` (setup, first run), `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`.
+
+### Open items / next steps
+1. **First real runs (need the user):** `gh pr create / merge / comment / update-branch / edit --base` never ran against real GitHub; AskUserQuestion + permission prompts only verified against the fake Claude CLI → try one real Claude session and one throwaway PR.
+2. Packaging (electron-builder; ship `scripts/jira-mock` unpacked).
+3. Demo seed: refresher keeps calling gh for fake `ctx-observability/*` repos (backs off, logs errors); project sidebar refetches `gh pr list` often while gh fails → consider a "demo" flag that disables refresh for seed items, or start with an empty workspace.
+4. `acli` output shape unverified (when switching off the jira mock).
+5. Diffs omit untracked files; composer lacks skill autocomplete / model picker; chat dock narrow when sidebar is wide; "Change status…" icon is a caret.
+6. Dev-mode CSP with HMR not exercised.
+
 ## Phases
 
 | # | Scope | Owner | Status |
@@ -53,10 +68,11 @@ Read this first when resuming. Updated by the orchestrator after every phase / a
 | 2a | Shared viewers in `components/viewers/`: Markdown (+mermaid), DiffViewer, CodeEditor, WebPanel (webview), LogView | sonnet agent, worktree → branch `phase-2a-viewers` | ✅ done, merged (`1908b3e`) |
 | 2b | Renderer glue: data hooks, live sync + refresher, chat → real claude sessions, AskUserQuestion answering, form dialog / runTask / SidebarTabs / openExternal toolkit, project settings with pickers | opus agent on `app` | ✅ done (`e10c3b8`) |
 | 3 | Kind modules (actions + sidebars), 4 parallel slices: A project+ticket+deployment · B worktree+record+todo · C pr+build+testrun · D agent+app | A,B sonnet · C,D opus, each in own worktree → branches `phase-3{a,b,c,d}-…` | ✅ done, all merged |
-| 4 | Integration pass: gap fixes (list in log), cleanup, skills list, real-repo click-through smoke, docs | opus agent on `app` | ⏳ running |
+| 4 | Integration pass: gap fixes (list in log), cleanup, skills list, real-repo click-through smoke, docs | opus agent on `app` | ✅ done (`f7b5f69`) |
 
 ## Log
 
+- 2026-11-14 — Phase 4 done (`1633284`…`f7b5f69`): skills list (17), prototype dialogs removed, stuck spinner toasts fixed, chat dock respects sidebar, SidebarSection actions slot, single Jira URL resolver (+ integration config now actually loaded), `gh:prEdit` + stacked-PR retarget + `mergeStateStatus` in ring, background build refresh, Settings dialog (HUD gear), production CSP, real-repo click-through smoke + fixes (Windows worktree removal while agent running, error texts, toasts position, agent handles, record discovery log spam), docs rewritten (`CONTRIBUTING.md` replaces the phase 3 brief). Orchestrator reviewed screenshots.
 - 2026-11-14 — Phase 3d done + merged (`5b17fbb`; 241 tests total, all green). agent: harness sidebar (transcript w/ markdown, tool rows, thinking, question card, permission cards, composer w/ Esc interrupt, status line), option/allow/deny/stop/interrupt/follow-up actions. app: Preview webview w/ viewport switcher, Log, Details; start/stop/restart/open; ring by state. E2E verified with fake Claude CLI + a real `node -e` HTTP server (URL detection, restart frees port/pid, crash state). Hotspot: `debug.ts` (+inspect/select/runAction), smoke steps. Gaps: runTask spinner toasts can get stuck when many toasts are queued; floating action list/chat box overlaps sidebar bottom-left ~25px; composer has no skill autocomplete/model picker; real-Claude thinking/multi-question untested.
 - 2026-11-14 — Phase 3c done + merged (`31d7b98`; 223 tests). pr: merge form (merge/squash/rebase, warnings, offer worktree removal), rebase via update-branch (conflicts → `/rebase` skill), AI review comment w/ confirm, address-review/review-pr/describe-pr (AI); sidebar Overview/Files/GitHub webview; stacked-PR section; build auto-discovery from checks. build: rerun (Actions, failed-only) or open details for Jenkins; jobs/steps sidebar + webview. testrun: rerun/stop, failing-test extraction, live log. Live-verified read-only on cli/cli#15052 (PR + Actions run) and a fake vitest run. No hotspots. Gaps: no `gh pr edit --base` retarget channel; ring ignores `mergeStateStatus` (not in schema); builds only refresh while a sidebar is open.
 - 2026-11-14 — Phase 3b done + merged (`479971d`; 188 tests). worktree: Create PR form (push + stacked-on select → pr item + "stacked on" link), launch app / run tests (create app/testrun items), remove w/ force, rebase/review (AI), open folder/editor; sidebar Changes (diff vs base / uncommitted) + Stats. record: live markdown sidebar w/ edit + task toggles writing to file; grill/plan/implement (AI); **auto-discovery** of `<baseDir>/records/**/*.md`. todo: inline editor + preview, quick add. Hotspots: new `git:push` channel, `gitOps.push`, `startRecordDiscovery()` in `sync/index.ts`. Gaps: flows not clicked through in the app; diffs omit untracked files; PR body Jira link hard-coded `jira.ctx.internal`; skills grill/plan/implement not in ChatBox SKILLS list (phase 4).
