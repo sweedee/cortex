@@ -1,0 +1,87 @@
+/* Worktree sidebar: changes / stats tabs. Flat, tokens from index.css. */
+.wt-note {
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-subdued);
+}
+.wt-error {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--dt-colors-text-critical-default);
+  overflow-wrap: anywhere;
+}
+.wt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.wt-toolbar .grow {
+  flex: 1;
+}
+.wt-diff {
+  padding: 8px 14px 14px;
+}
+.wt-files,
+.wt-commits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.wt-files li,
+.wt-commits li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  min-width: 0;
+}
+.wt-files .letter {
+  flex: none;
+  width: 14px;
+  font: 600 11px ui-monospace, Consolas, monospace;
+  text-align: center;
+  color: var(--ink-subdued);
+}
+.wt-files .letter.new {
+  color: var(--dt-colors-text-success-default);
+}
+.wt-files .letter.del {
+  color: var(--dt-colors-text-critical-default);
+}
+.wt-files .letter.conflict {
+  color: var(--dt-colors-text-warning-default);
+}
+.wt-files .path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+.wt-commits .sha {
+  flex: none;
+  font: 11px ui-monospace, Consolas, monospace;
+  color: var(--ink-faint);
+}
+.wt-commits .subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wt-totals {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.wt-totals .add {
+  color: var(--dt-colors-text-success-default);
+}
+.wt-totals .del {
+  color: var(--dt-colors-text-critical-default);
+}
