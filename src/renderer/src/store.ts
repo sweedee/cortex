@@ -18,8 +18,8 @@ import { SEED_ITEMS, SEED_LINKS } from './seed';
 export type { ColorBy, Filter } from './domain';
 
 /** Persisted settings for integrations and layout (part of the workspace prefs, v2). */
-export type Settings = Pick<Prefs, 'model' | 'permissionMode' | 'aiReviewComment' | 'refreshSec' | 'sidebarWidth'>;
-const settingsOf = (p: Prefs): Settings => ({ model: p.model, permissionMode: p.permissionMode, aiReviewComment: p.aiReviewComment, refreshSec: p.refreshSec, sidebarWidth: p.sidebarWidth });
+export type Settings = Pick<Prefs, 'model' | 'effort' | 'permissionMode' | 'aiReviewComment' | 'refreshSec' | 'sidebarWidth'>;
+const settingsOf = (p: Prefs): Settings => ({ model: p.model, effort: p.effort, permissionMode: p.permissionMode, aiReviewComment: p.aiReviewComment, refreshSec: p.refreshSec, sidebarWidth: p.sidebarWidth });
 
 export type Dialog =
   | { type: 'add'; kind: Kind; at: { x: number; y: number } }

@@ -192,6 +192,8 @@ export interface ClaudeSessionSummary {
   model?: string;
   /** `--permission-mode` the session runs with (unset = the CLI's default) */
   permissionMode?: string;
+  /** the `--model` chosen for it (alias or id; unset = the CLI's default); `model` is what the CLI resolved */
+  modelSetting?: string;
   /** `--effort` (unset = the CLI's default) */
   effort?: string;
   /** settings the running process could not take live; the next message restarts it with `--resume` */

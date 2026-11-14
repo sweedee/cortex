@@ -84,6 +84,7 @@ interface StoredSession {
   model?: string;
   permissionMode?: string;
   effort?: string;
+  modelSetting?: string;
   createdAt: string;
   updatedAt: string;
   lastText?: string;
@@ -150,12 +151,13 @@ export class ClaudeSessions {
           running: false,
           updatedAt: s.updatedAt,
           lastText: s.lastText,
+          ...(s.modelSetting ? { modelSetting: s.modelSetting } : {}),
         };
         session.usage = { ...session.usage, costUsd: s.costUsd ?? 0, contextWindow: s.contextWindow };
         if (s.model && s.contextWindow) this.windows.set(s.model, s.contextWindow);
         this.entries.set(s.localId, {
           session,
-          req: { cwd: s.cwd, title: s.title, model: s.model, effort: s.effort as ClaudeStartRequest['effort'], permissionMode: s.permissionMode as ClaudeStartRequest['permissionMode'] },
+          req: { cwd: s.cwd, title: s.title, model: s.modelSetting ?? s.model, effort: s.effort as ClaudeStartRequest['effort'], permissionMode: s.permissionMode as ClaudeStartRequest['permissionMode'] },
           events: [],
           asks: new Map(),
           controls: new Map(),
@@ -180,6 +182,7 @@ export class ClaudeSessions {
       model: s.model,
       permissionMode: req.permissionMode,
       effort: req.effort,
+      modelSetting: req.model,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
       lastText: s.lastText?.slice(0, 500),
@@ -370,6 +373,7 @@ export class ClaudeSessions {
       e.req = { ...existing.req, ...req };
       e.session = { ...existing.session, title: req.title ?? existing.session.title, model: req.model ?? existing.session.model, effort: req.effort ?? existing.session.effort, sessionId: req.resume ?? existing.session.sessionId };
     }
+    e.session = { ...e.session, modelSetting: e.req.model };
     this.entries.set(localId, e);
     this.spawn(e, !!e.session.sessionId && (!!req.resume || !!existing));
     if (req.prompt) this.sendUser(e, req.prompt);
@@ -412,7 +416,7 @@ export class ClaudeSessions {
     if (c.model !== undefined) {
       const model = c.model && c.model !== 'default' ? c.model : undefined;
       e.req = { ...e.req, model };
-      e.session = { ...e.session, model: model ?? e.session.model };
+      e.session = { ...e.session, model: model ?? e.session.model, modelSetting: model };
       out.model = live ? (this.control(e, 'model', { subtype: 'set_model', model: model ?? 'default' }) ? 'live' : 'restart') : 'next';
     }
     if (c.permissionMode !== undefined) {

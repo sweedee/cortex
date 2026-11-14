@@ -5,35 +5,21 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { KeyboardShortcut } from '@dynatrace/strato-components/content';
-import { AiIcon, ArrowUpIcon, XmarkIcon } from '@dynatrace/strato-icons';
+import { AiIcon, ArrowUpIcon, TerminalIcon, XmarkIcon } from '@dynatrace/strato-icons';
 import { actionsForItem, actionsForSelection, sendPrompt, type Action } from '../actions';
 import type { Item } from '../domain';
 import { skillIcon } from '../kinds/icons';
 import { kindIcon, kindLabel } from '../kinds/registry';
-import { getState, mentionedIds, select, setDraft, setSearch, useStore, useVisible } from '../store';
+import { getState, mentionedIds, select, setDraft, setSearch, setSettings, useStore, useVisible } from '../store';
+import { useClaudeCatalog } from '../data/claude';
+import { SessionPickers } from './SessionPickers';
+import { slashOptions, type SlashOption } from './sessionOptions';
 import { accentOf, NEUTRAL_ACCENT, stripes, useItemColors } from '../visual';
 import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
+import { SKILLS } from './skills';
 
-export const SKILLS: { name: string; desc: string }[] = [
-  { name: 'create-ticket', desc: 'Draft a Jira ticket for a project' },
-  { name: 'review-renovate', desc: 'Review and merge safe dependency updates' },
-  { name: 'brainstorm', desc: 'Explore options for a ticket into a brainstorm record' },
-  { name: 'plan', desc: 'Explore the code and write a plan record' },
-  { name: 'grill', desc: 'Poke holes in a plan before approving it' },
-  { name: 'implement', desc: 'Implement a plan in its worktree' },
-  { name: 'rebase', desc: 'Rebase a branch and resolve the conflicts' },
-  { name: 'review', desc: 'Critical review of a worktree before a PR' },
-  { name: 'review-pr', desc: 'Review a pull request' },
-  { name: 'address-review', desc: 'Fix unresolved review comments' },
-  { name: 'describe-pr', desc: 'Write the PR description from the diff' },
-  { name: 'fix-ci', desc: 'Find why a build failed and fix it' },
-  { name: 'explain-build', desc: 'Explain a CI failure without changing code' },
-  { name: 'fix-tests', desc: 'Find why tests fail and fix them' },
-  { name: 'status-summary', desc: 'Summarise where these items stand' },
-  { name: 'continue-session', desc: 'Send a follow-up to an agent session' },
-  { name: 'fork-session', desc: 'Branch a session to try another approach' },
-];
+export { SKILLS } from './skills';
 
 /** One entry of the #/! action search: an action and the item(s) it runs on. */
 interface ActionOption {
@@ -46,7 +32,7 @@ interface ActionOption {
 
 type Popup =
   | { type: 'mention'; start: number; query: string; options: Item[]; hits: string[] }
-  | { type: 'skill'; start: number; query: string; options: typeof SKILLS }
+  | { type: 'skill'; start: number; query: string; options: SlashOption[] }
   | { type: 'action'; start: number; query: string; options: ActionOption[] }
   | null;
 
@@ -73,6 +59,8 @@ export function ChatBox() {
   const selected = useStore((s) => s.selected);
   const focusTick = useStore((s) => s.focusTick);
   const visible = useVisible();
+  const settings = useStore((s) => s.settings);
+  const catalog = useClaudeCatalog().data;
   const colors = useItemColors();
   const ta = useRef<HTMLTextAreaElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
@@ -126,8 +114,7 @@ export function ChatBox() {
     }
     const s = before.match(/(^|\s)\/([\w-]*)$/);
     if (s) {
-      const q = s[2].toLowerCase();
-      const options = SKILLS.filter((k) => k.name.includes(q)).slice(0, 7);
+      const options = slashOptions(s[2], SKILLS, catalog?.commands, 7);
       setPopup({ type: 'skill', start: pos - s[2].length - 1, query: s[2], options });
       setActive(0);
       return;
@@ -149,7 +136,7 @@ export function ChatBox() {
       o.action.run(o.items);
       return;
     }
-    const insert = popup.type === 'mention' ? `@${(popup.options[i] as Item).handle} ` : `/${(popup.options[i] as (typeof SKILLS)[number]).name} `;
+    const insert = popup.type === 'mention' ? `@${(popup.options[i] as Item).handle} ` : `/${(popup.options[i] as SlashOption).name} `;
     const end = popup.start + 1 + popup.query.length;
     const next = draft.slice(0, popup.start) + insert + draft.slice(end);
     setDraft(next);
@@ -216,7 +203,7 @@ export function ChatBox() {
           </mark>,
         );
       } else {
-        const known = SKILLS.some((s) => s.name === t.slice(1));
+        const known = SKILLS.some((s) => s.name === t.slice(1)) || !!catalog?.commands.some((c) => c.name === t.slice(1));
         out.push(
           <mark key={i} className={`tok tok-skill ${known ? '' : 'is-unknown'}`}>
             {t}
@@ -227,7 +214,7 @@ export function ChatBox() {
     }
     out.push(draft.slice(last) + '​');
     return out;
-  }, [draft, handles, colors]);
+  }, [draft, handles, colors, catalog]);
 
   const syncScroll = () => {
     if (mirror.current && ta.current) mirror.current.scrollTop = ta.current.scrollTop;
@@ -321,6 +308,21 @@ export function ChatBox() {
           </div>
         </div>
 
+        <div className="chat-foot">
+          <SessionPickers
+            label="Defaults for new agent sessions"
+            value={{ model: settings.model, effort: settings.effort, permissionMode: settings.permissionMode }}
+            onChange={(p) =>
+              setSettings({
+                ...(p.model !== undefined ? { model: p.model || undefined } : {}),
+                ...(p.effort !== undefined ? { effort: p.effort || undefined } : {}),
+                ...(p.permissionMode !== undefined ? { permissionMode: p.permissionMode } : {}),
+              })
+            }
+          />
+          <span className="chat-foot-hint">new sessions</span>
+        </div>
+
         {popup && (popup.options.length > 0 || popup.type === 'action') && (
           <div className="chat-popup" role="listbox" style={{ left: Math.min(popupX(draft, caret), 380) }}>
             <div className="chat-popup-head">
@@ -373,7 +375,7 @@ export function ChatBox() {
                     <span className="chat-option-sub">{o.title}</span>
                   </div>
                 ))
-              : (popup.options as typeof SKILLS).map((o, i) => (
+              : (popup.options as SlashOption[]).map((o, i) => (
                   <div
                     key={o.name}
                     role="option"
@@ -382,9 +384,11 @@ export function ChatBox() {
                     onMouseDown={(e) => (e.preventDefault(), accept(i))}
                     onMouseEnter={() => setActive(i)}
                   >
-                    <span className="chat-option-icon">{skillIcon(o.name)}</span>
+                    <span className="chat-option-icon">{o.source === 'cortex' ? skillIcon(o.name) : <TerminalIcon />}</span>
                     <span className="chat-option-main">/{o.name}</span>
-                    <span className="chat-option-sub">{o.desc}</span>
+                    <span className="chat-option-sub" title={o.desc}>
+                      {o.args ? `${o.args} · ${o.desc}` : o.desc}
+                    </span>
                   </div>
                 ))}
           </div>

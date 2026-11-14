@@ -114,7 +114,7 @@ export async function sendPrompt(text: string, mentioned: string[]): Promise<str
   const title = agentTitle(sk, subject);
   const id = newId('a');
   const taken = new Set(getState().items.map((i) => i.handle.toLowerCase()));
-  const { model, permissionMode } = getState().settings;
+  const { model, effort, permissionMode } = getState().settings;
   const links = items.map((m) => ({ from: id, to: m.id, label: 'about' }));
   if (project && !items.some((m) => m.id === project.id)) links.push({ from: id, to: project.id, label: 'belongs to' });
   const at = subject ? place.near(subject.id) : project ? place.near(project.id) : place.center();
@@ -125,14 +125,14 @@ export async function sendPrompt(text: string, mentioned: string[]): Promise<str
       handle: agentHandle(sk, subject, (h) => taken.has(h.toLowerCase())),
       title,
       projectId: project?.id,
-      data: { cwd: where.cwd, localId: id, model, status: 'running', skill: sk, lastActivity: 'Starting Claude Code', startedAt: Date.now() },
+      data: { cwd: where.cwd, localId: id, model, effort, ...(permissionMode !== 'default' ? { permissionMode } : {}), status: 'running', skill: sk, lastActivity: 'Starting Claude Code', startedAt: Date.now() },
     },
     links,
   ) as ItemOf<'agent'>;
   place.seed(id, at);
   select([id], false, { mention: false });
   try {
-    await claudeOps.start({ localId: id, cwd: where.cwd, prompt: buildPrompt(text, items, ctx), title, model, permissionMode });
+    await claudeOps.start({ localId: id, cwd: where.cwd, prompt: buildPrompt(text, items, ctx), title, model, effort, permissionMode });
   } catch (e) {
     patchData<'agent'>(agent, { status: 'failed', error: errorText(e), lastActivity: 'Could not start', endedAt: Date.now() });
     notify(id, { text: `${title} could not start: ${errorText(e)}`, tone: 'critical' });

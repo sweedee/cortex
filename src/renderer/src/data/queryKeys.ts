@@ -54,6 +54,7 @@ export const qk = {
   claude: {
     all: ['claude'] as const,
     list: () => ['claude', 'list'] as const,
+    catalog: () => ['claude', 'catalog'] as const,
     /** one session (prefix of its transcript) */
     session: (localId: string) => ['claude', 'session', localId] as const,
     transcript: (localId: string) => ['claude', 'session', localId, 'transcript'] as const,
