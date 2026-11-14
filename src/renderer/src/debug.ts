@@ -4,10 +4,10 @@
  * clicks. Present in dev, and in a build only when main opened the page as `index.html#smoke`
  * (main does that only with CORTEX_SMOKE=1).
  */
-import { sendPrompt } from './actions';
+import { openAdd, sendPrompt } from './actions';
 import { chooseOption } from './kinds/agent/session';
 import { actionsForItem } from './kinds/registry';
-import { addItem, addLink, getState, inspect, itemById, select } from './store';
+import { addItem, addLink, getState, inspect, itemById, replaceWorld, select } from './store';
 import { refreshDue } from './sync';
 import { formDriver } from './ui/form';
 
@@ -41,4 +41,4 @@ async function showGallery() {
 }
 
 if (import.meta.env.DEV || location.hash === '#smoke')
-  window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue, inspect, select, runAction, forms: formDriver, showGallery };
+  window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue, inspect, select, runAction, forms: formDriver, showGallery, openAdd, replaceWorld };

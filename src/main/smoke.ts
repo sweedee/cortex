@@ -5,6 +5,7 @@
  */
 import { writeFile } from 'node:fs/promises';
 import { app, type BrowserWindow } from 'electron';
+import { runRepoSmoke } from './smokeRepo';
 
 /** a tiny HTTP server on a random port that prints its URL like a dev server (phase 3d app e2e) */
 const SMOKE_APP_CMD = `node -e "const s=require('http').createServer((q,r)=>r.end('<h1>hi from the smoke app</h1>'));s.listen(0,'127.0.0.1',()=>console.log('  Local: http://localhost:'+s.address().port+'/'))"`;
@@ -182,6 +183,11 @@ const PROBE = `(async () => {
 
 export function runSmoke(win: BrowserWindow) {
   win.webContents.once('did-finish-load', () => {
+    // CORTEX_SMOKE_REPO=1: the real-repo click-through (smokeRepo.ts) instead of the bridge probe
+    if (process.env['CORTEX_SMOKE_REPO'] === '1') {
+      setTimeout(() => void runRepoSmoke(win).catch((err) => (console.error('[smoke-repo] failed:', err), app.quit())), 2500);
+      return;
+    }
     setTimeout(async () => {
       try {
         const r: unknown = await win.webContents.executeJavaScript(PROBE);
