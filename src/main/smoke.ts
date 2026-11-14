@@ -61,9 +61,39 @@ const PROBE = `(async () => {
       return { codemirror: !!q('.cm-editor'), mermaid: !!q('svg[id^="mermaid"], .mermaid svg, [class*="mermaid"] svg'), diff: !!q('.cxv-diff-hunk'), cspMeta: q('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')?.slice(0, 60), violations };
     });
   }
+  const d = window.__cortexDebug;
+  // CORTEX_SMOKE_WORLD=1: the first-run world (the real demo repo when it is checked out), one forced refresh with the
+  // real tools (read-only: gh / git / Jira views), then what each bubble shows and every refresher warning.
+  // Start with CORTEX_JIRA_CLI=acli to use the real Jira (smoke runs default to the mock).
+  if (${JSON.stringify(process.env['CORTEX_SMOKE_WORLD'] === '1')} && d) {
+    await step('world: first-run world after a forced refresh', async () => {
+      const warnings = [];
+      const orig = console.warn;
+      console.warn = (...a) => { warnings.push(a.map((x) => (x instanceof Error ? x.message : typeof x === 'string' ? x : JSON.stringify(x))).join(' ').slice(0, 240)); orig(...a); };
+      try {
+        await d.resetToDemo();
+        await d.refreshDue(true);
+        await new Promise((r) => setTimeout(r, 1500));
+      } finally {
+        console.warn = orig;
+      }
+      const s = d.getState();
+      const show = (i) => {
+        const x = i.data;
+        if (i.kind === 'ticket') return x.key + ' ' + x.status + ' (' + x.statusCategory + ') ' + (x.assignee || '-');
+        if (i.kind === 'pr') return '#' + x.number + ' ' + x.state + ' checks=' + JSON.stringify(x.checks) + ' merge=' + x.mergeable + '/' + x.mergeStateStatus;
+        if (i.kind === 'build') return x.name + ' ' + x.state + '/' + x.conclusion + ' run ' + x.runId;
+        if (i.kind === 'worktree') return x.branch + ' ' + JSON.stringify(x.git);
+        if (i.kind === 'project') return x.repo + ' ' + JSON.stringify(x.stats);
+        if (i.kind === 'record') return x.path;
+        return i.title;
+      };
+      const config = await c.integrations.config();
+      return { jira: config.jira, items: s.items.map((i) => i.kind + ' ' + i.id + ': ' + show(i)), warnings };
+    });
+  }
   // CORTEX_SMOKE_E2E=1 (dev, or a build opened with #smoke; uses window.__cortexDebug): renderer flows end to end. Start with
   // CORTEX_CLAUDE_BIN=<fake-claude.mjs> so no real (paid) Claude session is started.
-  const d = window.__cortexDebug;
   if (${JSON.stringify(process.env['CORTEX_SMOKE_E2E'] === '1')} && d) {
     const until = async (get, pred, ms = 20000) => { const t0 = Date.now(); for (;;) { const v = get(); if (pred(v)) return v; if (Date.now() - t0 > ms) throw new Error('timeout, last: ' + JSON.stringify(v && v.data)); await new Promise((r) => setTimeout(r, 100)); } };
     let wt;
