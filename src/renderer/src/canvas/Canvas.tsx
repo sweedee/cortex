@@ -586,11 +586,11 @@ export function Canvas() {
                         body: 'Replaces every bubble and link on the canvas with the demo world. The saved workspace is overwritten.',
                         confirm: 'Reset',
                         danger: true,
-                        onConfirm: () => {
-                          resetToDemo();
-                          unpinAll();
-                          setTimeout(() => fitTo(), 50);
-                        },
+                        onConfirm: () =>
+                          void resetToDemo().then(() => {
+                            unpinAll();
+                            setTimeout(() => fitTo(), 50);
+                          }),
                       })
                     }
                   >

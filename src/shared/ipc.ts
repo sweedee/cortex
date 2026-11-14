@@ -138,6 +138,8 @@ export interface AppInfo {
   /** `process.platform` (win32, darwin, linux), or `browser` without the desktop shell */
   platform: string;
   userData: string;
+  /** the user's home folder (`os.homedir()`; '' in the browser) */
+  home?: string;
   version: string;
   electron?: string;
 }

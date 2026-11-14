@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEED_ITEMS, SEED_LINKS } from '../seed';
+import { SEED_ITEMS, SEED_LINKS } from '../testing/fakeWorld';
 import v0 from './fixtures/workspace-v0.json';
 import v1 from './fixtures/workspace-v1.json';
 import { DEFAULT_PREFS, migrate, parseWorkspace } from './migrations';

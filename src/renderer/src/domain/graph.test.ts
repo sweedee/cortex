@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEED_ITEMS, SEED_LINKS } from '../seed';
+import { SEED_ITEMS, SEED_LINKS } from '../testing/fakeWorld';
 import { linkedIds, rootsOf } from './graph';
 import type { Item, Kind, Link } from './types';
 

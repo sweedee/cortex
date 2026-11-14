@@ -13,7 +13,6 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import type { ColorBy, DataOf, Filter, Item, ItemOf, Kind, Link, NewItem, Notice, Prefs, Segment } from './domain';
 import { DEFAULT_PREFS, rootsOf, STATUS_GROUPS } from './domain';
 import { notifyPermitted } from './native';
-import { SEED_ITEMS, SEED_LINKS } from './seed';
 
 export type { ColorBy, Filter } from './domain';
 
@@ -65,8 +64,8 @@ export interface State {
 }
 
 const initial = (): State => ({
-  items: SEED_ITEMS,
-  links: SEED_LINKS,
+  items: [],
+  links: [],
   selected: [],
   hovered: null,
   draft: '',

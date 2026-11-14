@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isValidElement } from 'react';
 import { ItemSchema, KINDS, type ItemOf } from '../domain';
-import { SEED_ITEMS, SEED_LINKS } from '../seed';
+import { SEED_ITEMS, SEED_LINKS } from '../testing/fakeWorld';
 import { makeItem } from '../store';
 import { agentRing } from './agent';
 import { prRing } from './pr';

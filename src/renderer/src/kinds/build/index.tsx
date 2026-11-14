@@ -7,7 +7,7 @@ import { openForm } from '../../ui/form';
 import { openUrl } from '../../ui/task';
 import { skill, toast } from '../common';
 import type { KindModule } from '../types';
-import { buildFailed, buildRing, duration, externalLabel, isJenkinsUrl, rerunBlocked, rerunMode } from './logic';
+import { buildFailed, buildRing, ciProvider, duration, externalLabel, rerunBlocked, rerunMode } from './logic';
 import { BuildSidebar } from './Sidebar';
 
 export { buildFailed, buildRing } from './logic';
@@ -20,7 +20,7 @@ export async function rerunBuild(b: Build) {
     showToast({
       type: 'info',
       title: `Re-run ${b.data.name} on its own page`,
-      message: `${isJenkinsUrl(b.data.url) ? 'Jenkins' : 'This CI'} reports through the GitHub checks API, which gh can't re-trigger. Opened the details page instead.`,
+      message: `${ciProvider(b.data).name === 'CI' ? 'This CI' : ciProvider(b.data).name} reports through the GitHub checks API, which gh can't re-trigger. Opened the details page instead.`,
       lifespan: 8000,
     });
     return openUrl(b.data.url);
@@ -76,8 +76,8 @@ export const build: KindModule<'build'> = {
         run: () => void rerunBuild(b),
       },
       {
-        id: 'jenkins',
-        label: externalLabel(b.data.url),
+        id: 'open',
+        label: externalLabel(b.data),
         type: 'external',
         icon: <ExternalLinkIcon />,
         disabled: b.data.url ? undefined : 'No details URL',

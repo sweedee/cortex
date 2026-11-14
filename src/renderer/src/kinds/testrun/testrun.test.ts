@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemOf, TestRunData } from '../../domain';
-import { SEED_ITEMS, SEED_LINKS } from '../../seed';
+import { SEED_ITEMS, SEED_LINKS } from '../../testing/fakeWorld';
 import { mapTestState } from '../../sync/mapping';
 import { makeCtx } from '../registry';
 import { failingTests } from './failures';

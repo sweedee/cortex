@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GhRun } from '../../../../shared/integrations/github';
 import type { BuildData, ItemOf } from '../../domain';
-import { SEED_ITEMS, SEED_LINKS } from '../../seed';
+import { SEED_ITEMS, SEED_LINKS } from '../../testing/fakeWorld';
 import { makeCtx } from '../registry';
 import { build as buildKind } from './index';
-import { diffPatch, duration, externalLabel, isJenkinsUrl, rerunBlocked, rerunMode, runPatch, stageOf } from './logic';
+import { ciProvider, diffPatch, duration, externalLabel, isJenkinsUrl, rerunBlocked, rerunMode, runPatch, stageOf } from './logic';
 
 const seed = (id: string) => SEED_ITEMS.find((i) => i.id === id) as ItemOf<'build'>;
 const ctx = makeCtx(SEED_ITEMS, SEED_LINKS);
@@ -34,15 +34,21 @@ const run = (o: Partial<GhRun> = {}): GhRun => ({
   ...o,
 });
 
-describe('build: Jenkins vs Actions', () => {
-  it('detects Jenkins urls', () => {
+describe('build: CI providers', () => {
+  it('detects the provider', () => {
     expect(isJenkinsUrl('https://jenkins.acme.io/job/x/12/')).toBe(true);
     expect(isJenkinsUrl('https://ci.ctx.internal/job/console-ui/1838')).toBe(true);
     expect(isJenkinsUrl('https://github.com/o/r/actions/runs/1')).toBe(false);
     expect(isJenkinsUrl('https://circleci.com/gh/o/r/1')).toBe(false);
     expect(isJenkinsUrl('')).toBe(false);
-    expect(externalLabel('https://jenkins.acme.io/job/x')).toBe('Open in Jenkins');
-    expect(externalLabel('https://github.com/o/r/actions/runs/1')).toBe('Open details');
+    expect(ciProvider({ repo: 'o/r', runId: '7', url: 'https://github.com/o/r/actions/runs/7/job/9' })).toMatchObject({ id: 'github-actions', integrated: true, partition: 'persist:github' });
+    expect(ciProvider({ repo: 'unknown/x', url: 'https://github.com/o/r/actions/runs/7' })).toMatchObject({ id: 'github-actions', integrated: false });
+    expect(ciProvider({ repo: 'o/r', url: 'https://jenkins.acme.io/job/x/12/' })).toMatchObject({ id: 'jenkins', name: 'Jenkins', partition: 'persist:ci' });
+    expect(ciProvider({ repo: 'o/r', url: 'https://app.circleci.com/pipelines/1' })).toMatchObject({ id: 'other', name: 'app.circleci.com' });
+    expect(ciProvider({ repo: 'o/r', url: '' })).toMatchObject({ id: 'other', name: 'CI' });
+    expect(externalLabel({ repo: 'o/r', url: 'https://jenkins.acme.io/job/x' })).toBe('Open in Jenkins');
+    expect(externalLabel({ repo: 'o/r', runId: '1', url: 'https://github.com/o/r/actions/runs/1' })).toBe('Open in GitHub Actions');
+    expect(externalLabel({ repo: 'o/r', url: 'https://buildkite.com/x/1' })).toBe('Open details');
   });
   it('rerun mode: gh for Actions runs, the CI page otherwise', () => {
     expect(rerunMode(withData(seed('b-1838'), { runId: '123', repo: 'o/r' }).data)).toBe('actions');
@@ -54,10 +60,10 @@ describe('build: Jenkins vs Actions', () => {
   });
   it('actions: labels follow the CI, no placeholders, View details opens the sidebar', () => {
     const jenkins = actions(seed('b-1838'));
-    expect(jenkins.find((a) => a.id === 'jenkins')?.label).toBe('Open in Jenkins');
+    expect(jenkins.find((a) => a.id === 'open')?.label).toBe('Open in Jenkins');
     expect(jenkins.find((a) => a.id === 'rerun')).toMatchObject({ type: 'external', label: 'Re-run (on CI page)' });
     const gh = actions(withData(seed('b-1838'), { runId: '7', repo: 'o/r', url: 'https://github.com/o/r/actions/runs/7' }));
-    expect(gh.find((a) => a.id === 'jenkins')?.label).toBe('Open details');
+    expect(gh.find((a) => a.id === 'open')?.label).toBe('Open in GitHub Actions');
     expect(gh.find((a) => a.id === 'rerun')).toMatchObject({ type: 'direct', label: 'Re-run…' });
     expect(gh.find((a) => a.id === 'details')?.type).toBe('view');
   });

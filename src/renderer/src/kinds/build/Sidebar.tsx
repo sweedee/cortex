@@ -15,7 +15,7 @@ import { getState, inspect, patchData, select } from '../../store';
 import { agoText } from '../../tones';
 import { errorText, openUrl } from '../../ui/task';
 import type { KindCtx, SidebarProps } from '../types';
-import { diffPatch, duration, externalLabel, isJenkinsUrl, rerunMode, runPatch } from './logic';
+import { ciProvider, diffPatch, duration, externalLabel, rerunMode, runPatch } from './logic';
 import './build.css';
 
 type Build = ItemOf<'build'>;
@@ -29,11 +29,11 @@ export function BuildSidebar({ item, ctx }: SidebarProps<'build'>) {
         { id: 'overview', label: 'Overview', render: () => <Overview build={item} ctx={ctx} /> },
         {
           id: 'details',
-          label: isJenkinsUrl(item.data.url) ? 'Jenkins' : 'Details',
+          label: ciProvider(item.data).id === 'other' ? 'Details' : ciProvider(item.data).name,
           wide: true,
           render: () =>
             item.data.url ? (
-              <WebPanel src={/^https?:\/\//i.test(item.data.url) ? item.data.url : `https://${item.data.url}`} partition={isJenkinsUrl(item.data.url) ? 'persist:ci' : 'persist:github'} onOpenExternal={(u) => void openUrl(u)} />
+              <WebPanel src={/^https?:\/\//i.test(item.data.url) ? item.data.url : `https://${item.data.url}`} partition={ciProvider(item.data).partition} onOpenExternal={(u) => void openUrl(u)} />
             ) : (
               <SidebarSection>
                 <div className="build-state">No details URL known for this build.</div>
@@ -100,7 +100,7 @@ function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
             </Chip>
           )}
           <Chip size="condensed" color="neutral">
-            {actions ? 'GitHub Actions' : isJenkinsUrl(d.url) ? 'Jenkins' : 'external check'}
+            {ciProvider(d).name}
           </Chip>
         </div>
         <dl className="sidebar-facts">
@@ -113,7 +113,7 @@ function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
         </dl>
         {d.url && (
           <div className="build-url">
-            <button className="build-link" onClick={() => void openUrl(d.url)} title={externalLabel(d.url)}>
+            <button className="build-link" onClick={() => void openUrl(d.url)} title={externalLabel(d)}>
               {d.url}
             </button>
           </div>
@@ -137,7 +137,7 @@ function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
         </SidebarSection>
       ) : (
         <SidebarSection label="Jobs">
-          <div className="build-state">{isJenkinsUrl(d.url) ? 'Jenkins stages and logs are on the Jenkins page (Jenkins tab).' : 'Not a GitHub Actions run: see the Details tab.'}</div>
+          <div className="build-state">{ciProvider(d).id === 'other' ? 'Jobs and logs of this CI are on its details page (Details tab).' : `${ciProvider(d).name} jobs and logs are on its details page (${ciProvider(d).name} tab).`}</div>
         </SidebarSection>
       )}
       <ConnectionsSection item={b} ctx={ctx} />

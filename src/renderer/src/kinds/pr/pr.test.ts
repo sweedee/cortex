@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GhCheck } from '../../../../shared/integrations/github';
 import type { ItemOf, PrData } from '../../domain';
-import { SEED_ITEMS, SEED_LINKS } from '../../seed';
+import { SEED_ITEMS, SEED_LINKS } from '../../testing/fakeWorld';
 import { makeItem } from '../../store';
 import { makeCtx } from '../registry';
 import { buildKey, checkToBuild, planBuildSync, runIdFromUrl } from './builds';
