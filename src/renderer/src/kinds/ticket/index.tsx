@@ -1,4 +1,4 @@
-import { PlusIcon, SorterIcon, SuccessIcon } from '@dynatrace/strato-icons';
+import { PlusIcon, StepIcon, SuccessIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
 import { external, skill } from '../common';
 import { openNewWorktree } from '../project/worktreeFlow';
@@ -45,7 +45,7 @@ export const ticket: KindModule<'ticket'> = {
         id: 'status',
         label: 'Change status…',
         type: 'direct',
-        icon: <SorterIcon />,
+        icon: <StepIcon />,
         run: ([x]) => void openChangeStatus(x as ItemOf<'ticket'>),
       },
       {

@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { parse } from 'diff2html';
+import { ChevronDownSmallIcon, ChevronRightSmallIcon } from '@dynatrace/strato-icons';
 import type { DiffBlock, DiffFile } from 'diff2html/lib/types';
 import { parseDiffStats, type DiffFileStatus } from './diffStats';
 import '../viewers.css';
@@ -107,7 +108,7 @@ function FileSection({
   return (
     <section className="cxv-diff-file" id={id}>
       <button type="button" className="cxv-diff-file-head" onClick={onToggle} aria-expanded={open}>
-        <span className="cxv-diff-caret">{open ? '▾' : '▸'}</span>
+        <span className="cxv-diff-caret">{open ? <ChevronDownSmallIcon size={14} /> : <ChevronRightSmallIcon size={14} />}</span>
         <span className={`cxv-diff-status cxv-diff-status-${status}`}>{STATUS_LABEL[status]}</span>
         <span className="cxv-diff-name">{fileName(file)}</span>
         <span className="cxv-diff-counts">
