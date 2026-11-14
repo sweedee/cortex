@@ -95,6 +95,17 @@ export function browseUrl(issue: Pick<JiraIssue, 'key' | 'self'>): string {
   return m ? `${m[1]}/browse/${issue.key}` : '';
 }
 
+/**
+ * Browse URL of an issue key: from the issue's REST `self` when known, else the configured site
+ * (`integrations:config` → `jira.site`), else the mock's default site.
+ */
+export function jiraBrowseUrl(key: string, opts: { issue?: Pick<JiraIssue, 'key' | 'self'>; site?: string } = {}): string {
+  const fromIssue = opts.issue ? browseUrl(opts.issue) : '';
+  if (fromIssue) return fromIssue;
+  const site = (opts.site || 'https://example.atlassian.net').replace(/\/+$/, '');
+  return `${site}/browse/${key}`;
+}
+
 // ---- ADF ----------------------------------------------------------------------
 
 function inline(nodes: AdfNode[] = []): string {

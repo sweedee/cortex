@@ -1,26 +1,20 @@
 /** Ticket operations: change status, mark done (Jira first), open in Jira, refresh the cached fields. */
 import { queryClient } from '../../data/queryClient';
 import { qk } from '../../data/queryKeys';
-import { jiraOps } from '../../data/jira';
+import { jiraOps, jiraUrl } from '../../data/jira';
 import { itemById, patchData } from '../../store';
 import type { ItemOf } from '../../domain';
 import { native } from '../../native';
 import { ticketPatch } from '../../sync/mapping';
 import { openForm, str } from '../../ui/form';
 import { archive, toast } from '../common';
-import type { IntegrationConfig } from '../../../../shared/integrations/config';
-import type { JiraIssue } from '../../../../shared/integrations/jira';
 import { JIRA_STATUSES } from '../../../../shared/integrations/jira';
-import { jiraUrl, transitionToDone } from './model';
+import { transitionToDone } from './model';
 
 type Ticket = ItemOf<'ticket'>;
 
-/** Browse URL: from the cached issue, else the configured Jira site, else the mock's. */
-export function ticketUrl(key: string): string {
-  const issue = queryClient.getQueryData<JiraIssue>(qk.jira.issue(key));
-  const config = queryClient.getQueryData<IntegrationConfig>(qk.app.config());
-  return jiraUrl(key, { issue, site: config?.jira.site });
-}
+/** Browse URL of a ticket (see `jiraUrl` in data/jira.ts). */
+export const ticketUrl = jiraUrl;
 
 /** Re-read the issue and write status, assignee, sprint… (and the title) back to the bubble. */
 export async function refreshTicket(id: string): Promise<void> {

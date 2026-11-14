@@ -1,6 +1,7 @@
 /** App-level queries (`app:info`, `integrations:config`). */
 import { useQuery } from '@tanstack/react-query';
 import { native } from '../native';
+import { queryClient } from './queryClient';
 import { ready } from './ops';
 import { qk } from './queryKeys';
 
@@ -13,3 +14,6 @@ export function useAppInfo() {
 export function useIntegrationConfig() {
   return useQuery({ queryKey: qk.app.config(), queryFn: () => native.integrations.config(), enabled: ready(), staleTime: Infinity });
 }
+
+/** The same config outside React (cached for the app's lifetime). */
+export const loadIntegrationConfig = () => queryClient.ensureQueryData({ queryKey: qk.app.config(), queryFn: () => native.integrations.config(), staleTime: Infinity });

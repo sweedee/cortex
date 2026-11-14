@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { jiraUrl, linkRows, relatedIds, stepsToDone, transitionToDone } from './model';
+import { jiraBrowseUrl as jiraUrl } from '../../../../shared/integrations/jira';
+import { linkRows, relatedIds, stepsToDone, transitionToDone } from './model';
 
 describe('ticket model', () => {
   it('walks the workflow to Done', () => {

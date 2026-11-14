@@ -38,10 +38,10 @@ export function defaultPrTitle(w: Worktree, ticket?: ItemOf<'ticket'>): string {
   return w.data.ticketKey ? `${w.data.ticketKey}: ${text}` : text;
 }
 
-/** Body for a new PR: the linked ticket key with a link. */
-export function defaultPrBody(w: Worktree, ticket?: ItemOf<'ticket'>): string {
+/** Body for a new PR: the linked ticket key with a link (`url` = `jiraUrl` from data/jira.ts). */
+export function defaultPrBody(w: Worktree, ticket: ItemOf<'ticket'> | undefined, url: (key: string) => string): string {
   const key = ticket?.data.key ?? w.data.ticketKey;
-  return key ? `Ticket: [${key}](https://jira.ctx.internal/browse/${key})\n\n` : '';
+  return key ? `Ticket: [${key}](${url(key)})\n\n` : '';
 }
 
 /** Open PRs of the project (candidates to stack on), excluding the worktree's own. */

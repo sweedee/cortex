@@ -2,6 +2,7 @@
 import { gitOps } from '../../data/git';
 import { appOps } from '../../data/apps';
 import { ghOps } from '../../data/gh';
+import { jiraUrl } from '../../data/jira';
 import { testOps } from '../../data/tests';
 import type { Item, ItemOf } from '../../domain';
 import { place } from '../../layout';
@@ -28,7 +29,7 @@ export async function createPr(w: Worktree, ctx: KindCtx) {
     title: 'Create pull request',
     description: `${w.data.branch} → ${w.data.baseBranch} in ${project.data.repo}. The branch is pushed to origin first.`,
     submitLabel: 'Push & create PR',
-    values: { title: defaultPrTitle(w, ticket), body: defaultPrBody(w, ticket), base: w.data.baseBranch, draft: false, stackOn: '' },
+    values: { title: defaultPrTitle(w, ticket), body: defaultPrBody(w, ticket, jiraUrl), base: w.data.baseBranch, draft: false, stackOn: '' },
     fields: [
       { name: 'title', label: 'Title', type: 'text', required: true },
       { name: 'body', label: 'Description', type: 'textarea', rows: 6 },

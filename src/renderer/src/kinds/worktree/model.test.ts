@@ -41,8 +41,9 @@ describe('worktree model', () => {
   });
   it('defaults the PR title and body', () => {
     expect(defaultPrTitle(wt())).toBe('CTX-12: Retry backoff');
-    expect(defaultPrBody(wt())).toContain('[CTX-12]');
-    expect(defaultPrBody(wt({ ticketKey: undefined }))).toBe('');
+    const url = (k: string) => `https://acme.atlassian.net/browse/${k}`;
+    expect(defaultPrBody(wt(), undefined, url)).toBe('Ticket: [CTX-12](https://acme.atlassian.net/browse/CTX-12)\n\n');
+    expect(defaultPrBody(wt({ ticketKey: undefined }), undefined, url)).toBe('');
   });
   it('stacks on the parent PR head branch', () => {
     const prs = [pr('a', 'feat/a'), pr('b', 'feat/b', 'merged'), pr('own', 'feat/CTX-12-retry-backoff')];

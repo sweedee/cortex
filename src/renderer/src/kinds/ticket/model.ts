@@ -1,5 +1,5 @@
-/** Pure helpers of the ticket kind: workflow, browse URL, "mark done" fallback, related items. */
-import { browseUrl, type JiraIssue } from '../../../../shared/integrations/jira';
+/** Pure helpers of the ticket kind: workflow, "mark done" fallback, related items. */
+import type { JiraIssue } from '../../../../shared/integrations/jira';
 
 /** The main flow of the (mock) workflow, in order. A real site's workflow is whatever Jira allows. */
 const FLOW = ['To Do', 'In Progress', 'In Review', 'Done'];
@@ -10,14 +10,6 @@ export function stepsToDone(status: string): string[] {
   if (at === FLOW.length - 1) return [];
   if (at < 0) return status.toLowerCase() === 'blocked' ? FLOW.slice(1) : ['Done'];
   return FLOW.slice(at + 1);
-}
-
-/** Browse URL of a ticket: from the issue's REST `self` when known, else the configured site. */
-export function jiraUrl(key: string, opts: { issue?: Pick<JiraIssue, 'key' | 'self'>; site?: string } = {}): string {
-  const fromIssue = opts.issue ? browseUrl(opts.issue) : '';
-  if (fromIssue) return fromIssue;
-  const site = (opts.site ?? 'https://example.atlassian.net').replace(/\/+$/, '');
-  return `${site}/browse/${key}`;
 }
 
 export type DoneResult = { ok: true; via: 'direct' | 'steps' } | { ok: false; error: string };

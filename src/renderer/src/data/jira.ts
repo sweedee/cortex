@@ -1,9 +1,11 @@
 /** Jira (`native.jira.*`, the mock CLI or acli): issues, searches, and the write ops. */
 import { useQuery } from '@tanstack/react-query';
-import { summarizeIssue } from '../../../shared/integrations/jira';
+import type { IntegrationConfig } from '../../../shared/integrations/config';
+import { jiraBrowseUrl, summarizeIssue, type JiraIssue } from '../../../shared/integrations/jira';
 import type { JiraCreateIssueRequest, JiraEditIssueRequest } from '../../../shared/ipc';
 import { native } from '../native';
 import { invalidate, ready } from './ops';
+import { queryClient } from './queryClient';
 import { qk } from './queryKeys';
 
 /** Full issue (REST v3 shape: ADF description, comments, links, …). */
@@ -18,6 +20,16 @@ export function useJiraIssueSummary(key: string | undefined) {
 
 export function useJiraSearch(jql: string | undefined, limit?: number) {
   return useQuery({ queryKey: qk.jira.search(jql ?? '', limit), queryFn: () => native.jira.search(jql!, { limit }), enabled: ready(jql) });
+}
+
+/**
+ * Browse URL of an issue key: the cached issue's site (REST `self`), else the configured Jira site
+ * (`integrations:config`, prefetched by `startSync`), else the mock's. The one place that builds Jira links.
+ */
+export function jiraUrl(key: string): string {
+  const issue = queryClient.getQueryData<JiraIssue>(qk.jira.issue(key));
+  const config = queryClient.getQueryData<IntegrationConfig>(qk.app.config());
+  return jiraBrowseUrl(key, { issue, site: config?.jira.site });
 }
 
 /** Writes. Each invalidates the issue and every search. */
