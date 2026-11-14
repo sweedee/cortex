@@ -5,7 +5,9 @@
  */
 import { ProgressCircle } from '@dynatrace/strato-components/content';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
+import { useEffect } from 'react';
 import { native } from '../native';
+import { startProgressToast } from './progressToast';
 
 /** A readable message of a failed native call (strips Electron's "Error invoking remote method …"). */
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -26,20 +28,20 @@ export interface TaskOptions<T> {
  *   await runTask('Merging #482', ghOps.prMerge(repo, 482, 'squash'), { success: '#482 merged' });
  */
 export async function runTask<T>(label: string, work: Promise<T> | (() => Promise<T>), opts: TaskOptions<T> = {}): Promise<T | undefined> {
-  const id = showToast({
-    type: 'info',
-    title: `${label}…`,
-    lifespan: 'infinite',
-    message: (
-      <span className="task-progress">
-        <ProgressCircle size="small" aria-label={label} />
-        <span>Working on it</span>
-      </span>
-    ),
+  const progress = startProgressToast({
+    show: (id) =>
+      void showToast({
+        id,
+        type: 'info',
+        title: `${label}…`,
+        lifespan: 'infinite',
+        message: <TaskProgress label={label} onMount={() => progress.mounted()} />,
+      }),
+    dismiss: dismissToast,
   });
   try {
     const result = await (typeof work === 'function' ? work() : work);
-    dismissToast(id);
+    progress.finish();
     if (!opts.quiet) {
       const title = typeof opts.success === 'function' ? opts.success(result) : (opts.success ?? `${label} done`);
       const message = typeof opts.message === 'function' ? opts.message(result) : opts.message;
@@ -47,11 +49,23 @@ export async function runTask<T>(label: string, work: Promise<T> | (() => Promis
     }
     return result;
   } catch (e) {
-    dismissToast(id);
+    progress.finish();
     console.warn(`[task] ${label} failed`, e);
     showToast({ type: 'critical', title: `${label} failed`, message: errorText(e), lifespan: 10_000 });
     return undefined;
   }
+}
+
+/** The spinner toast's content; tells the controller when the (possibly queued) toast is really on screen. */
+function TaskProgress({ label, onMount }: { label: string; onMount: () => void }) {
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- once, when the toast appears
+  useEffect(onMount, []);
+  return (
+    <span className="task-progress">
+      <ProgressCircle size="small" aria-label={label} />
+      <span>Working on it</span>
+    </span>
+  );
 }
 
 const failed = (what: string, error?: string) => showToast({ type: 'warning', title: `Could not open ${what}`, message: error, lifespan: 6000 });
