@@ -56,7 +56,7 @@ export function effortChoices(catalog?: Pick<ClaudeCatalog, 'models'>, model?: s
 export type PermissionValue = 'default' | 'manual' | 'acceptEdits' | 'plan' | 'auto' | 'dontAsk' | 'bypassPermissions';
 
 export const PERMISSION_CHOICES: (Choice<PermissionValue> & { value: PermissionValue; tone?: 'warning' | 'critical' })[] = [
-  { value: 'default', label: 'CLI default', short: 'ask', hint: 'No flag: the CLI’s configured mode' },
+  { value: 'default', label: 'CLI default', short: 'mode', hint: 'No flag: the CLI’s configured permission mode' },
   { value: 'manual', label: 'manual', short: 'manual', hint: 'Ask before every tool' },
   { value: 'acceptEdits', label: 'acceptEdits', short: 'accept edits', hint: 'Edits run, other tools ask' },
   { value: 'plan', label: 'plan', short: 'plan', hint: 'Read-only planning, no changes' },

@@ -345,6 +345,44 @@ export async function runRepoSmoke(win: BrowserWindow) {
   });
   await shot('agent-harness');
 
+  await step('agent harness: subagent group + strip, live model switch, status bar, / autocomplete', async () => {
+    if (!/fake-claude/.test(process.env['CORTEX_CLAUDE_BIN'] ?? '')) throw new Error('skipped: set CORTEX_CLAUDE_BIN to the fake CLI (no real sessions in the smoke)');
+    const r1 = await page<{ chips: number; nested: string[] }>(`async (d, h) => {
+      const wt = d.itemById(${J(wtId)});
+      const id = await d.sendPrompt('agent: map the code of @' + wt.handle, [wt.id]);
+      d.select([id]); d.inspect(id);
+      await h.until(() => d.itemById(id), (a) => a && a.data.status === 'done', 20000, 'done');
+      const head = await h.until(() => h.$('.ah-subagent-head'), Boolean, 10000, 'subagent group');
+      head.click();
+      await h.until(() => h.$('.ah-subagent-body .ah-tool-row'), Boolean, 5000, 'nested tools');
+      const nested = [...document.querySelectorAll('.ah-subagent-body .ah-tool-name')].map((e) => e.textContent);
+      const chips = document.querySelectorAll('.ah-subchip').length;
+      h.$('.ah-subagent').scrollIntoView({ block: 'start' });
+      h.agentId = id;
+      return { chips, nested };
+    }`);
+    if (!r1.nested.includes('Glob') || !r1.chips) throw new Error(`subagent not shown: ${J(r1)}`);
+    await shot('agent-subagents');
+    const r = await page<{ badge: string; model: string; note: string; status: string; slash: string[] }>(`async (d, h) => {
+      const id = h.agentId;
+      // live model switch through the composer picker's op
+      const s = await window.cortex.claude.configure(id, { model: 'sonnet', permissionMode: 'acceptEdits', effort: 'high' });
+      const a = await h.until(() => d.itemById(id), (x) => /sonnet/.test(x.data.model || ''), 10000, 'model switched');
+      await h.until(() => h.$('.ah-note'), Boolean, 10000, 'switch note');
+      // / autocomplete in the sidebar composer
+      const ta = h.$('.ah-composer textarea');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, '/re');
+      ta.setSelectionRange(3, 3);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      const pop = await h.until(() => h.$('.ah-slash'), Boolean, 5000, 'slash popup');
+      const slash = [...pop.querySelectorAll('.chat-option-main')].map((e) => e.textContent);
+      return { badge: JSON.stringify(s), model: a.data.model, note: h.$('.ah-note').textContent, status: h.$('.ah-status').textContent, slash };
+    }`);
+    return `nested ${r1.nested.join(', ')}, ${r1.chips} badge(s); configure ${r.badge}; model ${r.model}; note "${r.note}"; slash ${r.slash.join(' ')}; status "${r.status}"`;
+  });
+  await shot('agent-slash-and-switch');
+  await page(`async (d, h) => { const ta = h.$('.ah-composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, ''); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.blur(); return true; }`).catch(() => false);
+
   await step('settings dialog (HUD gear)', async () => {
     const f = await page<{ values: Record<string, unknown> } | undefined>(`async (d, h) => {
       d.inspect(null);
