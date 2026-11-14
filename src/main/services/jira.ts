@@ -53,7 +53,8 @@ export class JiraService {
   }
 
   private acli(args: string[]) {
-    return runOk(this.run, this.spec.command, this.argv(args), { cwd: this.cwd, env: this.spec.env });
+    // the mock runs as `<electron> <script> jira workitem …`: name it by what it does in errors
+    return runOk(this.run, this.spec.command, this.argv(args), { cwd: this.cwd, env: this.spec.env }, `jira ${args.filter((a) => !a.startsWith('-')).slice(0, 2).join(' ')}`.trim());
   }
 
   async search(jql: string, opts: { limit?: number; fields?: string[] } = {}): Promise<JiraIssue[]> {

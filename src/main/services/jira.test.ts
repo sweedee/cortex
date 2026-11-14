@@ -56,6 +56,7 @@ describe('jira-mock + JiraService', () => {
   });
 
   it('validates transitions against the workflow', async () => {
+    await expect(jira.transition('CTX-4840', 'Done')).rejects.toThrow(/^jira transition CTX-4840: transition to "Done" is not available/);
     await expect(jira.transition('CTX-4840', 'Done')).rejects.toThrow(/not available for CTX-4840 \(status "To Do"\)\. Available: In Progress, Blocked/);
     await jira.transition('CTX-4840', 'in progress');
     expect((await jira.view('CTX-4840')).fields.status.name).toBe('In Progress');

@@ -22,11 +22,12 @@ export class CliError extends Error {
   readonly code: number | null;
   readonly stderr: string;
   readonly stdout: string;
-  constructor(cmd: string, args: string[], r: ExecResult) {
-    const detail = (r.stderr || r.stdout).trim() || (r.timedOut ? 'timed out' : `exit code ${r.code}`);
+  /** `label` replaces the "<cmd> <subcommand>" prefix of the message (e.g. "jira transition" for the mock run through electron) */
+  constructor(cmd: string, args: string[], r: ExecResult, label?: string) {
+    const detail = (r.stderr || r.stdout).trim().replace(/^Error: /, '') || (r.timedOut ? 'timed out' : `exit code ${r.code}`);
     // "gh pr create: …", "git worktree remove: …" (the subcommand, not its options / values)
     const sub = args.slice(0, args.findIndex((a) => a.startsWith('-')) >>> 0).slice(0, 3);
-    super(`${[cmd, ...sub].join(' ')}: ${detail}`);
+    super(`${label ?? [cmd, ...sub].join(' ')}: ${detail}`);
     this.name = 'CliError';
     this.cmd = cmd;
     this.args = args;
@@ -37,9 +38,9 @@ export class CliError extends Error {
 }
 
 /** Run and throw `CliError` on a non-zero exit; resolves stdout. */
-export async function runOk(run: Runner, cmd: string, args: string[], opts: RunOptions): Promise<string> {
+export async function runOk(run: Runner, cmd: string, args: string[], opts: RunOptions, label?: string): Promise<string> {
   const r = await run(cmd, args, opts);
-  if (r.code !== 0) throw new CliError(cmd, args, r);
+  if (r.code !== 0) throw new CliError(cmd, args, r, label);
   return r.stdout;
 }
 

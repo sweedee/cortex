@@ -308,7 +308,8 @@ export async function runRepoSmoke(win: BrowserWindow) {
       await h.sleep(1000);
       return t;
     }`);
-    const jump = to === 'Done' ? 'In Review' : 'Done';
+    // a move the workflow doesn't allow from there (To Do → Done, later states → To Do)
+    const jump = to === 'To Do' ? 'Done' : to === 'Done' ? 'In Review' : 'To Do';
     const bad = await page<string | null>(`async (d, h) => {
       d.runAction(${J(ticketId)}, 'status');
       await h.form('Change status');
