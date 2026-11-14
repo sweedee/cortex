@@ -82,7 +82,7 @@ describe('agentTarget / naming', () => {
   });
 
   it('titles and unique handles', () => {
-    expect(agentTitle('plan-ticket', ticket)).toBe('Plan CTX-4821');
+    expect(agentTitle('plan', ticket)).toBe('Plan CTX-4821');
     expect(agentTitle(undefined, undefined)).toBe('Chat');
     const taken = new Set(['agent/implement-ctx4821']);
     expect(agentHandle('implement', ticket, (h) => taken.has(h))).toBe('agent/implement-ctx4821-2');

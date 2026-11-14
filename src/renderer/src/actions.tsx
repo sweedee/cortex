@@ -24,7 +24,7 @@ export { actionsForItem } from './kinds/registry';
 function multiActions(items: Item[]): Action[] {
   const kinds = new Set(items.map((i) => i.kind));
   const out: Action[] = [skill('ask', 'Ask about these', '', { icon: <ChatIcon />, primary: true, run: (xs) => insertSkill(null, xs.map((x) => x.id)) })];
-  if (kinds.has('ticket')) out.push(skill('plan-multi', 'Plan together', 'plan-ticket'));
+  if (kinds.has('ticket')) out.push(skill('plan-multi', 'Plan together', 'plan'));
   if (kinds.size === 1 && kinds.has('pr')) out.push(skill('review-multi', 'Review all', 'review-pr'));
   if (kinds.size === 1 && kinds.has('build')) out.push(skill('fix-multi', 'Fix all builds', 'fix-ci'));
   out.push(skill('summary', 'Status summary', 'status-summary'));

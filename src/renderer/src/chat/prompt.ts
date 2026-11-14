@@ -132,17 +132,20 @@ export function agentTarget(mentioned: Item[]): ItemOf<'agent'> | null {
 
 /** "Plan CTX-4821", "Chat wt/retry", from the skill and the first mention. */
 const AGENT_TITLE: Record<string, string> = {
-  'plan-ticket': 'Plan',
-  implement: 'Implement',
-  'fix-ci': 'Fix CI',
-  'review-pr': 'Review',
-  'self-review': 'Self-review',
-  'address-review': 'Address review',
-  'resolve-conflicts': 'Resolve conflicts',
-  'create-pr': 'Create PR',
-  'grill-plan': 'Grill plan',
-  'implement-plan': 'Implement plan',
+  plan: 'Plan',
   brainstorm: 'Brainstorm',
+  grill: 'Grill',
+  implement: 'Implement',
+  rebase: 'Rebase',
+  review: 'Review',
+  'review-pr': 'Review',
+  'address-review': 'Address review',
+  'describe-pr': 'Describe',
+  'fix-ci': 'Fix CI',
+  'explain-build': 'Explain',
+  'fix-tests': 'Fix tests',
+  'create-ticket': 'New ticket',
+  'review-renovate': 'Renovate',
 };
 export function agentTitle(skill: string | undefined, subject: Item | undefined): string {
   return `${skill ? (AGENT_TITLE[skill] ?? skill) : 'Chat'}${subject ? ` ${subject.handle}` : ''}`;
