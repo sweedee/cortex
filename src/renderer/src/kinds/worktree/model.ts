@@ -2,7 +2,7 @@
 import type { GitFileChange } from '../../../../shared/integrations/git';
 import type { AppStartRequest, TestRunRequest } from '../../../../shared/integrations/runners';
 import type { GhPrCreateRequest } from '../../../../shared/ipc';
-import type { ItemOf } from '../../domain';
+import type { Item, ItemOf } from '../../domain';
 
 type Worktree = ItemOf<'worktree'>;
 type Project = ItemOf<'project'>;
@@ -102,3 +102,36 @@ export function removeDisabled(w: Worktree, project: Project | undefined): strin
 /** Runner requests for the app / test item of a worktree; the runner id is the item id. */
 export const appRequest = (id: string, w: Worktree, command: string): AppStartRequest => ({ id, cwd: w.data.path, command });
 export const testRequest = (id: string, w: Worktree, command: string): TestRunRequest => ({ id, cwd: w.data.path, command });
+
+// ---- processes inside a worktree (stopped before `git worktree remove`) ------------------
+
+const normPath = (p: string) => {
+  const s = p.replace(/\\/g, '/').replace(/\/+$/, '');
+  return /^[a-zA-Z]:/.test(s) ? s.toLowerCase() : s;
+};
+/** `p` is the worktree folder or inside it. */
+export const isInside = (p: string | undefined, dir: string) => !!p && (normPath(p) === normPath(dir) || normPath(p).startsWith(normPath(dir) + '/'));
+
+export interface LiveInWorktree {
+  /** agent session ids (`localId`) with a process that may hold the folder */
+  agents: string[];
+  /** app runner ids */
+  apps: string[];
+  /** test runner ids */
+  tests: string[];
+}
+
+/**
+ * What runs in the worktree and would keep Windows from deleting it: agent sessions started there
+ * (their process lives on after a turn), running apps and test runs that Cortex started.
+ */
+export function liveInWorktree(items: Item[], dir: string): LiveInWorktree {
+  const out: LiveInWorktree = { agents: [], apps: [], tests: [] };
+  for (const i of items) {
+    if (i.archived) continue;
+    if (i.kind === 'agent' && i.data.localId && isInside(i.data.cwd, dir) && i.data.status !== 'failed') out.agents.push(i.data.localId);
+    if (i.kind === 'app' && i.data.procId && isInside(i.data.cwd, dir) && (i.data.state === 'running' || i.data.state === 'starting')) out.apps.push(i.data.procId);
+    if (i.kind === 'testrun' && i.data.procId && isInside(i.data.cwd, dir) && i.data.state === 'running') out.tests.push(i.data.procId);
+  }
+  return out;
+}

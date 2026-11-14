@@ -63,7 +63,7 @@ export async function openSettings() {
     fields: [
       { name: 'model', label: 'Claude model', type: 'text', placeholder: 'CLI default', hint: 'An alias (opus, sonnet) or a full model id. Blank = whatever the claude CLI uses.' },
       { name: 'permissionMode', label: 'Permission mode', type: 'select', options: PERMISSION_MODES, hint: 'claude --permission-mode for new sessions. Tool prompts show up as Allow / Deny on the agent bubble.' },
-      { name: 'aiReviewComment', label: 'AI review comment', type: 'text', placeholder: config?.github.aiReviewComment ?? '@claude review', hint: 'Posted on a PR by “Request AI review”. Blank = the default above.' },
+      { name: 'aiReviewComment', label: 'AI review comment', type: 'text', placeholder: config?.github.aiReviewComment ?? '@claude review', hint: 'Posted on a PR by “Request AI review”. Blank = the default shown.' },
       { name: 'refreshSec', label: 'Background refresh (seconds)', type: 'text', required: true, validate: validRefresh, hint: 'How often git / GitHub / Jira caches on the bubbles refresh (15 s while checks or builds run).' },
       { name: 'desktopNotify', label: 'Desktop notifications when Cortex is in the background', type: 'checkbox' },
       { name: 'soundOn', label: 'Sound for new notices', type: 'checkbox' },

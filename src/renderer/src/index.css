@@ -600,6 +600,8 @@ body {
 }
 .sidebar-kind {
   display: inline-flex;
+  flex: none;
+  white-space: nowrap;
   align-items: center;
   gap: 6px;
   font-size: 11px;
@@ -1674,4 +1676,10 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ---- toasts: top left, under the brand (bottom left they covered the chat dock and its actions) -- */
+body .Toastify__toast-container.Toastify__toast-container--bottom-left {
+  top: 64px;
+  bottom: auto;
 }

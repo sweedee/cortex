@@ -7,12 +7,15 @@ import { testOps } from '../../data/tests';
 import type { Item, ItemOf } from '../../domain';
 import { place } from '../../layout';
 import { native } from '../../native';
-import { addItem, addLink, getState, inspect, makeItem, patchData, removeItems, select } from '../../store';
+import { addItem, addLink, getState, inspect, makeItem, patchData, removeItems, select, setArchived } from '../../store';
 import { openForm, str } from '../../ui/form';
 import { errorText, runTask } from '../../ui/task';
 import { archive, toast } from '../common';
 import type { KindCtx } from '../types';
-import { appRequest, defaultPrBody, defaultPrTitle, isAbsolutePath, prBase, stackCandidates, testRequest, type PrFormValues } from './model';
+import { claudeOps } from '../../data/claude';
+import { appRequest, defaultPrBody, defaultPrTitle, isAbsolutePath, liveInWorktree, prBase, stackCandidates, testRequest, type PrFormValues } from './model';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Worktree = ItemOf<'worktree'>;
 
@@ -52,7 +55,11 @@ export async function createPr(w: Worktree, ctx: KindCtx) {
       const parent = prs.find((p) => p.id === form.stackOn);
       const base = prBase(form, prs);
       await gitOps.push(w.data.path, { setUpstream: true });
-      const { number, url } = await ghOps.prCreate({ dir: w.data.path, repo: project.data.repo, title: form.title.trim(), body: form.body, base, head: w.data.branch, draft: form.draft || undefined });
+      const { number, url } = await ghOps
+        .prCreate({ dir: w.data.path, repo: project.data.repo, title: form.title.trim(), body: form.body, base, head: w.data.branch, draft: form.draft || undefined })
+        .catch((e: unknown) => {
+          throw new Error(`${w.data.branch} was pushed to origin, but gh pr create failed: ${errorText(e)}`);
+        });
       const existing = getState().items.find((i) => i.kind === 'pr' && i.data.repo === project.data.repo && i.data.number === number);
       const links = [
         { from: '', to: w.id, label: 'from branch' },
@@ -175,9 +182,17 @@ export async function removeWorktree(w: Worktree, ctx: KindCtx) {
       dirtyFiles = w.data.git?.changedFiles ?? 0;
     }
   } else dirtyFiles = w.data.git?.changedFiles ?? 0;
+  const live = real ? liveInWorktree(getState().items, w.data.path) : { agents: [], apps: [], tests: [] };
+  const running = [
+    live.agents.length && `${live.agents.length} agent session${live.agents.length === 1 ? '' : 's'}`,
+    live.apps.length && `${live.apps.length} app${live.apps.length === 1 ? '' : 's'}`,
+    live.tests.length && `${live.tests.length} test run${live.tests.length === 1 ? '' : 's'}`,
+  ].filter(Boolean);
   await openForm({
     title: 'Remove worktree?',
-    description: real ? `git worktree remove ${w.data.path}. The branch ${w.data.branch} is kept.` : 'This worktree has no checkout on disk; it is only archived on the canvas.',
+    description: real
+      ? `git worktree remove ${w.data.path}. The branch ${w.data.branch} is kept.${running.length ? ` Stops what runs in it first: ${running.join(', ')}.` : ''}`
+      : 'This worktree has no checkout on disk; it is only archived on the canvas.',
     submitLabel: 'Remove',
     danger: true,
     fields: [
@@ -191,13 +206,28 @@ export async function removeWorktree(w: Worktree, ctx: KindCtx) {
     ],
     onSubmit: async (v) => {
       if (real) {
+        // processes running in the folder keep Windows from deleting it
+        const stops = [...live.agents.map((id) => claudeOps.stop(id)), ...live.apps.map((id) => appOps.stop(id)), ...live.tests.map((id) => testOps.stop(id))];
+        if (stops.length) {
+          await Promise.allSettled(stops);
+          await sleep(1500);
+        }
+        const remove = () => gitOps.worktreeRemove(project!.data.baseDir!, w.data.path, { force: v.force === true });
         try {
-          await gitOps.worktreeRemove(project!.data.baseDir!, w.data.path, { force: v.force === true });
+          await remove().catch(async (e: unknown) => {
+            // a process that only just exited may still hold a handle for a moment
+            if (!/permission denied|being used|resource busy|directory not empty/i.test(errorText(e))) throw e;
+            await sleep(2500);
+            await remove();
+          });
         } catch (e) {
           throw new Error(errorText(e));
         }
       }
-      archive([w], 'Removed');
+      if (!real) return archive([w], 'Archived');
+      // the checkout is gone: no undo (it would bring back a bubble without a folder)
+      setArchived([w.id], true);
+      toast(`Removed ${w.handle}`, `${w.data.path} is deleted; the branch ${w.data.branch} is kept. Archived on the canvas.`);
     },
   });
 }

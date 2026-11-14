@@ -24,7 +24,9 @@ export class CliError extends Error {
   readonly stdout: string;
   constructor(cmd: string, args: string[], r: ExecResult) {
     const detail = (r.stderr || r.stdout).trim() || (r.timedOut ? 'timed out' : `exit code ${r.code}`);
-    super(`${cmd} ${args.slice(0, 3).join(' ')}: ${detail}`);
+    // "gh pr create: …", "git worktree remove: …" (the subcommand, not its options / values)
+    const sub = args.slice(0, args.findIndex((a) => a.startsWith('-')) >>> 0).slice(0, 3);
+    super(`${[cmd, ...sub].join(' ')}: ${detail}`);
     this.name = 'CliError';
     this.cmd = cmd;
     this.args = args;

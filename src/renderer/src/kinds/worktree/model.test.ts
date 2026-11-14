@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ItemOf } from '../../domain';
-import { buildPrRequest, defaultPrBody, defaultPrTitle, isAbsolutePath, launchDisabled, prBase, removeDisabled, stackCandidates, statusLetter, testsDisabled } from './model';
+import type { Item, ItemOf } from '../../domain';
+import { buildPrRequest, defaultPrBody, defaultPrTitle, isAbsolutePath, isInside, launchDisabled, liveInWorktree, prBase, removeDisabled, stackCandidates, statusLetter, testsDisabled } from './model';
 
 const base = { createdAt: 0, updatedAt: 0 };
 const wt = (over: Partial<ItemOf<'worktree'>['data']> = {}): ItemOf<'worktree'> => ({
@@ -60,5 +60,24 @@ describe('worktree model', () => {
     expect(testsDisabled(wt(), project({ testCommand: undefined }))).toMatch(/test command/);
     expect(removeDisabled(wt(), project({ baseDir: undefined }))).toMatch(/base checkout/);
     expect(removeDisabled(wt({ path: '~/wt/x' }), undefined)).toBeUndefined();
+  });
+});
+
+describe('processes in a worktree', () => {
+  it('finds agent sessions, running apps and test runs inside the folder (case / slash insensitive on Windows)', () => {
+    const mk = (kind: string, data: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ id: kind + Math.random(), kind, handle: 'h', title: 't', createdAt: 0, updatedAt: 0, data, ...extra }) as unknown as Item;
+    const dir = String.raw`C:\wt\x`;
+    const items = [
+      mk('agent', { localId: 'a1', cwd: 'c:/WT/x', status: 'done' }),
+      mk('agent', { localId: 'a2', cwd: 'C:/wt/x-other', status: 'running' }),
+      mk('agent', { cwd: dir, status: 'running' }),
+      mk('app', { procId: 'p1', cwd: String.raw`C:\wt\x\web`, state: 'running', command: 'x' }),
+      mk('app', { procId: 'p2', cwd: dir, state: 'stopped', command: 'x' }),
+      mk('testrun', { procId: 't1', cwd: dir, state: 'running', command: 'x' }),
+      mk('testrun', { procId: 't2', cwd: dir, state: 'running', command: 'x' }, { archived: true }),
+    ];
+    expect(liveInWorktree(items, dir)).toEqual({ agents: ['a1'], apps: ['p1'], tests: ['t1'] });
+    expect(isInside(dir, 'C:/wt/x/')).toBe(true);
+    expect(isInside(undefined, 'C:/wt/x')).toBe(false);
   });
 });

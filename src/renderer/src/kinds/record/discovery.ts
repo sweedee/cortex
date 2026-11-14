@@ -34,6 +34,8 @@ export async function scanProject(project: Project): Promise<number> {
   const dir = recordsDir(baseDir);
   let entries;
   try {
+    // ask the parent first: a missing folder is normal and should not log an IPC error every poll
+    if (!(await hasRecordsDir(baseDir))) return 0;
     entries = await native.fs.list(dir, { glob: '**/*.md' });
   } catch {
     return 0; // no records folder (yet)
@@ -63,8 +65,15 @@ export async function scanProject(project: Project): Promise<number> {
   return plan.add.length + plan.update.length;
 }
 
+/** `<baseDir>/records` exists (listing the base checkout, not the folder itself, never throws ENOENT). */
+async function hasRecordsDir(baseDir: string): Promise<boolean> {
+  const entries = await native.fs.list(baseDir, { glob: 'records' }).catch(() => []);
+  return entries.some((e) => e.isDir && e.name === 'records');
+}
+
 async function startWatch(project: Project, w: Watch) {
   try {
+    if (!(await hasRecordsDir(current(project).data.baseDir ?? ''))) throw new Error('no records folder');
     const id = await native.fs.watch(w.dir);
     if (w.stopped) {
       void native.fs.unwatch(id);

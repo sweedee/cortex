@@ -153,7 +153,10 @@ export function agentTitle(skill: string | undefined, subject: Item | undefined)
 
 /** A handle not used by any item: `agent/implement-ctx4821`, then `-2`, `-3`, … */
 export function agentHandle(skill: string | undefined, subject: Item | undefined, taken: (h: string) => boolean): string {
-  const base = `agent/${(skill ?? 'chat') + (subject ? '-' + subject.handle.replace(/[^\w]/g, '').toLowerCase().slice(-8) : '')}`;
+  // the ticket key when the subject has one (wt/CTX-4821-retry-… → ctx4821), else the end of its handle
+  const key = subject?.handle.match(/[A-Z][A-Z0-9]+-\d+/)?.[0];
+  const tail = subject ? (key ?? subject.handle).replace(/[^\w]/g, '').toLowerCase().slice(key ? 0 : -8) : '';
+  const base = `agent/${(skill ?? 'chat') + (tail ? '-' + tail : '')}`;
   if (!taken(base)) return base;
   for (let n = 2; ; n++) if (!taken(`${base}-${n}`)) return `${base}-${n}`;
 }
