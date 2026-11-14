@@ -26,7 +26,7 @@ export type Dialog =
   | { type: 'confirm'; title: string; body: string; confirm: string; danger?: boolean; onConfirm: () => void }
   | null;
 
-export const EMPTY_FILTER: Filter = { hiddenKinds: [], status: [], projects: [], query: '', unreadOnly: false, showArchived: false };
+export const EMPTY_FILTER: Filter = { kinds: [], status: [], projects: [], query: '', unreadOnly: false, showArchived: false };
 
 /** Matches of the @-query being typed in the chat box, highlighted on the canvas. */
 export interface Search {
@@ -130,7 +130,7 @@ export function visibleSet(s: State = getState()): Set<string> {
   const ids = new Set<string>();
   for (const i of s.items) {
     if (i.archived && !f.showArchived) continue;
-    if (f.hiddenKinds.includes(i.kind)) continue;
+    if (f.kinds.length && !f.kinds.includes(i.kind)) continue;
     if (groups.length && !groups.some((g) => g.test(info!.get(i.id)?.ring ?? []))) continue;
     if (roots && !(f.projects.includes(i.id) || i.projectId && f.projects.includes(i.projectId) || roots.get(i.id)?.some((r) => f.projects.includes(r)))) continue;
     if (f.unreadOnly && !(i.notice && !i.notice.read)) continue;
@@ -143,7 +143,7 @@ export function visibleSet(s: State = getState()): Set<string> {
 export const useVisible = () => useStore(visibleSet);
 
 export const activeFilterCount = (f: Filter) =>
-  f.hiddenKinds.length + f.status.length + f.projects.length + (f.query.trim() ? 1 : 0) + (f.unreadOnly ? 1 : 0) + (f.showArchived ? 1 : 0);
+  f.kinds.length + f.status.length + f.projects.length + (f.query.trim() ? 1 : 0) + (f.unreadOnly ? 1 : 0) + (f.showArchived ? 1 : 0);
 
 /** Drop selection / inspection of items that are no longer visible. */
 const prune = (s: State): State => {
@@ -156,8 +156,8 @@ const prune = (s: State): State => {
 export const setFilter = (patch: Partial<Filter>) => setState((s) => prune({ ...s, filter: { ...s.filter, ...patch } }));
 export const resetFilter = () => setState((s) => prune({ ...s, filter: EMPTY_FILTER }));
 export const toggleKind = (kind: Kind) => {
-  const h = getState().filter.hiddenKinds;
-  setFilter({ hiddenKinds: h.includes(kind) ? h.filter((k) => k !== kind) : [...h, kind] });
+  const k = getState().filter.kinds;
+  setFilter({ kinds: k.includes(kind) ? k.filter((x) => x !== kind) : [...k, kind] });
 };
 
 // ---- helpers ------------------------------------------------------------------

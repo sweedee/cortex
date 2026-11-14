@@ -16,7 +16,8 @@ function TodoEditor({ item, ctx }: SidebarProps<'todo'>) {
   const { id } = item;
   const [title, setTitle] = useState(item.title);
   const [body, setBody] = useState(item.data.body);
-  const [preview, setPreview] = useState(false);
+  // opens on the rendered notes; an empty todo starts in the editor
+  const [preview, setPreview] = useState(item.data.body.trim() !== '');
   const saved = useRef(item.data.body);
   const latest = useRef(body);
   latest.current = body;

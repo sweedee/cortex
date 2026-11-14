@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, Notification, shell, webContents } from 'electron';
 import spawn from 'cross-spawn';
 import type { OpenResult } from '../../shared/ipc';
 import { handle, type IpcContext } from './handle';
@@ -42,6 +42,19 @@ export function registerDesktop(ctx: IpcContext) {
         });
       }),
   );
+
+  // Colour-scheme emulation for an embedded <webview> guest. Electron has no API for
+  // `prefers-color-scheme` on one page (nativeTheme is app-wide), so use CDP's
+  // Emulation.setEmulatedMedia through the debugger, which stays attached for the guest's lifetime.
+  handle(ctx, 'webview:setColorScheme', async ({ webContentsId, scheme }) => {
+    const wc = webContents.fromId(webContentsId);
+    const host = ctx.getWindow()?.webContents;
+    // only guests embedded in the app window, never other windows or the app itself
+    if (!wc || wc.isDestroyed() || !host || wc.hostWebContents !== host) throw new Error('webview:setColorScheme: not an embedded webview');
+    if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
+    const features = scheme ? [{ name: 'prefers-color-scheme', value: scheme }] : [];
+    await wc.debugger.sendCommand('Emulation.setEmulatedMedia', { features });
+  });
 
   // Electron drops click handlers of notifications that get garbage collected; keep them.
   const live = new Set<Notification>();

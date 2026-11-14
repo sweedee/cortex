@@ -90,9 +90,9 @@ To use a real Jira: install `acli`, run `acli jira auth login`, and start Cortex
 | `#` or `!` in the chat box | run an action of the mentioned bubbles |
 | Enter / Shift+Enter in the chat box | send (starts an agent, or continues the one agent mentioned) / new line |
 | `/` or Ctrl+K, Esc, Del, Ctrl+A | focus the chat box, deselect / close, remove from the canvas, select all |
-| Legend (bottom left) | show / hide bubble types; *Filter* for status, project, unread, archived |
+| Filter button (top right) | show only selected bubble types (none selected = everything), status, project, unread, archived |
 | Bell (top right) | notifications; click one to fly to its bubble |
-| Gear (top right) | settings |
+| Gear (top right) | settings (incl. bubble colouring: project, ticket, gray) |
 
 Ring = status, derived from each bubble's data (segments for mixed states: an approved but conflicting PR
 is part green, part orange; a breathing segment means something is running). Dot at the top right of a

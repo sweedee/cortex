@@ -267,11 +267,15 @@ export async function runRepoSmoke(win: BrowserWindow) {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Ask Mara about the retry cap');
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.blur();
-      [...document.querySelectorAll('.sidebar-body button')].find((b) => b.textContent.trim() === 'Preview').click();
-      const box = await h.until(() => h.$('.todo-preview input[type=checkbox]'), Boolean, 5000, 'task checkbox');
-      box.click();
+      // a todo opens on the rendered notes (preview first)
+      const box = await h.until(() => h.$('.todo-preview input[type=checkbox]'), Boolean, 5000, 'task checkbox (preview is the default view)');
+      // the lazy markdown may not be wired yet: click again until the body changes
+      for (let i = 0; i < 20 && !d.itemById(todo.id).data.body.includes('[x]'); i++) { h.$('.todo-preview input[type=checkbox]').click(); await new Promise((r) => setTimeout(r, 150)); }
       const cur = await h.until(() => d.itemById(todo.id), (x) => x.title === 'Ask Mara about the retry cap' && x.data.body.includes('[x]'), 5000, 'todo saved');
-      return { title: cur.title, body: cur.data.body };
+      // checklist quick action: the second item's action ticks it in the body
+      d.runAction(todo.id, 'check-1');
+      const both = await h.until(() => d.itemById(todo.id), (x) => x.data.body.split('[x]').length === 3, 5000, 'checklist quick action ticked the item');
+      return { title: cur.title, body: both.data.body };
     }`);
     return `"${t.title}", body ${J(t.body)}`;
   });
@@ -351,6 +355,27 @@ export async function runRepoSmoke(win: BrowserWindow) {
   });
   await shot('settings');
   await page(`async (d) => { d.forms.cancel('Settings'); return true; }`);
+
+  await step('filter popover (HUD): selecting a kind shows only that kind', async () => {
+    const r = await page<{ kinds: string[]; visible: string[]; label: string }>(`async (d, h) => {
+      document.querySelector('.hud-filter-btn').click();
+      await h.until(() => h.$('.filter-panel'), Boolean, 5000, 'filter panel');
+      [...document.querySelectorAll('.filter-panel .filter-chip')].find((b) => /Todo/.test(b.textContent)).click();
+      const f = await h.until(() => d.getState().filter, (x) => x.kinds.length === 1, 5000, 'kind selected');
+      return { kinds: f.kinds, visible: [...new Set(d.getState().items.filter((i) => !i.archived).map((i) => i.kind))], label: h.text('.filter-label') };
+    }`);
+    return `filter.kinds=${r.kinds.join()} (items of ${r.visible.length} kinds exist); label "${r.label}"`;
+  });
+  await shot('filter-popover');
+  await step('filter popover: deselecting the last kind shows everything again', async () => {
+    const n = await page<number>(`async (d, h) => {
+      [...document.querySelectorAll('.filter-panel .filter-chip')].find((b) => /Todo/.test(b.textContent)).click();
+      await h.until(() => d.getState().filter, (x) => x.kinds.length === 0, 5000, 'filter cleared');
+      document.querySelector('.hud-filter-btn').click();
+      return d.getState().filter.kinds.length;
+    }`);
+    return `kinds ${n}`;
+  });
 
   await step('worktree "Remove…" → archived and gone from git worktree list', async () => {
     const w = await page<{ archived?: boolean }>(`async (d, h) => {
