@@ -35,25 +35,16 @@ import {
   resetFilter,
   select,
   setArchived,
-  setColorBy,
   setFilter,
   toggleKind,
   useStore,
   useVisible,
-  type ColorBy,
 } from '../store';
 import { accentOf, useItemColors } from '../visual';
-
-const COLOR_BY: [ColorBy, string][] = [
-  ['none', 'Gray'],
-  ['project', 'Project'],
-  ['ticket', 'Ticket'],
-];
 
 export function Hud() {
   const items = useStore((s) => s.items);
   const filter = useStore((s) => s.filter);
-  const colorBy = useStore((s) => s.colorBy);
   const desktopNotify = useStore((s) => s.desktopNotify);
   const soundOn = useStore((s) => s.soundOn);
   const visible = useVisible();
@@ -77,14 +68,6 @@ export function Hud() {
       </div>
 
       <div className="hud hud-top-right">
-        <div className="hud-colorby" role="radiogroup" aria-label="Colour bubbles by">
-          <span className="hud-colorby-label">Colour</span>
-          {COLOR_BY.map(([v, label]) => (
-            <button key={v} role="radio" aria-checked={colorBy === v} className={`hud-colorby-opt ${colorBy === v ? 'is-on' : ''}`} onClick={() => setColorBy(v)}>
-              {label}
-            </button>
-          ))}
-        </div>
         <Tooltip text={nFilters ? `${visible.size} of ${live.length} shown. Filter by type, status, project…` : 'Filter by type, status, project…'}>
           <Button
             variant="default"

@@ -215,7 +215,7 @@ their own setters.
 
 ```jsonc
 {
-  "version": 2,
+  "version": 3,
   "items": [ /* Item */ ],
   "links": [ { "id": "l1", "from": "t-4821", "to": "p-ingest", "label": "in project" } ],
   "prefs": {
@@ -244,7 +244,8 @@ their own setters.
 Versions: v0 had display-only items (`status`, `facts`, `subtitle`, `flags`, `cluster`, `notice.ago`) and
 prefs in localStorage; v0 → v1 parses those strings into typed `data`, `plan` → `record`, `cluster` →
 `projectId`, `notice.ago` → `notice.at`, and carries the localStorage prefs over. v1 → v2 adds the settings
-prefs with their defaults; agent data gains the optional `localId`, `pendingPermissions` and `error`.
+prefs with their defaults; agent data gains the optional `localId`, `pendingPermissions` and `error`. v2 → v3: `filter.hiddenKinds`
+becomes `filter.kinds` (kinds to show; empty = all; "hid build" becomes "everything except build").
 Fixtures: `domain/fixtures/workspace-v0.json`, `workspace-v1.json`.
 
 Adding a version: bump `WORKSPACE_VERSION`, add `MIGRATIONS[old]`, a fixture of the old format and a test.

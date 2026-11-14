@@ -1054,34 +1054,6 @@ body {
   align-items: center;
   gap: 10px;
 }
-.hud-colorby {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 4px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.hud-colorby-label {
-  padding: 0 6px 0 4px;
-  font-size: 11px;
-  color: var(--ink-faint);
-}
-.hud-colorby-opt {
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--ink-subdued);
-  font: 600 12px var(--dt-typography-text-base-default-family, system-ui), sans-serif;
-  cursor: pointer;
-}
-.hud-colorby-opt:hover,
-.hud-colorby-opt.is-on {
-  background: var(--surface-hover);
-  color: var(--ink);
-}
 .hud-bell {
   position: relative;
 }
