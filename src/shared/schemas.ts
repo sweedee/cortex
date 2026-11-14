@@ -62,6 +62,7 @@ export const schemas = {
   'shell:openExternal': z.object({ url: httpUrl }),
   'shell:openPath': z.object({ path: absPath }),
   'shell:openInEditor': z.object({ path: absPath }),
+  'webview:setColorScheme': z.object({ webContentsId: z.number().int().nonnegative(), scheme: z.enum(['light', 'dark']).nullable() }),
   'notify:desktop': z.object({ title: z.string().max(500), body: z.string().max(5000), tag: z.string().max(500).optional(), itemId: z.string().optional() }),
   'workspace:load': z.undefined(),
   'workspace:save': z.object({ data: z.unknown() }),

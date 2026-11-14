@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { ProgressCircle } from '@dynatrace/strato-components/content';
-import { ArrowLeftIcon, ArrowRightIcon, ExternalLinkIcon, RefreshIcon } from '@dynatrace/strato-icons';
+import { ArrowLeftIcon, ArrowRightIcon, DarkmodeIcon, ExternalLinkIcon, LightmodeIcon, RefreshIcon } from '@dynatrace/strato-icons';
+import { Tooltip } from '@dynatrace/strato-components/overlays';
+import { native } from '../../../native';
 import '../viewers.css';
 
 export type Viewport = 'desktop' | 'tablet' | 'mobile';
@@ -20,6 +22,11 @@ export interface WebPanelProps {
   viewport?: Viewport;
   /** Show desktop/tablet/mobile switch buttons in the toolbar; `viewport` is then the initial value. */
   viewportSwitcher?: boolean;
+  /**
+   * Light / dark toggle for the page (emulates `prefers-color-scheme` in the guest). Without a pick the
+   * page follows the app's theme. Desktop app only; the iframe fallback cannot emulate it.
+   */
+  colorSchemeToggle?: boolean;
   className?: string;
 }
 
@@ -31,6 +38,26 @@ interface WebviewEl extends HTMLElement {
   canGoBack(): boolean;
   canGoForward(): boolean;
   getURL(): string;
+  getWebContentsId(): number;
+}
+
+export type Scheme = 'light' | 'dark';
+
+/** The app's colour scheme: Strato's AppRoot sets `data-theme` on <html>, else the OS preference. */
+export function appScheme(): Scheme {
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t === 'light' || t === 'dark') return t;
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+function subscribeScheme(cb: () => void) {
+  const obs = new MutationObserver(cb);
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  const mq = window.matchMedia?.('(prefers-color-scheme: light)');
+  mq?.addEventListener('change', cb);
+  return () => {
+    obs.disconnect();
+    mq?.removeEventListener('change', cb);
+  };
 }
 
 const inElectron = typeof navigator !== 'undefined' && /Electron\//.test(navigator.userAgent);
@@ -41,7 +68,7 @@ export function WebPanel(props: WebPanelProps) {
   return <WebPanelInner key={`${props.partition ?? ''}|${props.src}|${retry}`} {...props} onRetry={() => setRetry((n) => n + 1)} />;
 }
 
-function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = true, viewport: viewportProp = 'desktop', viewportSwitcher, className, onRetry }: WebPanelProps & { onRetry: () => void }) {
+function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = true, viewport: viewportProp = 'desktop', viewportSwitcher, colorSchemeToggle, className, onRetry }: WebPanelProps & { onRetry: () => void }) {
   const ref = useRef<WebviewEl | null>(null);
   const [url, setUrl] = useState(src);
   const [loading, setLoading] = useState(true);
@@ -49,6 +76,25 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
   const [nav, setNav] = useState({ back: false, forward: false });
   const [viewportPick, setViewport] = useState<Viewport | null>(null);
   const viewport = viewportPick ?? viewportProp;
+  const [schemePick, setSchemePick] = useState<Scheme | null>(null);
+  const app = useSyncExternalStore(subscribeScheme, appScheme);
+  const scheme = schemePick ?? app;
+  const schemeRef = useRef(scheme);
+  useEffect(() => {
+    schemeRef.current = scheme;
+  }, [scheme]);
+  const emulate = colorSchemeToggle && inElectron;
+  /** push the effective scheme into the guest (it needs to be attached: dom-ready) */
+  const applyScheme = useCallback(() => {
+    const wv = ref.current;
+    if (!emulate || !wv) return;
+    try {
+      void native.webview.setColorScheme(wv.getWebContentsId(), schemeRef.current).catch(() => {});
+    } catch {
+      /* not attached yet: dom-ready calls again */
+    }
+  }, [emulate]);
+  useEffect(applyScheme, [applyScheme, scheme]);
   const onNavigateRef = useRef(onNavigate);
   useEffect(() => {
     onNavigateRef.current = onNavigate;
@@ -89,14 +135,18 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
     wv.addEventListener('did-navigate', sync);
     wv.addEventListener('did-navigate-in-page', sync);
     wv.addEventListener('did-fail-load', fail);
+    wv.addEventListener('dom-ready', applyScheme);
+    wv.addEventListener('did-navigate', applyScheme);
     return () => {
+      wv.removeEventListener('dom-ready', applyScheme);
+      wv.removeEventListener('did-navigate', applyScheme);
       wv.removeEventListener('did-start-loading', start);
       wv.removeEventListener('did-stop-loading', stop);
       wv.removeEventListener('did-navigate', sync);
       wv.removeEventListener('did-navigate-in-page', sync);
       wv.removeEventListener('did-fail-load', fail);
     };
-  }, []);
+  }, [applyScheme]);
 
   const reload = useCallback(() => {
     if (error || !inElectron) onRetry();
@@ -139,6 +189,13 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
                 {v[0].toUpperCase() + v.slice(1)}
               </Button>
             ))}
+          {emulate && (
+            <Tooltip text={`Previewing in ${scheme} mode${schemePick ? '' : ' (follows the app)'}. Switch to ${scheme === 'dark' ? 'light' : 'dark'}.`}>
+              <Button size="condensed" variant={schemePick ? 'emphasized' : 'default'} aria-label={`Preview color scheme: ${scheme}`} onClick={() => setSchemePick(scheme === 'dark' ? 'light' : 'dark')}>
+                <Button.Prefix>{scheme === 'dark' ? <DarkmodeIcon /> : <LightmodeIcon />}</Button.Prefix>
+              </Button>
+            </Tooltip>
+          )}
           {onOpenExternal && (
             <Button size="condensed" variant="default" aria-label="Open externally" onClick={() => onOpenExternal(url)}>
               <Button.Prefix>

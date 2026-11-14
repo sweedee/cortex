@@ -110,7 +110,7 @@
 .cxv-diff-counts { font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
 .cxv-diff-add-n { color: var(--dt-colors-text-success-default); }
 .cxv-diff-del-n { color: var(--dt-colors-text-critical-default); }
-.cxv-diff-caret { width: 10px; color: var(--dt-colors-text-neutral-subdued); }
+.cxv-diff-caret { display: inline-flex; width: 14px; color: var(--dt-colors-text-neutral-subdued); }
 .cxv-diff-status {
   display: inline-block; min-width: 16px; text-align: center; font-size: 10px; font-weight: 700;
   border-radius: 3px; padding: 1px 3px;

@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 
-export const WORKSPACE_VERSION = 2;
+export const WORKSPACE_VERSION = 3;
 
 // ---- shared vocabulary ---------------------------------------------------------------------
 
@@ -264,7 +264,8 @@ export const LinkSchema = z.object({ id: z.string(), from: z.string(), to: z.str
 export const StatusGroupSchema = z.enum(['attention', 'failing', 'running', 'active', 'review', 'done', 'idle']);
 
 export const FilterSchema = z.object({
-  hiddenKinds: z.array(KindSchema),
+  /** kinds to show; empty = every kind (v3; before that `hiddenKinds`) */
+  kinds: z.array(KindSchema),
   /** status buckets to keep; empty = any status */
   status: z.array(StatusGroupSchema),
   /** project ids whose items to keep; empty = every project */

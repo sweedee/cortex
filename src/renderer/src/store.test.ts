@@ -16,11 +16,15 @@ describe('visibleSet', () => {
     expect([...visibleSet()].sort()).toEqual([...all].sort());
   });
 
-  it('hides kinds', () => {
-    setFilter({ hiddenKinds: ['build', 'agent'] });
+  it('shows only the selected kinds (none selected = all)', () => {
+    setFilter({ kinds: ['build', 'agent'] });
     const v = visibleSet();
-    expect(SEED_ITEMS.filter((i) => v.has(i.id)).some((i) => i.kind === 'build' || i.kind === 'agent')).toBe(false);
-    expect(v.has('p-ingest')).toBe(true);
+    const shown = SEED_ITEMS.filter((i) => v.has(i.id));
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.every((i) => i.kind === 'build' || i.kind === 'agent')).toBe(true);
+    expect(v.has('p-ingest')).toBe(false);
+    setFilter({ kinds: [] });
+    expect(visibleSet().has('p-ingest')).toBe(true);
   });
 
   it('filters by status group (derived from the ring)', () => {

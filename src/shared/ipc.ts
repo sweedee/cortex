@@ -155,6 +155,7 @@ export interface InvokeChannels {
   'shell:openExternal': [{ url: string }, void];
   'shell:openPath': [{ path: string }, OpenResult];
   'shell:openInEditor': [{ path: string }, OpenResult];
+  'webview:setColorScheme': [{ webContentsId: number; scheme: 'light' | 'dark' | null }, void];
   'notify:desktop': [DesktopNotification, void];
   'workspace:load': [void, unknown | null];
   'workspace:save': [{ data: unknown }, void];
@@ -203,6 +204,10 @@ export interface CortexApi {
     openExternal(url: string): Promise<void>;
     openPath(path: string): Promise<OpenResult>;
     openInEditor(path: string): Promise<OpenResult>;
+  };
+  webview: {
+    /** make an embedded <webview> page see `prefers-color-scheme: light | dark` (null = stop emulating) */
+    setColorScheme(webContentsId: number, scheme: 'light' | 'dark' | null): Promise<void>;
   };
   notify: {
     desktop(n: DesktopNotification): Promise<void>;
