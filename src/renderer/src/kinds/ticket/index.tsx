@@ -1,9 +1,11 @@
-import { LabelIcon, PlusIcon, SorterIcon } from '@dynatrace/strato-icons';
+import { PlusIcon, SorterIcon, SuccessIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { place } from '../../layout';
-import { openDialog } from '../../store';
-import { external, placeholder, skill } from '../common';
+import { external, skill } from '../common';
+import { openNewWorktree } from '../project/worktreeFlow';
 import type { KindModule } from '../types';
+import { completeTickets, openChangeStatus, ticketUrl } from './actions';
+import { TicketIcon } from './icon';
+import { TicketSidebar } from './Sidebar';
 
 const BLOCKER = /blocker|highest/i;
 
@@ -19,7 +21,7 @@ export function ticketRing({ data }: ItemOf<'ticket'>): Segment[] {
 export const ticket: KindModule<'ticket'> = {
   kind: 'ticket',
   label: 'Ticket',
-  icon: (s) => <LabelIcon size={s} />,
+  icon: (s) => <TicketIcon size={s} />,
   radius: 38,
   level: 1,
 
@@ -33,26 +35,43 @@ export const ticket: KindModule<'ticket'> = {
     ...(data.branch ? [['Branch', data.branch] as [string, string]] : []),
   ],
 
-  actions: ([t]) => {
+  actions: ([t], ctx) => {
     const todo = t.data.statusCategory === 'new' || ticketRing(t)[0].tone === 'critical';
+    const project = ctx.projectOf(t);
     return [
-      skill('plan', 'Plan', 'plan-ticket', { primary: todo }),
+      skill('plan', 'Plan', 'plan', { primary: todo }),
       skill('brainstorm', 'Brainstorm', 'brainstorm'),
-      skill('implement', 'Implement', 'implement', { primary: t.data.statusCategory === 'indeterminate' }),
-      skill('refine', 'Refine ticket', 'refine-ticket'),
-      placeholder('status', 'Change status…', <SorterIcon />),
+      {
+        id: 'status',
+        label: 'Change status…',
+        type: 'direct',
+        icon: <SorterIcon />,
+        run: ([x]) => void openChangeStatus(x as ItemOf<'ticket'>),
+      },
       {
         id: 'start',
-        label: 'Create worktree',
+        label: 'Create worktree…',
         type: 'direct',
         icon: <PlusIcon />,
-        run: ([x]) => openDialog({ type: 'add', kind: 'worktree', at: place.near(x.id) }),
+        disabled: project ? undefined : 'This ticket is not in a project',
+        run: ([x]) => {
+          const p = ctx.projectOf(x);
+          if (p) void openNewWorktree(p, { ticket: x as ItemOf<'ticket'> });
+        },
       },
-      external('jira', 'Open in Jira', (i) => `jira.ctx.internal/browse/${i.handle}`),
+      external('jira', 'Open in Jira', (i) => (i.kind === 'ticket' ? ticketUrl(i.data.key) : '')),
+      // not the shared "complete" (a local patch): Jira is transitioned first, see actions.ts
+      {
+        id: 'complete',
+        label: 'Mark done',
+        type: 'direct',
+        icon: <SuccessIcon />,
+        run: (items) => void completeTickets(items as ItemOf<'ticket'>[]),
+      },
     ];
   },
 
-  complete: () => ({ status: 'Done', statusCategory: 'done' }),
+  Sidebar: TicketSidebar,
 
   addable: {
     label: 'Import Jira ticket…',

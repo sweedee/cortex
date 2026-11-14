@@ -517,3 +517,33 @@ e.g. `CORTEX_CLAUDE_BIN=src/main/services/__fixtures__/fake-claude.mjs` for a fr
 `CORTEX_JIRA_CLI=mock|acli`, `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`, `CORTEX_CLAUDE_BIN`,
 `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`. Defaults in `shared/integrations/config.ts`
 (`integrations:config` returns the effective values).
+
+### Kind: project
+
+`kinds/project/`: `Sidebar.tsx` (repository setup with open-folder / open-in-editor buttons and inline start / test
+commands, tickets, open PR summary via `usePrList` + `useRenovatePrs`, worktrees on disk (`useWorktrees`) vs on canvas
+with "Add to canvas", deployments + "Add deployment"), `worktreeFlow.ts` (the "new worktree" form -> `gitOps.worktreeAdd`
+-> linked `worktree` bubble; also used by the ticket), `worktreeModel.ts` (pure: branch / path / args / untracked
+worktrees), `prSummary.ts` (pure PR counts), `parts.tsx` (small sidebar widgets shared with ticket and deployment).
+Actions: create ticket (AI `create-ticket`), review Renovate PRs (AI `review-renovate`, count from `data.stats.renovatePrs`,
+which the refresher keeps current), new worktree (UI), open repo / folder / in editor, Settings. A project without an
+absolute `baseDir` shows "Set the project's base checkout in Settings…" and the worktree actions open Settings instead.
+
+### Kind: ticket
+
+`kinds/ticket/`: own `TicketIcon` (stub with notches). Actions: plan (AI `plan`), brainstorm (AI), change status (UI radio form
+-> `jiraOps.transition`, the mock's invalid-transition error is shown inline, then `refreshTicket` writes the new status back),
+create worktree (project's flow, prefilled `<KEY>-<slug>`, sets `data.branch`, links `works on`), open in Jira (URL from
+the cached issue's `self`, else the configured site), mark done (overrides the shared complete: transitions to Done in Jira,
+stepping through the workflow if the direct move is rejected, else completes locally with a warning toast).
+Sidebar tabs: Details (fields, ADF description via `adfToMarkdown` + `Markdown`, linked issues, comments + add comment
+via `jiraOps.comment`, related canvas items including PRs of the ticket's worktrees) and Jira (`WebPanel`, wide,
+`partition="persist:jira"`; the mock site just shows the panel's error state).
+
+### Kind: deployment
+
+`kinds/deployment/`: stage chip via `badge` (dev neutral, staging primary, prod critical, custom pending). Actions: open,
+edit (`form.ts`, also used to add a deployment from the project sidebar; custom stage label; re-links `deploys`).
+Sidebar tabs: Details (URL, stage, project, status section labelled "mock") and Preview (`WebPanel`, wide).
+`model.ts` `mockStatus(id, now, known)` is deterministic per item id plus a 15 s jitter on the response time; it is the
+single place to replace with a real health check (same `DeploymentStatus` shape).
