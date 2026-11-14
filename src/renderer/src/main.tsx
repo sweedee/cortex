@@ -16,6 +16,7 @@ import { FormHost } from './ui/form';
 import './desktop';
 import { loadWorkspace, startAutosave } from './persist';
 import { startSync } from './sync';
+import './debug';
 import './index.css';
 
 async function boot() {

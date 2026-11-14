@@ -5,7 +5,8 @@
  *   CORTEX_JIRA_CLI=mock|acli         which Jira CLI to use (default mock)
  *   CORTEX_JIRA_MOCK_SCRIPT=<path>    jira-mock entry (default <app>/scripts/jira-mock/jira-mock.mjs)
  *   JIRA_MOCK_DB=<file>               mock data file (default <userData>/jira-mock.json)
- *   CORTEX_CLAUDE_BIN=<path>          claude binary (default `claude` on PATH)
+ *   CORTEX_CLAUDE_BIN=<path>          claude binary (default `claude` on PATH); a `.js` / `.mjs` path runs with
+ *                                     Electron's node (e.g. src/main/services/__fixtures__/fake-claude.mjs)
  *   CORTEX_AI_REVIEW_COMMENT=<text>   PR comment that triggers the AI review (default `@claude review`)
  *   CORTEX_RENOVATE_APP=<slug>        Renovate GitHub App slug (default renovate)
  */

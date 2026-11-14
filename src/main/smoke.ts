@@ -39,6 +39,32 @@ const PROBE = `(async () => {
     const off = c.on('test:state', (s) => { seen.push(s.status); if (s.status !== 'running') { off(); resolve({ seen, summary: s.summary }); } });
     c.tests.run({ id: 'smoke', cwd: repo, command: 'node -e "console.log(String.fromCharCode(35)+\\' pass 1\\')"' }).catch((e) => { off(); resolve('ERROR: ' + e.message); });
   }));
+  // CORTEX_SMOKE_E2E=1 (dev only, uses window.__cortexDebug): renderer flows end to end. Start with
+  // CORTEX_CLAUDE_BIN=<fake-claude.mjs> so no real (paid) Claude session is started.
+  const d = window.__cortexDebug;
+  if (${JSON.stringify(process.env['CORTEX_SMOKE_E2E'] === '1')} && d) {
+    const until = async (get, pred, ms = 20000) => { const t0 = Date.now(); for (;;) { const v = get(); if (pred(v)) return v; if (Date.now() - t0 > ms) throw new Error('timeout, last: ' + JSON.stringify(v && v.data)); await new Promise((r) => setTimeout(r, 100)); } };
+    let wt;
+    await step('e2e: project on this repo + worktree git refresh', async () => {
+      const remote = await c.git.remoteRepo(repo);
+      const branch = await c.git.currentBranch(repo);
+      const p = d.addItem({ kind: 'project', handle: 'smoke-cortex', title: 'cortex (smoke)', data: { repo: remote || 'sweedee/cortex', baseDir: repo, defaultBranch: 'main' } });
+      wt = d.addItem({ kind: 'worktree', handle: 'wt/smoke', title: branch, projectId: p.id, data: { path: repo, branch: branch || 'HEAD', baseBranch: 'main' } });
+      d.addLink(wt.id, p.id, 'belongs to');
+      await d.refreshDue(true);
+      return { repo: remote, worktreeGit: d.itemById(wt.id).data.git, projectStats: d.itemById(p.id).data.stats };
+    });
+    if (wt) await step('e2e: chat → agent → question → answer (claude bin: ' + ${JSON.stringify((process.env['CORTEX_CLAUDE_BIN'] ?? 'claude').split(/[\\/]/).pop())} + ')', async () => {
+      if (!${JSON.stringify(/fake-claude/.test(process.env['CORTEX_CLAUDE_BIN'] ?? ''))}) return 'skipped: set CORTEX_CLAUDE_BIN to the fake CLI';
+      const id = await d.sendPrompt('ask which approach to take for @wt/smoke', [wt.id]);
+      const a1 = await until(() => d.itemById(id), (a) => a && a.data.status === 'waiting' && a.data.pendingQuestion);
+      const asked = { status: a1.data.status, question: a1.data.pendingQuestion.questions[0].question, options: a1.data.pendingQuestion.questions[0].options.map((o) => o.label), notice: a1.notice && a1.notice.text };
+      d.chooseOption(a1, 'Queue');
+      const a2 = await until(() => d.itemById(id), (a) => a && a.data.status === 'done');
+      const session = await c.claude.session(id);
+      return { cwd: a2.data.cwd, sessionId: !!a2.data.sessionId, asked, done: { status: a2.data.status, lastActivity: a2.data.lastActivity, notice: a2.notice && a2.notice.text, usage: a2.data.usage }, promptSent: session.messages[0] && session.messages[0].text };
+    });
+  }
   out.rootRendered = !!document.querySelector('#root')?.children.length;
   return out;
 })()`;

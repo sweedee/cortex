@@ -21,6 +21,8 @@ type Send = <C extends EventChannel>(channel: C, payload: EventChannels[C]) => v
 
 export function createServices(paths: ServicePaths, send: Send) {
   const config = resolveConfig();
+  // CORTEX_CLAUDE_BIN may point at a node script (e.g. the fake CLI fixture): run it with this runtime
+  const claudeScript = /\.[cm]?js$/i.test(config.claude.bin);
   const jira = new JiraService(jiraCliSpec(config, paths), { cwd: paths.userData });
   const services = {
     config,
@@ -28,8 +30,9 @@ export function createServices(paths: ServicePaths, send: Send) {
     gh: new GhService(config.github, { cwd: paths.userData }),
     jira,
     claude: new ClaudeSessions({
-      bin: config.claude.bin,
-      prefixArgs: config.claude.prefixArgs,
+      bin: claudeScript ? process.execPath : config.claude.bin,
+      prefixArgs: claudeScript ? [config.claude.bin, ...config.claude.prefixArgs] : config.claude.prefixArgs,
+      env: claudeScript && paths.isElectron ? { ELECTRON_RUN_AS_NODE: '1' } : undefined,
       storeFile: join(paths.userData, 'claude-sessions.json'),
       send: send as ConstructorParameters<typeof ClaudeSessions>[0]['send'],
       defaultPermissionMode: config.claude.defaultPermissionMode,

@@ -156,19 +156,27 @@ async function runJob(job: Job) {
   }
 }
 
-let busy = false;
-/** One pass: run the due jobs (a few at a time). Exported for the smoke probe / tests. */
-export async function refreshDue(force = false) {
-  if (busy) return;
-  busy = true;
-  try {
+let running: Promise<void> | null = null;
+/**
+ * One pass: run the due jobs (a few at a time); `force` runs every job. A background pass in
+ * flight is awaited first (a forced pass then still runs). Exported for the smoke probe / tests.
+ */
+export async function refreshDue(force = false): Promise<void> {
+  if (running) {
+    await running;
+    if (!force) return;
+  }
+  const pass = (async () => {
     const intervalMs = getState().settings.refreshSec * 1000;
     const now = Date.now();
     const due = jobsFor(getState().items).filter((j) => force || dueAt(j, intervalMs) <= now);
     for (let i = 0; i < due.length; i += PARALLEL) await Promise.all(due.slice(i, i + PARALLEL).map(runJob));
-  } finally {
-    busy = false;
-  }
+  })();
+  running = pass.finally(() => {
+    if (running === guarded) running = null;
+  });
+  const guarded = running;
+  await guarded;
 }
 
 let timer: ReturnType<typeof setInterval> | undefined;
