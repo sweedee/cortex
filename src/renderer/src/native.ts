@@ -106,7 +106,7 @@ function integrationFallbacks(): Pick<CortexApi, 'integrations' | 'git' | 'gh' |
   const empty = () => Promise.resolve([] as never[]);
   return {
     integrations: group('integrations', ['config']),
-    git: group('git', ['isRepo', 'currentBranch', 'remoteRepo', 'worktreeList', 'worktreeAdd', 'worktreeRemove', 'status', 'diff', 'diffStat', 'log', 'fetch', 'rebase', 'rebaseAbort']),
+    git: group('git', ['isRepo', 'currentBranch', 'remoteRepo', 'worktreeList', 'worktreeAdd', 'worktreeRemove', 'status', 'diff', 'diffStat', 'log', 'fetch', 'rebase', 'rebaseAbort', 'push']),
     gh: group('gh', ['prList', 'prView', 'prCreate', 'prMerge', 'prComment', 'prUpdateBranch', 'prDiff', 'prChecks', 'runView', 'runRerun', 'renovatePrs']),
     jira: group('jira', ['search', 'view', 'transition', 'create', 'comment', 'edit']),
     claude: { ...group('claude', ['start', 'send', 'answer', 'permission', 'interrupt', 'stop', 'remove', 'transcript', 'session']), list: empty },

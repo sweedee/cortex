@@ -121,6 +121,16 @@ describe('GitService (real git, temp repo)', () => {
     expect(await git.currentBranch(repo)).toBe('topic');
   }, 30_000);
 
+  it('pushes the current branch and sets the upstream', async () => {
+    const remote = realpathSync(mkdtempSync(join(tmpdir(), 'cortex-remote-')));
+    await sh(remote, 'init', '-q', '--bare');
+    await sh(repo, 'remote', 'add', 'pushremote', remote);
+    await sh(repo, 'checkout', '-q', '-b', 'pushme');
+    await git.push(repo, { remote: 'pushremote', setUpstream: true });
+    expect((await git.status(repo)).upstream).toBe('pushremote/pushme');
+    rmSync(remote, { recursive: true, force: true });
+  }, 30_000);
+
   it('throws readable errors', async () => {
     await expect(git.rebase(repo, 'no-such-ref')).rejects.toThrow(/git rebase/);
     await expect(git.log(repo, { range: 'nope..HEAD' })).rejects.toThrow(/nope/);

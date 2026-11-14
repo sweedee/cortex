@@ -304,6 +304,7 @@ export interface InvokeChannels {
   'git:fetch': [{ dir: string; remote?: string; prune?: boolean }, void];
   'git:rebase': [{ dir: string; onto: string }, GitRebaseResult];
   'git:rebaseAbort': [{ dir: string }, void];
+  'git:push': [{ dir: string; remote?: string; setUpstream?: boolean }, void];
 
   'gh:prList': [GhPrListRequest, GhPrListItem[]];
   'gh:prView': [{ repo: string; number: number }, GhPullRequest];
@@ -378,6 +379,8 @@ export interface CortexApi {
     fetch(dir: string, opts?: { remote?: string; prune?: boolean }): Promise<void>;
     rebase(dir: string, onto: string): Promise<GitRebaseResult>;
     rebaseAbort(dir: string): Promise<void>;
+    /** `git push [-u] <remote> HEAD` (remote default origin) */
+    push(dir: string, opts?: { remote?: string; setUpstream?: boolean }): Promise<void>;
   };
   gh: {
     prList(repo: string, filter?: Omit<GhPrListRequest, 'repo'>): Promise<GhPrListItem[]>;
