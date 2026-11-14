@@ -23,9 +23,6 @@ const settingsOf = (p: Prefs): Settings => ({ model: p.model, permissionMode: p.
 
 export type Dialog =
   | { type: 'add'; kind: Kind; at: { x: number; y: number } }
-  | { type: 'session'; itemId: string }
-  | { type: 'record'; itemId: string }
-  | { type: 'log'; itemId: string }
   | { type: 'confirm'; title: string; body: string; confirm: string; danger?: boolean; onConfirm: () => void }
   | null;
 

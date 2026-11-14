@@ -195,7 +195,6 @@ export function unpinAll() {
   clearPinned();
   sim.alpha(0.9).restart();
 }
-export const isPinned = (id: string) => nodes.get(id)?.fx != null;
 
 // ---- placement helpers for new bubbles --------------------------------------------
 

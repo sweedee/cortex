@@ -2,7 +2,6 @@
  * Building blocks for kind actions, and the shared actions every kind gets
  * (complete, archive, unarchive, remove). Must not import the registry (kind modules import this).
  */
-import type { ReactElement } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { CodeIcon, DeleteIcon, ExternalLinkIcon, FolderOpenIcon, SuccessIcon, UndoIcon } from '@dynatrace/strato-icons';
@@ -58,18 +57,6 @@ export function openPathAction(id: string, label: string, path: (i: Item) => str
 /** Opens a folder / file in the editor (`code <path>`, falls back to the OS). */
 export function openInEditorAction(id: string, label: string, path: (i: Item) => string | undefined, extra: Partial<Action> = {}): Action {
   return { id, label, type: 'external', icon: <CodeIcon />, run: (items) => void openInEditor(path(items[0]) ?? ''), ...extra };
-}
-
-/** A UI action that exists in the design but is not built yet: shows a toast. */
-export function placeholder(id: string, label: string, icon: ReactElement, extra: Partial<Action> = {}): Action {
-  return {
-    id,
-    label,
-    type: 'direct',
-    icon,
-    run: () => toast(`${label.replace(/…$/, '')}: not implemented yet`, 'Coming in a later phase.', 'info'),
-    ...extra,
-  };
 }
 
 // ---- complete / archive -----------------------------------------------------------------
