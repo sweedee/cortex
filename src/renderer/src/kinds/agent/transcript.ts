@@ -12,6 +12,7 @@ export type Row =
   | { kind: 'user'; id: string; at: string; text: string }
   | { kind: 'assistant'; id: string; at: string; text: string }
   | { kind: 'thinking'; id: string; at: string; text: string }
+  | { kind: 'note'; id: string; at: string; text: string }
   | { kind: 'tool'; id: string; at: string; tool: string; summary: string; status: ToolStatus; input?: Record<string, unknown>; result?: string }
   | { kind: 'question'; id: string; at: string; status: ToolStatus; questions: AskQuestion[]; answers?: Record<string, string>; error?: string };
 

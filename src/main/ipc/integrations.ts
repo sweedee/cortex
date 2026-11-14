@@ -52,6 +52,8 @@ export function registerIntegrations(ctx: IpcContext, s: Services) {
   handle(ctx, 'claude:list', () => claude.list());
   handle(ctx, 'claude:transcript', ({ localId }) => claude.transcript(localId));
   handle(ctx, 'claude:session', ({ localId }) => claude.session(localId));
+  handle(ctx, 'claude:configure', ({ localId, ...c }) => claude.configure(localId, c));
+  handle(ctx, 'claude:catalog', () => claude.catalog());
 
   handle(ctx, 'apps:start', (req) => apps.start(req));
   handle(ctx, 'apps:stop', ({ id }) => apps.stop(id));

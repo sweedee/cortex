@@ -232,7 +232,7 @@ export interface CortexApi {
 // this block is purely additive. Payload types live in `./integrations/*` (dependency free).
 // =============================================================================================
 
-import type { ClaudeAnswers, ClaudeEvent, ClaudeEventMessage, ClaudePermissionDecision, ClaudeSession, ClaudeSessionSummary, ClaudeStartRequest } from './integrations/claude';
+import type { ClaudeAnswers, ClaudeCatalog, ClaudeConfigureRequest, ClaudeConfigureResult, ClaudeEvent, ClaudeEventMessage, ClaudePermissionDecision, ClaudeSession, ClaudeSessionSummary, ClaudeStartRequest } from './integrations/claude';
 import type { IntegrationConfig } from './integrations/config';
 import type { GitDiffStat, GitLogEntry, GitRebaseResult, GitStatus, GitWorktree } from './integrations/git';
 import type { GhCheck, GhMergeMethod, GhPrListItem, GhPullRequest, GhRun, GhUpdateBranchResult } from './integrations/github';
@@ -348,6 +348,8 @@ export interface InvokeChannels {
   'claude:list': [void, ClaudeSessionSummary[]];
   'claude:transcript': [{ localId: string }, ClaudeEvent[]];
   'claude:session': [{ localId: string }, ClaudeSession];
+  'claude:configure': [{ localId: string } & ClaudeConfigureRequest, ClaudeConfigureResult];
+  'claude:catalog': [void, ClaudeCatalog];
 
   'apps:start': [AppStartRequest, AppState];
   'apps:stop': [{ id: string }, boolean];
@@ -428,6 +430,10 @@ export interface CortexApi {
     list(): Promise<ClaudeSessionSummary[]>;
     transcript(localId: string): Promise<ClaudeEvent[]>;
     session(localId: string): Promise<ClaudeSession>;
+    /** change model / effort / permission mode (live when the process can take it) */
+    configure(localId: string, c: ClaudeConfigureRequest): Promise<ClaudeConfigureResult>;
+    /** slash commands, skills and models the CLI offers */
+    catalog(): Promise<ClaudeCatalog>;
   };
   apps: {
     start(req: AppStartRequest): Promise<AppState>;
