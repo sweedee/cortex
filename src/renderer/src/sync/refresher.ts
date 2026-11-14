@@ -6,6 +6,8 @@
  * - open PR → `gh pr view` (state, review decision, mergeable, checks rollup)
  * - ticket → `jira view` (status, category, assignee, sprint, points, title)
  * - project with a repo → open PR count, Renovate PR count
+ * - build that is not completed → `gh run view` (GitHub Actions run id) or, for other CI linked
+ *   to a PR, that PR's `gh pr checks` (one call per PR for all its builds); 15 s while running
  *
  * Results also seed the matching query caches. Failures are quiet: logged once per item, and
  * the item (and, for gh, its whole repo) backs off exponentially (up to 30 intervals). Paths
@@ -15,6 +17,8 @@ import { queryClient } from '../data/queryClient';
 import { qk } from '../data/queryKeys';
 import { isRealPath, type Item, type ItemOf } from '../domain';
 import { isDesktop, native } from '../native';
+import { diffPatch, runPatch } from '../kinds/build/logic';
+import { planBuildSync } from '../kinds/pr/builds';
 import { getState, itemById, patchData } from '../store';
 import { changes, prChecksRunning, prPatch, projectStatsPatch, ticketPatch, worktreeGitPatch } from './mapping';
 
@@ -58,6 +62,16 @@ export function jobsFor(items: Item[]): Job[] {
       case 'project':
         if (isRealRepo(i.data.repo)) jobs.push({ id: i.id, group: `gh:${i.data.repo}`, fast: false, run: () => refreshProject(i.id) });
         break;
+      case 'build': {
+        if (i.data.state === 'completed' || !isRealRepo(i.data.repo)) break;
+        if (i.data.runId && /^\d+$/.test(i.data.runId)) jobs.push({ id: i.id, group: `gh:${i.data.repo}`, fast: true, run: () => refreshBuildRun(i.id) });
+        else if (i.data.prNumber) {
+          // other CI (Jenkins…) only shows up in the PR's checks: one job per PR covers all its builds
+          const key = `checks:${i.data.repo}#${i.data.prNumber}`;
+          if (!jobs.some((j) => j.id === key)) jobs.push({ id: key, group: `gh:${i.data.repo}`, fast: true, run: () => refreshPrChecks(i.data.repo, i.data.prNumber!, i.data.branch) });
+        }
+        break;
+      }
     }
   }
   return jobs;
@@ -123,6 +137,29 @@ async function refreshProject(id: string) {
   if (!cur) return;
   const patch = projectStatsPatch(cur.data, open.length, renovate.length);
   if (changes(cur.data, patch)) patchData<'project'>(cur, patch);
+}
+
+async function refreshBuildRun(id: string) {
+  const b = get(id, 'build');
+  if (!b) return;
+  const runId = Number(b.data.runId);
+  const run = await native.gh.runView(b.data.repo, runId);
+  queryClient.setQueryData(qk.gh.run(b.data.repo, runId), run);
+  const cur = get(id, 'build');
+  if (!cur) return;
+  const patch = diffPatch(cur.data, runPatch(run));
+  if (Object.keys(patch).length) patchData<'build'>(cur, patch);
+}
+
+/** The PR's checks → its existing build items (never creates any; that is the PR sidebar's "Add to canvas"). */
+async function refreshPrChecks(repo: string, number: number, branch: string) {
+  const checks = await native.gh.prChecks(repo, number);
+  queryClient.setQueryData(qk.gh.checks(repo, number), checks);
+  const items = getState().items;
+  const pr =
+    items.find((i): i is ItemOf<'pr'> => i.kind === 'pr' && i.data.repo === repo && i.data.number === number) ??
+    ({ id: '', kind: 'pr', data: { repo, number, headBranch: branch } } as unknown as ItemOf<'pr'>);
+  for (const u of planBuildSync(items, pr, checks).updates) patchData<'build'>(u.id, u.patch);
 }
 
 /** Next time a job may run, given its own and its group's failures. */
