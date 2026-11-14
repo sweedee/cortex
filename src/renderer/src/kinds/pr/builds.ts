@@ -75,7 +75,8 @@ export function planBuildSync(items: Item[], pr: ItemOf<'pr'>, checks: GhCheck[]
       const patch: BuildPatch = {};
       for (const k of SAME) if (JSON.stringify(cur.data[k]) !== JSON.stringify(data[k])) (patch as Record<string, unknown>)[k] = data[k];
       if (Object.keys(patch).length) out.updates.push({ id: cur.id, patch });
-    } else {
+    } else if (c.bucket !== 'skipping') {
+      // skipped checks would only clutter the canvas
       out.creates.push({
         kind: 'build',
         handle: `${c.name} · #${pr.data.number}`,

@@ -45,9 +45,9 @@ export const runRequest = (t: TestRun): TestRunRequest => ({ id: t.id, cwd: t.da
 export const startPatch = (t: TestRun, now = Date.now()): Partial<TestRunData> => ({ state: 'running', procId: t.id, summary: undefined, outputTail: undefined, startedAt: now, endedAt: undefined });
 
 export const durationText = (d: Pick<TestRunData, 'startedAt' | 'endedAt' | 'state'>, now = Date.now()) => {
-  if (!d.startedAt) return '–';
+  if (d.startedAt == null) return '–';
   const end = d.endedAt ?? (d.state === 'running' ? now : undefined);
-  if (!end) return '–';
+  if (end == null) return '–';
   const s = Math.max(0, Math.round((end - d.startedAt) / 1000));
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
 };

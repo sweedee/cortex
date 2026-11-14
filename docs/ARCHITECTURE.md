@@ -517,3 +517,61 @@ e.g. `CORTEX_CLAUDE_BIN=src/main/services/__fixtures__/fake-claude.mjs` for a fr
 `CORTEX_JIRA_CLI=mock|acli`, `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`, `CORTEX_CLAUDE_BIN`,
 `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`. Defaults in `shared/integrations/config.ts`
 (`integrations:config` returns the effective values).
+
+### Kind: pr
+
+`kinds/pr/`: `index.tsx` (module), `logic.ts` (pure: ring, action availability, merge form → `prMerge` args,
+stack helpers), `actions.tsx` (UI flows), `builds.ts` (checks → build items), `Sidebar.tsx`, `pr.css`.
+
+- **Ring** mirrors the refresher's `prPatch` / `summarizePr`: merged / closed alone; otherwise a review slice
+  (draft wins, then approved / changes requested / pending) plus a conflict slice and a checks slice, so an
+  approved but conflicting PR is a split ring. "No checks" counts as green for *mergeable*.
+- **Actions.** *Merge…* (UI; disabled for drafts, closed / merged PRs and demo repos): form with merge method
+  (squash default / merge / rebase), "delete branch", and a warning line when checks fail or run, the PR isn't
+  approved or has conflicts → `ghOps.prMerge`; then the item is marked merged and archived (undo toast),
+  stacked children are handled (see below) and a toast offers to remove the PR's worktree (linked one, else the
+  project's worktree on the head branch; `gitOps.worktreeRemove` from the project's `baseDir`, else only the
+  bubble). *Rebase* (UI): `ghOps.prUpdateBranch(rebase)`; conflicts (known up front or reported) → warning
+  toast + `/rebase @PR` in the chat box. *Request AI review…* (UI): confirm showing the comment (setting, else
+  main's config) → `ghOps.requestAiReview`. *Address review* / *Review PR* / *Write description* (AI:
+  `address-review`, `review-pr`, `describe-pr`). *Open on GitHub*.
+- **Stacked PRs** (`data.stackedOn` + the "stacked on" link): the sidebar's Stack section lists parent and
+  children. When the parent is merged with "delete branch", GitHub retargets the children itself, so their
+  `baseBranch` is updated locally; otherwise a toast (and a hint in the child's sidebar) says to change the base
+  on GitHub. There is no `gh pr edit --base` channel, so Cortex never retargets by itself.
+- **Sidebar** tabs: *Overview* (summary, state chip, author, base ← head, mergeable / mergeStateStatus, files,
+  reviews + requested reviewers, checks from `usePrChecks` linking to their details, description (HTML comments
+  stripped), the last 5 comments, stack, connections; `usePr` results are written back with `prPatch`),
+  *Files* (wide `DiffViewer` on `usePrDiff`), *GitHub* (wide `WebPanel`, `partition="persist:github"`). Demo
+  repos (`unknown/…`, or not in the desktop app) show a hint instead of loading.
+- **Builds from checks**: the Checks section keeps existing build bubbles of the PR in step (deduped by repo +
+  name + PR number) and offers *Add N to canvas* for the missing ones (skipped checks excluded), linked
+  `checks` → the PR.
+
+### Kind: build
+
+`kinds/build/`: `index.tsx`, `logic.ts` (ring, Jenkins detection, rerun mode, `gh run view` → data), `Sidebar.tsx`.
+
+- *Re-run…*: with a numeric `runId` (GitHub Actions) a form with "only the failed jobs" (default on when it
+  failed) → `ghOps.runRerun`, then the item goes back to queued. Without one (Jenkins / other CI through the
+  checks API) gh can't rerun it: the details page opens and a toast says why. *Open in Jenkins* when the URL's
+  host contains "jenkins" (or has Jenkins' `/job/<name>` path on a non-GitHub host), else *Open details*.
+  *View details* opens the sidebar (replaces the prototype log dialog). AI: `fix-ci`, `explain-build`.
+- Sidebar: *Overview* (state / conclusion / CI chips, name, branch, PR (jumps to the PR item), trigger,
+  started, duration, stage, number / attempt, URL; for Actions runs the jobs from `useRun` (polls while running),
+  failed jobs highlighted with their steps; run data is written back to the item) and *Details* / *Jenkins*
+  (wide `WebPanel`; Jenkins uses the `persist:ci` partition).
+
+### Kind: testrun
+
+`kinds/testrun/`: `index.tsx`, `logic.ts` (ring, availability, runner request), `failures.ts`, `Sidebar.tsx`.
+
+- *Re-run*: `testOps.run({id: item.id, cwd, command})`; the item is set to running with `procId = item.id`
+  right away (restored if it can't start); live sync (`test:state`) then sets state, summary, times and
+  notices. Disabled while running and for non-absolute `cwd` (demo data). *Stop* while running
+  (`testOps.stop(procId)`; only for runs Cortex started). *View output* opens the sidebar. AI: `fix-tests`.
+  Items created elsewhere (the worktree kind, `procId` = item id) work the same way.
+- A failed run without failing tests (crash, exit code) still gets a red slice.
+- Sidebar: summary, state chip + counts, command, directory, duration (live while running), worktree, the
+  failing tests parsed from the output (`failingTests`: vitest, jest, pytest, go; deduped) with *Fix with
+  Claude*, and a live `LogView` of `useTestLog(procId)` (follows), falling back to `outputTail`.

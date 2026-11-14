@@ -27,6 +27,9 @@ type Pr = ItemOf<'pr'>;
 
 const COMMENTS = 5;
 
+/** PR templates are full of HTML comments; the markdown viewer shows raw HTML as text. */
+const stripComments = (s: string) => s.replace(/<!--[\s\S]*?-->/g, '').trim();
+
 export function PrSidebar({ item, ctx }: SidebarProps<'pr'>) {
   const real = isRealRepo(item.data.repo) && isDesktop;
   return (
@@ -110,7 +113,7 @@ function Overview({ pr, ctx, real }: { pr: Pr; ctx: KindCtx; real: boolean }) {
       {real && <Checks pr={pr} ctx={ctx} />}
       {view && (
         <SidebarSection label="Description">
-          {view.body.trim() ? <Markdown source={view.body} onLinkClick={(h) => void openUrl(h)} className="pr-md" /> : <div className="pr-state">No description.</div>}
+          {stripComments(view.body) ? <Markdown source={stripComments(view.body)} onLinkClick={(h) => void openUrl(h)} className="pr-md" /> : <div className="pr-state">No description.</div>}
         </SidebarSection>
       )}
       {view && <Comments view={view} />}
