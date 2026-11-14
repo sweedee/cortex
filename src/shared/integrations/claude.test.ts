@@ -78,9 +78,10 @@ describe('claude stream-json reducer', () => {
     expect(after.messages.find((m) => m.id === 'tb')).toMatchObject({ status: 'error', detail: 'denied' });
   });
 
-  it('marks failed turns, ignores subagent and unknown events', () => {
+  it('marks failed turns, nests subagent output, ignores unknown events', () => {
     const s = fold([init, { type: 'assistant', session_id: S, parent_tool_use_id: 'task1', message: { content: [{ type: 'text', text: 'sub' }] } }, { type: 'rate_limit_event' } as unknown as ClaudeEvent]);
-    expect(s.messages).toEqual([]);
+    expect(s.messages).toMatchObject([{ role: 'assistant', text: 'sub', parent: 'task1' }]);
+    expect(s.lastText).toBeUndefined();
     const f = applyClaudeEvent(s, { type: 'result', subtype: 'error_during_execution', is_error: true, session_id: S });
     expect(f).toMatchObject({ status: 'failed', error: 'error_during_execution' });
   });

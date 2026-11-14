@@ -1,0 +1,94 @@
+/* Model / effort / permission-mode pickers (chat/SessionPickers.tsx): flat, small, terminal-ish. */
+.sp-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.sp-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--dt-colors-text-neutral-subdued);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sp-btn svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.sp-btn .sp-caret {
+  width: 10px;
+  height: 10px;
+  opacity: 0.7;
+}
+.sp-btn:hover:not(:disabled),
+.sp-btn[data-state='open'],
+.sp-btn[aria-expanded='true'] {
+  background: var(--dt-colors-background-field-neutral-emphasized, rgba(127, 127, 127, 0.12));
+  color: var(--dt-colors-text-neutral-default);
+}
+.sp-btn.is-set {
+  color: var(--dt-colors-text-neutral-default);
+}
+.sp-btn:focus-visible {
+  outline: 2px solid var(--dt-colors-border-primary-accent);
+  outline-offset: -1px;
+}
+.sp-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.sp-btn.tone-warning {
+  color: var(--dt-colors-text-warning-default);
+}
+.sp-btn.tone-critical {
+  color: var(--dt-colors-text-critical-default);
+}
+.sp-pending {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dt-colors-text-warning-default);
+}
+.sp-blank {
+  display: inline-block;
+  width: 16px;
+}
+.sp-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sp-hint {
+  font-size: 11px;
+  color: var(--dt-colors-text-neutral-subdued);
+  max-width: 280px;
+  white-space: normal;
+}
+
+/* the chat box's footer row: defaults for new sessions */
+.chat-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 4px 34px;
+  min-width: 0;
+}
+.chat-foot-hint {
+  font-size: 11px;
+  color: var(--dt-colors-text-neutral-subdued);
+  opacity: 0.7;
+  white-space: nowrap;
+}

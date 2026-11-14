@@ -27,12 +27,16 @@ import {
   answersAsText,
   applyClaudeEvent,
   ASK_TOOL,
+  catalogOf,
   flattenAnswers,
   newSession,
   parseStreamLine,
   replayTranscript,
   toSummary,
   type ClaudeAnswers,
+  type ClaudeCatalog,
+  type ClaudeConfigureRequest,
+  type ClaudeConfigureResult,
   type ClaudeEvent,
   type ClaudeEventMessage,
   type ClaudePermissionDecision,
@@ -65,6 +69,8 @@ interface Entry {
   child?: ChildProcess;
   /** AskUserQuestion tool_use id → parked can_use_tool request */
   asks: Map<string, { requestId: string; input: Record<string, unknown> }>;
+  /** our own control requests in flight (set_model …) → what they change, for error reporting */
+  controls: Map<string, string>;
   stderr: LogTail;
   interrupting: boolean;
   stopping: boolean;
@@ -77,11 +83,17 @@ interface StoredSession {
   title: string;
   model?: string;
   permissionMode?: string;
+  effort?: string;
+  modelSetting?: string;
   createdAt: string;
   updatedAt: string;
   lastText?: string;
   costUsd?: number;
+  contextWindow?: number;
 }
+
+/** `--effort` levels the running process takes live (`apply_flag_settings {effortLevel}`); `max` is flag-only */
+const LIVE_EFFORT = new Set(['low', 'medium', 'high', 'xhigh']);
 
 let seq = 0;
 
@@ -114,6 +126,11 @@ export class ClaudeSessions {
   private entries = new Map<string, Entry>();
   private opts: ClaudeManagerOptions;
   private saveChain: Promise<void> = Promise.resolve();
+  /** what the CLI offers, from the latest `initialize` answer (any session, or a probe) */
+  private latestCatalog?: ClaudeCatalog;
+  private probing?: Promise<ClaudeCatalog>;
+  /** context window per model id, learned from result events */
+  private windows = new Map<string, number>();
 
   constructor(opts: ClaudeManagerOptions) {
     this.opts = opts;
@@ -129,18 +146,21 @@ export class ClaudeSessions {
       const list = JSON.parse(readFileSync(file, 'utf8')) as StoredSession[];
       for (const s of list) {
         const session: ClaudeSession = {
-          ...newSession({ localId: s.localId, cwd: s.cwd, title: s.title, sessionId: s.sessionId, model: s.model, permissionMode: s.permissionMode, at: s.createdAt }),
+          ...newSession({ localId: s.localId, cwd: s.cwd, title: s.title, sessionId: s.sessionId, model: s.model, permissionMode: s.permissionMode, effort: s.effort, at: s.createdAt }),
           status: 'done',
           running: false,
           updatedAt: s.updatedAt,
           lastText: s.lastText,
+          ...(s.modelSetting ? { modelSetting: s.modelSetting } : {}),
         };
-        session.usage = { ...session.usage, costUsd: s.costUsd ?? 0 };
+        session.usage = { ...session.usage, costUsd: s.costUsd ?? 0, contextWindow: s.contextWindow };
+        if (s.model && s.contextWindow) this.windows.set(s.model, s.contextWindow);
         this.entries.set(s.localId, {
           session,
-          req: { cwd: s.cwd, title: s.title, model: s.model, permissionMode: s.permissionMode as ClaudeStartRequest['permissionMode'] },
+          req: { cwd: s.cwd, title: s.title, model: s.modelSetting ?? s.model, effort: s.effort as ClaudeStartRequest['effort'], permissionMode: s.permissionMode as ClaudeStartRequest['permissionMode'] },
           events: [],
           asks: new Map(),
+          controls: new Map(),
           stderr: new LogTail(16 * 1024),
           interrupting: false,
           stopping: false,
@@ -161,10 +181,13 @@ export class ClaudeSessions {
       title: s.title,
       model: s.model,
       permissionMode: req.permissionMode,
+      effort: req.effort,
+      modelSetting: req.model,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
       lastText: s.lastText?.slice(0, 500),
       costUsd: s.usage.costUsd,
+      contextWindow: s.usage.contextWindow,
     }));
     const text = JSON.stringify(list, null, 2);
     this.saveChain = this.saveChain.then(() => atomicWrite(file, text)).catch(() => {});
@@ -192,7 +215,8 @@ export class ClaudeSessions {
 
   private spawn(e: Entry, resume: boolean) {
     const sessionId = e.session.sessionId ?? randomUUID();
-    e.session = { ...e.session, sessionId, running: true, status: 'starting', error: undefined, usage: { ...e.session.usage, processCostUsd: 0 } };
+    e.session = { ...e.session, sessionId, running: true, status: 'starting', error: undefined, restartPending: undefined, usage: { ...e.session.usage, processCostUsd: 0 } };
+    e.controls = new Map();
     e.interrupting = false;
     e.stopping = false;
     e.stderr = new LogTail(16 * 1024);
@@ -282,18 +306,34 @@ export class ClaudeSessions {
       // we don't serve other host requests (hooks, MCP, elicitation): say so, so the CLI doesn't hang
       this.write(e, { type: 'control_response', response: { subtype: 'error', request_id: ev.request_id, error: `cortex does not handle ${ev.request.subtype}` } });
     }
-    const prev = e.session.status;
+    const prev = e.session;
     let s = applyClaudeEvent(e.session, ev);
+    if (ev.type === 'control_response') {
+      const what = e.controls.get(ev.response.request_id);
+      e.controls.delete(ev.response.request_id);
+      if (ev.response.subtype === 'error' && what) {
+        // the CLI refused a live change: it applies with a restart instead
+        s = { ...s, activity: `Could not change ${what} live: ${ev.response.error ?? 'refused'}; applies with the next message`, restartPending: [...new Set([...(s.restartPending ?? []), what])] };
+      }
+      if (ev.response.subtype === 'success') {
+        const cat = catalogOf(ev.response.response);
+        if (cat) this.latestCatalog = cat;
+      }
+    }
     if (ev.type === 'result') {
       e.asks.clear();
       if (e.interrupting) {
         s = { ...s, status: 'idle', error: undefined, activity: 'Interrupted' };
         e.interrupting = false;
       }
+      if (s.model && s.usage.contextWindow) this.windows.set(s.model, s.usage.contextWindow);
     }
+    // the window is only reported with a result: reuse what an earlier session of that model learned
+    if (!s.usage.contextWindow && s.model && this.windows.has(s.model)) s = { ...s, usage: { ...s.usage, contextWindow: this.windows.get(s.model) } };
     if (s.status === 'running' && e.child === undefined) s = { ...s, status: 'done' };
     e.session = s;
-    if (ev.type === 'control_response' && prev === s.status) return; // our own acks: nothing visible changed
+    // our own acks: nothing visible changed
+    if (ev.type === 'control_response' && prev.status === s.status && prev.model === s.model && prev.permissionMode === s.permissionMode && prev.activity === s.activity && prev.cliVersion === s.cliVersion) return;
     this.emitState(e);
     if (ev.type === 'result' || (ev.type === 'system' && 'subtype' in ev && ev.subtype === 'init')) this.persist();
   }
@@ -305,6 +345,13 @@ export class ClaudeSessions {
     const ev = this.record(e, { type: 'user', session_id: sessionId, message: { role: 'user', content: text } });
     e.session = { ...applyClaudeEvent(e.session, ev), status: e.session.status === 'starting' ? 'starting' : 'running', activity: 'Thinking…' };
     this.emitState(e);
+  }
+
+  private control(e: Entry, what: string, request: Record<string, unknown>): boolean {
+    const id = `cfg-${++seq}`;
+    if (!this.write(e, { type: 'control_request', request_id: id, request })) return false;
+    e.controls.set(id, what);
+    return true;
   }
 
   private get(localId: string): Entry {
@@ -320,12 +367,13 @@ export class ClaudeSessions {
     const existing = this.entries.get(localId);
     if (existing?.child) throw new Error(`Claude session "${localId}" is already running`);
     const title = req.title ?? (req.prompt ? req.prompt.split('\n')[0].slice(0, 80) : 'Claude session');
-    const session = newSession({ localId, cwd: req.cwd, title, sessionId: req.resume ?? existing?.session.sessionId, model: req.model, permissionMode: req.permissionMode ?? this.opts.defaultPermissionMode });
-    const e: Entry = existing ?? { session, req, events: [], asks: new Map(), stderr: new LogTail(16 * 1024), interrupting: false, stopping: false };
+    const session = newSession({ localId, cwd: req.cwd, title, sessionId: req.resume ?? existing?.session.sessionId, model: req.model, effort: req.effort, permissionMode: req.permissionMode ?? this.opts.defaultPermissionMode });
+    const e: Entry = existing ?? { session, req, events: [], asks: new Map(), controls: new Map(), stderr: new LogTail(16 * 1024), interrupting: false, stopping: false };
     if (existing) {
       e.req = { ...existing.req, ...req };
-      e.session = { ...existing.session, title: req.title ?? existing.session.title, model: req.model ?? existing.session.model, sessionId: req.resume ?? existing.session.sessionId };
+      e.session = { ...existing.session, title: req.title ?? existing.session.title, model: req.model ?? existing.session.model, effort: req.effort ?? existing.session.effort, sessionId: req.resume ?? existing.session.sessionId };
     }
+    e.session = { ...e.session, modelSetting: e.req.model };
     this.entries.set(localId, e);
     this.spawn(e, !!e.session.sessionId && (!!req.resume || !!existing));
     if (req.prompt) this.sendUser(e, req.prompt);
@@ -334,9 +382,13 @@ export class ClaudeSessions {
     return toSummary(e.session);
   }
 
-  /** next user message; respawns with `--resume` when no process is attached */
-  send(localId: string, text: string): ClaudeSessionSummary {
+  /**
+   * Next user message. Respawns with `--resume` when no process is attached, or when a setting
+   * changed that the running process cannot take live (`restartPending`) and it is between turns.
+   */
+  async send(localId: string, text: string): Promise<ClaudeSessionSummary> {
     const e = this.get(localId);
+    if (e.child && e.session.restartPending?.length && e.session.status === 'idle') await this.stop(localId);
     if (!e.child) {
       if (!e.session.sessionId) throw new Error(`Claude session "${localId}" has no session id to resume`);
       this.spawn(e, true);
@@ -350,8 +402,107 @@ export class ClaudeSessions {
     return toSummary(e.session);
   }
 
+  /**
+   * Change model / effort / permission mode of a session. A running process gets them live over
+   * the control protocol (`set_model`, `set_permission_mode`, `apply_flag_settings {effortLevel}`);
+   * what it cannot take (effort `max`, back to the default effort) waits for a restart with the
+   * next message. Either way the next spawn passes them as flags.
+   */
+  configure(localId: string, c: ClaudeConfigureRequest): ClaudeConfigureResult {
+    const e = this.get(localId);
+    const out: ClaudeConfigureResult = {};
+    const pending = new Set(e.session.restartPending ?? []);
+    const live = !!e.child && !e.stopping;
+    if (c.model !== undefined) {
+      const model = c.model && c.model !== 'default' ? c.model : undefined;
+      e.req = { ...e.req, model };
+      e.session = { ...e.session, model: model ?? e.session.model, modelSetting: model };
+      out.model = live ? (this.control(e, 'model', { subtype: 'set_model', model: model ?? 'default' }) ? 'live' : 'restart') : 'next';
+    }
+    if (c.permissionMode !== undefined) {
+      e.req = { ...e.req, permissionMode: c.permissionMode };
+      e.session = { ...e.session, permissionMode: c.permissionMode };
+      out.permissionMode = live ? (this.control(e, 'permission mode', { subtype: 'set_permission_mode', mode: c.permissionMode }) ? 'live' : 'restart') : 'next';
+    }
+    if (c.effort !== undefined) {
+      const effort = c.effort ?? undefined;
+      e.req = { ...e.req, effort };
+      e.session = { ...e.session, effort };
+      if (!live) out.effort = 'next';
+      else if (effort && LIVE_EFFORT.has(effort) && this.control(e, 'effort', { subtype: 'apply_flag_settings', settings: { effortLevel: effort } })) {
+        out.effort = 'live';
+        pending.delete('effort');
+      } else {
+        out.effort = 'restart';
+        pending.add('effort');
+      }
+    }
+    for (const [k, v] of Object.entries(out)) if (v === 'restart' && k !== 'effort') pending.add(k === 'permissionMode' ? 'permission mode' : k);
+    e.session = { ...e.session, restartPending: live && pending.size ? [...pending] : undefined, updatedAt: new Date().toISOString() };
+    this.emitState(e);
+    this.persist();
+    return out;
+  }
+
+  /**
+   * What the CLI offers (slash commands, skills, models). From the latest `initialize` answer of
+   * any session; before the first session a short probe process answers `initialize` (no API call,
+   * no tokens) and exits.
+   */
+  catalog(cwd = homedir()): Promise<ClaudeCatalog> {
+    if (this.latestCatalog) return Promise.resolve(this.latestCatalog);
+    this.probing ??= new Promise<ClaudeCatalog>((resolve) => {
+      const empty: ClaudeCatalog = { commands: [], models: [] };
+      let child: ChildProcess;
+      try {
+        child = spawn(this.opts.bin, [...(this.opts.prefixArgs ?? []), '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence'], {
+          cwd,
+          env: { ...process.env, ...this.opts.env },
+          shell: false,
+          stdio: ['pipe', 'pipe', 'ignore'],
+          ...treeSpawnOptions,
+        });
+      } catch {
+        return resolve(empty);
+      }
+      let over = false;
+      const done = (cat: ClaudeCatalog) => {
+        if (over) return;
+        over = true;
+        clearTimeout(timer);
+        child.stdin?.end();
+        setTimeout(() => {
+          if (child.exitCode === null && child.signalCode === null) killTree(child.pid);
+        }, 1000);
+        resolve(cat);
+      };
+      const timer = setTimeout(() => done(empty), 20_000);
+      let buf = '';
+      child.stdout?.setEncoding('utf8').on('data', (chunk: string) => {
+        buf += chunk;
+        let nl: number;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const ev = parseStreamLine(buf.slice(0, nl));
+          buf = buf.slice(nl + 1);
+          if (ev?.type === 'control_response' && ev.response.request_id === 'probe-1') {
+            const cat = ev.response.subtype === 'success' ? catalogOf(ev.response.response) : null;
+            if (cat) this.latestCatalog ??= cat;
+            return done(cat ?? empty);
+          }
+        }
+      });
+      child.stdin?.on('error', () => {});
+      child.on('error', () => done(empty));
+      child.on('close', () => done(this.latestCatalog ?? empty));
+      child.stdin?.write(JSON.stringify({ type: 'control_request', request_id: 'probe-1', request: { subtype: 'initialize' } }) + '\n');
+    }).finally(() => {
+      this.probing = undefined;
+    });
+    return this.probing;
+  }
+
   /** answer an AskUserQuestion; returns how it was delivered */
-  answer(localId: string, toolUseId: string, answers: ClaudeAnswers): { via: 'tool' | 'message' } {
+  async answer(localId: string, toolUseId: string, answers: ClaudeAnswers): Promise<{ via: 'tool' | 'message' }> {
     const e = this.get(localId);
     const ask = e.asks.get(toolUseId);
     if (ask && e.child) {
@@ -365,7 +516,7 @@ export class ClaudeSessions {
       return { via: 'tool' };
     }
     // no parked request for it: the tool was not routed to us; answer in plain text instead
-    this.send(localId, answersAsText(answers));
+    await this.send(localId, answersAsText(answers));
     return { via: 'message' };
   }
 

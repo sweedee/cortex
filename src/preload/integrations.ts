@@ -60,6 +60,8 @@ export function integrationsApi(invoke: Invoke, on: On, eventChannels: readonly 
       list: () => invoke('claude:list'),
       transcript: (localId) => invoke('claude:transcript', { localId }),
       session: (localId) => invoke('claude:session', { localId }),
+      configure: (localId, c) => invoke('claude:configure', { localId, ...c }),
+      catalog: () => invoke('claude:catalog'),
     },
     apps: {
       start: (req) => invoke('apps:start', req),

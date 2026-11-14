@@ -15,7 +15,7 @@ export interface Mapped<D> {
   notice?: NoticeSpec;
 }
 
-/** Context window used for `usage.contextPct` (Claude Code's default window). */
+/** Context window for `usage.contextPct` until the CLI reported the real one (with the first result). */
 export const CONTEXT_WINDOW = 200_000;
 
 const firstLine = (s: string | undefined, max = 90) => {
@@ -57,7 +57,16 @@ export function mapClaudeState(s: ClaudeSessionSummary, prev: AgentData, title: 
       : undefined,
     pendingPermissions: s.pendingPermissions.length ? s.pendingPermissions.map((p) => ({ requestId: p.requestId, toolName: p.toolName, summary: firstLine(toolSummary(p.input), 120) })) : undefined,
     error: status === 'failed' ? (s.error ?? 'failed') : undefined,
-    usage: { contextPct: Math.min(100, Math.round((s.usage.contextTokens / CONTEXT_WINDOW) * 100)), costUsd: s.usage.costUsd, turns: s.usage.turns },
+    usage: {
+      contextPct: Math.min(100, Math.round((s.usage.contextTokens / (s.usage.contextWindow || CONTEXT_WINDOW)) * 100)),
+      costUsd: s.usage.costUsd,
+      turns: s.usage.turns,
+      contextTokens: s.usage.contextTokens,
+      ...(s.usage.contextWindow ? { contextWindow: s.usage.contextWindow } : {}),
+    },
+    ...(s.effort ? { effort: s.effort as AgentData['effort'] } : {}),
+    ...(s.permissionMode ? { permissionMode: s.permissionMode } : {}),
+    subagents: s.subagents?.length ? { running: s.subagents.filter((a) => a.status === 'running').length, total: s.subagents.length } : prev.subagents,
     startedAt: prev.startedAt ?? now,
     endedAt: ended ? (prev.endedAt && !['running', 'waiting'].includes(prev.status) ? prev.endedAt : now) : undefined,
   };

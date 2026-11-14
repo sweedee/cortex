@@ -113,7 +113,8 @@ src/renderer/src/
   data/        TanStack Query: queryClient.ts, queryKeys.ts, ops.ts, one file of hooks + write ops per integration
   sync/        live events → items (live.ts), startup reconciliation, background refresher, pure mappings
   ui/          toolkit for kind modules: form.tsx (openForm), formModel.ts, task.tsx (runTask, openUrl, …)
-  chat/        ChatBox.tsx (SKILLS list, @ / / / # popups), prompt.ts (prompt + context, cwd resolution)
+  chat/        ChatBox.tsx (@ / / / # popups), skills.ts (SKILLS), prompt.ts (prompt + context, cwd resolution),
+               SessionPickers.tsx + sessionOptions.ts (model / effort / permission-mode pickers, / command list)
   overlays/    Hud.tsx, Sidebar.tsx (shell), Dialogs.tsx (add / confirm), settings.ts (global settings form)
   store.ts     zustand store + the function API (select, patchItem, patchData, notify, insertSkill, …)
   persist.ts   workspace load (migrate + validate) and debounced autosave
@@ -334,13 +335,17 @@ item id as runner id and store it as `data.procId`. Live sync matches events by 
 3. Prompt = `buildPrompt`: the draft as typed (a leading `/skill` stays the slash command) + a context block, one
    line per mention, e.g. `- @CTX-4821 = Jira ticket CTX-4821 "Retry …" (In Progress, Story, branch feat/…)`.
 4. An agent item is created (`localId` = item id, handle `agent/<skill>-<ticket key>`, linked `about` the mentions
-   and `belongs to` the project), then `claude:start {localId, cwd, prompt, title, model, permissionMode}` with
-   `settings.model` (unset = CLI default) and `settings.permissionMode` (`default` = no flag). The draft clears
-   once sent; a toast offers *Open*.
+   and `belongs to` the project), then `claude:start {localId, cwd, prompt, title, model, effort, permissionMode}`
+   with `settings.model` / `settings.effort` (unset = CLI default) and `settings.permissionMode` (`default` = no
+   flag). The draft clears once sent; a toast offers *Open*.
 
-The chat box popups: `@` mentions (matching bubbles light up), `/` skills from the `SKILLS` list in
-`chat/ChatBox.tsx` (every skill a kind action inserts is listed there with a one-line description), `#` / `!`
-the actions of the mentioned bubbles.
+The chat box popups: `@` mentions (matching bubbles light up), `/` skills: the `SKILLS` list in `chat/skills.ts`
+(every skill a kind action inserts is listed there with a one-line description) merged with the CLI's own
+commands and skills (`claude:catalog`, see below), `#` / `!` the actions of the mentioned bubbles. Under the input,
+the model / effort / permission-mode pickers (`chat/SessionPickers.tsx`) set the defaults for new sessions; they
+are the same values as in the Settings dialog (`prefs.model`, `prefs.effort`, `prefs.permissionMode`). Choices
+come from the CLI's `initialize` answer (models with their effort levels) or, before that is known, the aliases
+`opus · sonnet · haiku · fable`.
 
 ## Toolkit for kind modules
 
@@ -521,11 +526,20 @@ deduped) with *Fix with Claude*, and a live `LogView`.
   multi-question or multi-select opens the answer form), *Allow* / *Deny* per pending permission, *Interrupt*
   (running), *Stop*, *Send follow-up* (puts `@agent` into the chat box), *Continue* / *Fork* (AI), folder
   actions. Demo agents (no `localId`) keep local stop / answer.
-- **Sidebar** (*Session* | *Details*): transcript from `useClaudeTranscript` through `buildRows()` (messages,
-  thinking, tool calls with inputs and results, collapsible), the open AskUserQuestion as an inline card
-  (radio / checkboxes, *Other…*, Submit → `claude:answer`), permission cards (Allow / Deny →
-  `claude:permission`), composer (Enter sends, Shift+Enter new line, Esc interrupts), status line (status,
-  model or "default model", permission mode when not default, context % bar, turns, cost, last activity).
+- **Sidebar** (*Session* | *Details*): transcript from `useClaudeTranscript` through `buildTranscript()` (messages,
+  thinking, tool calls with inputs and results, collapsible, notes such as a live model switch). A `Task` / `Agent`
+  call is a **subagent group**: status, type, tool count, tokens, duration; open = its prompt, its own tool calls
+  and text (messages with `parent_tool_use_id`, nested subagents too) and its result. A strip of subagent badges
+  above the composer jumps to them. The open AskUserQuestion is an inline card (radio / checkboxes, *Other…*,
+  Submit → `claude:answer`), permission cards (Allow / Deny → `claude:permission`). Composer: Enter sends (also
+  while running, to steer), Shift+Enter new line, Esc interrupts, `/` autocompletes Cortex skills + the session's
+  CLI commands, and the model / effort / permission-mode pickers change *this* session (`claude:configure`; a dot
+  marks a setting that applies with the next message). Status bar (`usage.ts`): status · model (as resolved by the
+  CLI) · effort · permission mode · context meter `used/window %` (warning ≥ 80 %, critical ≥ 95 %; the window
+  is assumed 200k until the first result reports it) · tokens in/out · cache hit of the latest call (tooltip: session
+  totals) · cost · turns and time · subagents.
+- **Canvas**: facts *Context* (tokens of window), *Subagents*, *Mode*; subtitle counts subagents; a running
+  subagent shows as a badge on the bubble (`data.subagents`, `data.usage.contextTokens / contextWindow`).
 
 ### app
 
@@ -677,8 +691,10 @@ each stdout line is an event, stamped, kept as the transcript, folded with `appl
 | `claude:permission {localId, requestId, decision}` | allow / deny a pending tool permission prompt |
 | `claude:interrupt {localId}` | `control_request {subtype: 'interrupt'}`; the turn ends, the process stays (status `idle`, activity "Interrupted") |
 | `claude:stop {localId}` / `claude:remove` | close stdin (tree-kill after 2 s) / also forget the session |
-| `claude:list` / `claude:transcript` / `claude:session` | summaries / raw events (after a restart: read from `~/.claude/projects/<slug>/<id>.jsonl`) / full session with messages |
-| events `claude:event {localId, event}`, `claude:state ClaudeSessionSummary` | status `starting · running · waiting · idle · done · failed`, `model`, `permissionMode`, `pendingQuestion`, `pendingPermissions`, `activity`, `lastText`, `usage` (tokens, context, cost, turns) |
+| `claude:list` / `claude:transcript` / `claude:session` | summaries / raw events (after a restart: read from `~/.claude/projects/<slug>/<id>.jsonl`) / full session with messages and the CLI's `commands` / `models` |
+| `claude:configure {localId, model?, effort?, permissionMode?}` → `{model?, effort?, permissionMode?: 'live' \| 'restart' \| 'next'}` | change a session's settings (`null` = CLI default). Running process: `set_model`, `set_permission_mode`, `apply_flag_settings {effortLevel}` control requests (live); effort `max` or back to the default effort is flag-only → `restartPending`, the next `send` between turns restarts the process with `--resume`. No process: applies on resume. A refused control request also falls back to the restart |
+| `claude:catalog` → `{commands, models, cliVersion}` | what the CLI offers, from the latest `initialize` answer of any session; before the first session a probe process (`--no-session-persistence`, `initialize` only, no API call) answers |
+| events `claude:event {localId, event}`, `claude:state ClaudeSessionSummary` | status `starting · running · waiting · idle · done · failed`, `model` (resolved), `modelSetting` (chosen), `effort`, `permissionMode`, `restartPending`, `pendingQuestion`, `pendingPermissions`, `activity`, `lastText`, `subagents`, `usage` (see below) |
 
 **AskUserQuestion.** With `--permission-prompt-tool stdio` the CLI asks the host before it runs a tool:
 a stdout line `{type: 'control_request', request_id, request: {subtype: 'can_use_tool', tool_name,
@@ -693,11 +709,32 @@ while a question is open denies the question first. Other tools' prompts appear 
 (depends on `--permission-mode`; `acceptEdits` / `bypassPermissions` reduce them). Other host requests (hooks,
 MCP, elicitation) are answered with an error response so the CLI never hangs.
 
-Permission modes (the Settings select): CLI default (no flag), `manual`, `acceptEdits`, `plan`, `auto`,
-`dontAsk`, `bypassPermissions`. Cost: `total_cost_usd` is cumulative per process, so each result adds its
-delta. Session metadata (`localId`, Claude `session_id`, cwd, title, model, permission mode, cost) is stored in
+**Usage.** Totals count every API call once (assistant messages repeat per content block; subagents included);
+at each `result`, `model_usage_since_last_result` replaces what was summed during the turn. The context size is
+the latest *main-thread* call's `input + cache_read + cache_creation` tokens (`usage.last` keeps the parts for the
+cache-hit rate); the window comes from `result.modelUsage[model].contextWindow` and is remembered per model for
+later sessions. `durationMs` sums the turns.
+
+**Subagents.** A `Task` / `Agent` tool use starts one (`description`, `subagent_type`, `run_in_background`);
+`system/task_started · task_progress · task_updated · task_notification` add the task id, tool count, tokens,
+duration and the current step; the tool result (foreground) or the task events (background) end it; a failed or
+interrupted turn stops the rest. Their messages carry `parent_tool_use_id` and are kept with `parent` set; they
+never change the main thread's text, model or context.
+
+Verified against a real Claude Code 2.1.325 session (haiku, one subagent, then a live `set_model` /
+`set_permission_mode` / `apply_flag_settings`), kept as
+`src/shared/integrations/__fixtures__/claude-real-subagent.jsonl` and replayed in `claudeUsage.test.ts`. After
+`set_model` the CLI echoes `<local-command-stdout>Set model to …` (shown as a note) and re-sends `system/init`;
+`set_permission_mode` is confirmed with `system/status {permissionMode}`.
+
+Permission modes (the Settings select and the pickers): CLI default (no flag), `manual`, `acceptEdits`, `plan`,
+`auto`, `dontAsk`, `bypassPermissions`. Effort: `low · medium · high · xhigh · max`. Cost: `total_cost_usd` is
+cumulative per process, so each result adds its delta. Session metadata (`localId`, Claude `session_id`, cwd, title, model, chosen model, effort, permission mode, cost,
+context window) is stored in
 `<userData>/claude-sessions.json`. Binary: `CORTEX_CLAUDE_BIN`; a `.js` / `.mjs` path runs with Electron's
-node, e.g. `CORTEX_CLAUDE_BIN=src/main/services/__fixtures__/fake-claude.mjs` for a free end-to-end run.
+node, e.g. `CORTEX_CLAUDE_BIN=src/main/services/__fixtures__/fake-claude.mjs` for a free end-to-end run (it answers the
+control requests above, reports growing usage with cache reads and a 200k window; `agent …` spawns a subagent,
+`full …` fills the context to 93 %).
 
 ### Apps and test runs
 

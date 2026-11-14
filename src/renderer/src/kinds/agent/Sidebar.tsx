@@ -1,40 +1,50 @@
 /**
- * The agent's sidebar: a basic Claude Code harness. Transcript (markdown messages, collapsible tool
- * calls, thinking), the open question as a card, permission prompts, a composer for follow-ups and
- * a status line. Ported from the `prototype` branch's `components/session/*`, on the real data:
- * `useClaudeTranscript` (raw events → rows, see transcript.ts) and `useClaudeSession` (status, usage,
- * pending prompts). Demo agents (no `localId`) show an empty state and their seeded question.
+ * The agent's sidebar: a Claude Code harness. Transcript (markdown messages, collapsible tool
+ * calls, thinking, subagents with their own tool calls nested), the open question as a card,
+ * permission prompts, a composer (follow-ups, `/` commands, model / effort / permission-mode
+ * pickers that change the running session) and a terminal-like status bar (context meter, tokens,
+ * cache hits, cost, turns, subagents). Data: `useClaudeTranscript` (raw events → rows, see
+ * transcript.ts) and `useClaudeSession` (status, usage, subagents, pending prompts). Demo agents
+ * (no `localId`) show an empty state and their seeded question.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { AiLoadingIndicator, Chip, ProgressCircle } from '@dynatrace/strato-components/content';
-import { ArrowUpIcon, BlockIcon, CheckmarkIcon, ChevronDownIcon, ChevronRightIcon, CriticalIcon, PauseIcon, StopIcon } from '@dynatrace/strato-icons';
-import { toolSummary, type ClaudeSession, type PendingPermission } from '../../../../shared/integrations/claude';
+import {
+  AgentIcon,
+  AIModelIcon,
+  ArrowUpIcon,
+  BlockIcon,
+  CheckmarkIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CriticalIcon,
+  DatabaseIcon,
+  PauseIcon,
+  SecurityIcon,
+  StopIcon,
+  TerminalIcon,
+  TokenIcon,
+} from '@dynatrace/strato-icons';
+import { toolSummary, type ClaudeConfigureRequest, type ClaudeEffort, type ClaudeSession, type PendingPermission, type SubagentInfo } from '../../../../shared/integrations/claude';
+import { SessionPickers } from '../../chat/SessionPickers';
+import { configureMessage, modelLabel, permissionChoice, slashOptions, type PermissionValue } from '../../chat/sessionOptions';
+import { SKILLS } from '../../chat/skills';
 import { Markdown } from '../../components/viewers';
-import { claudeOps, useClaudeSession, useClaudeTranscript } from '../../data/claude';
+import { claudeOps, useClaudeCatalog, useClaudeSession, useClaudeTranscript } from '../../data/claude';
 import type { ItemOf } from '../../domain';
 import { isDesktop } from '../../native';
 import { DefaultSidebar, SidebarTabs } from '../../sidebar';
+import { patchData } from '../../store';
 import { TONE_CHIP } from '../../tones';
 import { errorText, openUrl } from '../../ui/task';
 import { toast } from '../common';
+import { skillIcon } from '../icons';
 import type { SidebarProps } from '../types';
 import { answerQuestion, decidePermission, interruptAgent, stopAgent } from './session';
 import { agentRing } from './ring';
-import {
-  answersOf,
-  buildRows,
-  contextTone,
-  emptyChoice,
-  groupRows,
-  inputText,
-  isAnswered,
-  toggleChoice,
-  toggleOther,
-  usd,
-  type Choice,
-  type Row,
-} from './transcript';
+import { answersOf, buildTranscript, emptyChoice, groupRows, inputText, isAnswered, toggleChoice, toggleOther, type Block, type Choice, type Row } from './transcript';
+import { contextTone, duration, subagentTally, tokens, usageView, usd } from './usage';
 import './agent.css';
 
 type Agent = ItemOf<'agent'>;
@@ -63,8 +73,10 @@ function Harness({ agent }: { agent: Agent }) {
   const real = !!localId && isDesktop;
   const session = useClaudeSession(localId);
   const transcript = useClaudeTranscript(localId);
-  const rows = useMemo(() => buildRows(transcript.data ?? [], localId), [transcript.data, localId]);
+  const { rows, subagents: foldedSubs } = useMemo(() => buildTranscript(transcript.data ?? [], localId), [transcript.data, localId]);
   const s = session.data;
+  // the session state is fresher while running; the transcript fold works for restored sessions too
+  const subagents = s?.subagents?.length ? s.subagents : foldedSubs;
   const status = agent.data.status;
   const running = status === 'running';
   const pendingQ = agent.data.pendingQuestion;
@@ -76,11 +88,26 @@ function Harness({ agent }: { agent: Agent }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const last = rows[rows.length - 1];
-  const tick = `${rows.length}:${last && 'text' in last ? last.text.length : (last?.status ?? '')}:${status}:${perms.length}`;
+  const tick = `${rows.length}:${last && 'text' in last ? last.text.length : last?.kind === 'subagent' ? last.children.length : (last?.status ?? '')}:${status}:${perms.length}`;
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [tick]);
+
+  // a click on a subagent badge opens and reveals its group in the transcript
+  const [openSubs, setOpenSubs] = useState<Set<string>>(() => new Set());
+  const toggleSub = (id: string, open?: boolean) =>
+    setOpenSubs((prev) => {
+      const next = new Set(prev);
+      if (open ?? !next.has(id)) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const reveal = (id: string) => {
+    toggleSub(id, true);
+    stick.current = false;
+    requestAnimationFrame(() => document.getElementById(subDomId(id))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  };
 
   const blocks = groupRows(rows);
   const hasOpenCard = rows.some((r) => r.kind === 'question' && r.status === 'running');
@@ -107,17 +134,7 @@ function Harness({ agent }: { agent: Agent }) {
       <>
         {transcript.error && <div className="ah-error">Could not load the transcript: {errorText(transcript.error)}</div>}
         {!rows.length && !transcript.error && <div className="ah-empty">No messages yet.</div>}
-        {blocks.map((b) =>
-          b.kind === 'tools' ? (
-            <div key={b.id} className="ah-tools">
-              {b.rows.map((r) => (
-                <ToolRow key={r.id} row={r} />
-              ))}
-            </div>
-          ) : (
-            <RowView key={b.row.id} row={b.row} agent={agent} />
-          ),
-        )}
+        <Blocks blocks={blocks} agent={agent} openSubs={openSubs} toggleSub={toggleSub} />
         {/* the question is known from the state before its event reached the transcript */}
         {pendingQ && !hasOpenCard && <QuestionCard agent={agent} questions={pendingQ.questions} />}
       </>
@@ -140,18 +157,41 @@ function Harness({ agent }: { agent: Agent }) {
         ))}
         {running && (
           <div className="ah-working">
-            <AiLoadingIndicator>{agent.data.lastActivity ?? s?.activity ?? 'Working…'}</AiLoadingIndicator>
+            <AiLoadingIndicator>{s?.activity ?? agent.data.lastActivity ?? 'Working…'}</AiLoadingIndicator>
           </div>
         )}
         {status === 'failed' && <div className="ah-error">Session failed{agent.data.error ? `: ${agent.data.error}` : '.'}</div>}
       </div>
-      <Composer agent={agent} real={real} />
-      <StatusLine agent={agent} session={s} />
+      {subagents.length > 0 && <SubagentStrip subagents={subagents} onPick={reveal} />}
+      <Composer agent={agent} real={real} session={s} />
+      <StatusLine agent={agent} session={s} subagents={subagents} />
     </div>
   );
 }
 
-function RowView({ row, agent }: { row: Row; agent: Agent }) {
+const subDomId = (toolUseId: string) => `ah-sub-${toolUseId.replace(/[^\w-]/g, '')}`;
+
+function Blocks({ blocks, agent, openSubs, toggleSub }: { blocks: Block[]; agent: Agent; openSubs: Set<string>; toggleSub: (id: string) => void }) {
+  return (
+    <>
+      {blocks.map((b) =>
+        b.kind === 'tools' ? (
+          <div key={b.id} className="ah-tools">
+            {b.rows.map((r) => (
+              <ToolRow key={r.id} row={r} />
+            ))}
+          </div>
+        ) : b.row.kind === 'subagent' ? (
+          <SubagentRow key={b.row.id} row={b.row} agent={agent} open={openSubs.has(b.row.id)} openSubs={openSubs} toggleSub={toggleSub} />
+        ) : (
+          <RowView key={b.row.id} row={b.row} agent={agent} />
+        ),
+      )}
+    </>
+  );
+}
+
+function RowView({ row, agent }: { row: Exclude<Row, { kind: 'subagent' }>; agent: Agent }) {
   switch (row.kind) {
     case 'user':
       return (
@@ -165,6 +205,8 @@ function RowView({ row, agent }: { row: Row; agent: Agent }) {
           <Markdown source={row.text} onLinkClick={(h) => void openUrl(h)} />
         </div>
       );
+    case 'note':
+      return <div className="ah-note">{row.text}</div>;
     case 'thinking':
       return <Thinking text={row.text} />;
     case 'question':
@@ -175,6 +217,70 @@ function RowView({ row, agent }: { row: Row; agent: Agent }) {
   }
 }
 
+function SubStatusIcon({ status }: { status: SubagentInfo['status'] }) {
+  if (status === 'running') return <span className="ah-spinner" aria-label="Running" />;
+  if (status === 'failed') return <CriticalIcon className="ah-ic-critical" aria-label="Failed" />;
+  if (status === 'stopped') return <StopIcon className="ah-sub" aria-label="Stopped" />;
+  return <CheckmarkIcon className="ah-ic-success" aria-label="Done" />;
+}
+
+/** "Explore · 3 tools · 19k tokens · 4.2s" */
+const subFacts = (s: SubagentInfo) =>
+  [s.type, s.background ? 'background' : '', `${s.toolUses} tool${s.toolUses === 1 ? '' : 's'}`, s.tokens ? `${tokens(s.tokens)} tokens` : '', s.durationMs ? duration(s.durationMs) : ''].filter(Boolean).join(' · ');
+
+/** A Task / Agent call: header with the subagent's status and numbers; open = its prompt, tool calls, text, result. */
+function SubagentRow({ row, agent, open, openSubs, toggleSub }: { row: Extract<Row, { kind: 'subagent' }>; agent: Agent; open: boolean; openSubs: Set<string>; toggleSub: (id: string) => void }) {
+  const [showPrompt, setShowPrompt] = useState(false);
+  const s = row.sub;
+  const now = s.status === 'running' ? (s.activity ?? (s.lastTool ? `using ${s.lastTool}` : 'starting')) : '';
+  return (
+    <div className={`ah-subagent is-${s.status}`} id={subDomId(row.id)}>
+      <button type="button" className="ah-btn ah-subagent-head" aria-expanded={open} onClick={() => toggleSub(row.id)} title={row.prompt}>
+        <span className="ah-sub">{open ? <ChevronDownIcon /> : <ChevronRightIcon />}</span>
+        <SubStatusIcon status={s.status} />
+        <AgentIcon className="ah-sub" />
+        <span className="ah-subagent-title ah-ellipsis">{s.description}</span>
+        <span className="ah-sub ah-small ah-ellipsis">{now || subFacts(s)}</span>
+      </button>
+      {open && (
+        <div className="ah-subagent-body">
+          {now && <div className="ah-sub ah-small">{subFacts(s)}</div>}
+          {row.prompt && (
+            <div className="ah-thinking">
+              <button type="button" className="ah-btn ah-thinking-head" aria-expanded={showPrompt} onClick={() => setShowPrompt((o) => !o)}>
+                {showPrompt ? <ChevronDownIcon /> : <ChevronRightIcon />}
+                <span>Prompt</span>
+                {!showPrompt && <span className="ah-ellipsis ah-sub">{row.prompt.split('\n')[0]}</span>}
+              </button>
+              {showPrompt && <div className="ah-thinking-body">{row.prompt}</div>}
+            </div>
+          )}
+          {row.children.length === 0 && <div className="ah-sub ah-small">{s.status === 'running' ? 'Working…' : 'No tool calls.'}</div>}
+          <Blocks blocks={groupRows(row.children)} agent={agent} openSubs={openSubs} toggleSub={toggleSub} />
+          {row.result && <pre className={`ah-pre ah-subagent-result ${row.status === 'error' ? 'is-error' : ''}`}>{row.result}</pre>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Compact badges of the session's subagents, above the composer. */
+function SubagentStrip({ subagents, onPick }: { subagents: SubagentInfo[]; onPick: (toolUseId: string) => void }) {
+  const t = subagentTally(subagents);
+  return (
+    <div className="ah-substrip" role="list" aria-label={`Subagents: ${t.text}`}>
+      <span className="ah-substrip-label" title={t.text}>
+        <AgentIcon /> {t.total}
+      </span>
+      {subagents.map((s) => (
+        <button key={s.toolUseId} type="button" role="listitem" className={`ah-btn ah-subchip is-${s.status}`} onClick={() => onPick(s.toolUseId)} title={`${s.description} — ${s.status}${s.activity ? `: ${s.activity}` : ''}\n${subFacts(s)}`}>
+          <SubStatusIcon status={s.status} />
+          <span className="ah-ellipsis">{s.description}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 function Thinking({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -337,13 +443,17 @@ function PermissionCard({ agent, perm }: { agent: Agent; perm: { requestId: stri
   );
 }
 
-function Composer({ agent, real }: { agent: Agent; real: boolean }) {
+function Composer({ agent, real, session }: { agent: Agent; real: boolean; session: ClaudeSession | undefined }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [slash, setSlash] = useState<{ start: number; query: string } | null>(null);
+  const [active, setActive] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const catalog = useClaudeCatalog().data;
   const status = agent.data.status;
   const running = status === 'running';
   const asking = !!agent.data.pendingQuestion;
+  const options = slash ? slashOptions(slash.query, SKILLS, session?.commands ?? catalog?.commands) : [];
 
   useEffect(() => {
     const el = ref.current;
@@ -352,10 +462,30 @@ function Composer({ agent, real }: { agent: Agent; real: boolean }) {
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [text]);
 
+  const refreshSlash = (value: string, pos: number) => {
+    const m = value.slice(0, pos).match(/(^|\s)\/([\w:-]*)$/);
+    setSlash(m ? { start: pos - m[2].length - 1, query: m[2] } : null);
+    setActive(0);
+  };
+  const accept = (i: number) => {
+    const o = options[i];
+    if (!o || !slash) return;
+    const insert = `/${o.name} `;
+    const next = text.slice(0, slash.start) + insert + text.slice(slash.start + 1 + slash.query.length);
+    setText(next);
+    setSlash(null);
+    const pos = slash.start + insert.length;
+    requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.setSelectionRange(pos, pos);
+    });
+  };
+
   const send = async () => {
     const t = text.trim();
     if (!t || !agent.data.localId || sending) return;
     setSending(true);
+    setSlash(null);
     try {
       await claudeOps.send(agent.data.localId, t);
       setText('');
@@ -366,9 +496,50 @@ function Composer({ agent, real }: { agent: Agent; real: boolean }) {
     }
   };
 
-  const placeholder = !real ? 'Demo agent: no session to talk to' : asking ? 'Answer above, or type your answer here…' : running ? 'Claude is working. Send a message to steer it…' : 'Reply to Claude…';
+  const configure = async (p: { model?: string; effort?: ClaudeEffort | ''; permissionMode?: PermissionValue }) => {
+    if (!agent.data.localId) return;
+    const req: ClaudeConfigureRequest = {
+      ...(p.model !== undefined ? { model: p.model || null } : {}),
+      ...(p.effort !== undefined ? { effort: p.effort || null } : {}),
+      ...(p.permissionMode !== undefined ? { permissionMode: p.permissionMode } : {}),
+    };
+    try {
+      const r = await claudeOps.configure(agent.data.localId, req);
+      patchData<'agent'>(agent, {
+        ...(p.effort !== undefined ? { effort: p.effort || undefined } : {}),
+        ...(p.permissionMode !== undefined ? { permissionMode: p.permissionMode === 'default' ? undefined : p.permissionMode } : {}),
+      });
+      const msg = configureMessage(r);
+      toast(msg.title, msg.message, 'info');
+    } catch (e) {
+      toast('Could not change the session', errorText(e), 'critical');
+    }
+  };
+
+  const placeholder = !real ? 'Demo agent: no session to talk to' : asking ? 'Answer above, or type your answer here…' : running ? 'Claude is working. Send a message to steer it…' : 'Reply to Claude… / for commands';
   return (
     <div className="ah-composer">
+      {slash && options.length > 0 && (
+        <div className="chat-popup ah-slash" role="listbox" aria-label="Commands and skills">
+          <div className="chat-popup-head">Commands and skills</div>
+          {options.map((o, i) => (
+            <div
+              key={o.name}
+              role="option"
+              aria-selected={i === active}
+              className={`chat-option ${i === active ? 'is-active' : ''}`}
+              onMouseDown={(e) => (e.preventDefault(), accept(i))}
+              onMouseEnter={() => setActive(i)}
+            >
+              <span className="chat-option-icon">{o.source === 'cortex' ? skillIcon(o.name) : <TerminalIcon />}</span>
+              <span className="chat-option-main">/{o.name}</span>
+              <span className="chat-option-sub" title={o.desc}>
+                {o.args ? `${o.args} · ${o.desc}` : o.desc}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <textarea
         ref={ref}
         rows={1}
@@ -376,29 +547,46 @@ function Composer({ agent, real }: { agent: Agent; real: boolean }) {
         disabled={!real}
         placeholder={placeholder}
         aria-label="Message to the agent"
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          refreshSlash(e.target.value, e.target.selectionStart);
+        }}
+        onClick={(e) => refreshSlash(text, e.currentTarget.selectionStart)}
+        onBlur={() => setTimeout(() => setSlash(null), 120)}
         onKeyDown={(e) => {
           if (e.nativeEvent.isComposing) return;
+          if (slash && options.length) {
+            if (e.key === 'ArrowDown') return (e.preventDefault(), setActive((a) => (a + 1) % options.length));
+            if (e.key === 'ArrowUp') return (e.preventDefault(), setActive((a) => (a - 1 + options.length) % options.length));
+            if (e.key === 'Tab' || e.key === 'Enter') return (e.preventDefault(), accept(active));
+          }
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             void send();
           } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            if (running) void interruptAgent(agent);
+            if (slash) setSlash(null);
+            else if (running) void interruptAgent(agent);
             else ref.current?.blur();
           }
         }}
       />
       <div className="ah-composer-bar">
-        <span className="ah-sub ah-small ah-ellipsis">{running ? 'Esc to interrupt · Enter to send' : 'Enter to send · Shift+Enter for a new line'}</span>
+        <SessionPickers
+          label="This session"
+          disabled={!real}
+          pending={session?.restartPending}
+          value={{ model: session ? session.modelSetting : agent.data.model, effort: (session?.effort ?? agent.data.effort) as ClaudeEffort | undefined, permissionMode: session?.permissionMode ?? agent.data.permissionMode }}
+          onChange={(p) => void configure(p)}
+        />
         <span className="ah-composer-buttons">
           {real && running && (
-            <Button size="condensed" onClick={() => void interruptAgent(agent)}>
+            <Button size="condensed" onClick={() => void interruptAgent(agent)} aria-label="Interrupt (Esc)">
               <Button.Prefix>
                 <PauseIcon />
               </Button.Prefix>
-              Interrupt
+              Esc
             </Button>
           )}
           {real && (running || status === 'waiting') && (
@@ -408,11 +596,10 @@ function Composer({ agent, real }: { agent: Agent; real: boolean }) {
               </Button.Prefix>
             </Button>
           )}
-          <Button variant="accent" color="primary" size="condensed" disabled={!real || !text.trim() || sending} loading={sending} onClick={() => void send()} aria-label="Send">
+          <Button variant="accent" color="primary" size="condensed" disabled={!real || !text.trim() || sending} loading={sending} onClick={() => void send()} aria-label={running ? 'Send (steers the running turn)' : 'Send'}>
             <Button.Prefix>
               <ArrowUpIcon />
             </Button.Prefix>
-            Send
           </Button>
         </span>
       </div>
@@ -420,43 +607,96 @@ function Composer({ agent, real }: { agent: Agent; real: boolean }) {
   );
 }
 
-function StatusLine({ agent, session }: { agent: Agent; session: ClaudeSession | undefined }) {
+/** A terminal-like status bar: state │ model · effort · mode │ context meter │ tokens │ cache │ cost │ turns · time │ subagents. */
+function StatusLine({ agent, session, subagents }: { agent: Agent; session: ClaudeSession | undefined; subagents: SubagentInfo[] }) {
   const ring = agentRing(agent)[0];
-  const u = agent.data.usage;
-  const pct = u?.contextPct;
+  const d = agent.data;
+  const model = session?.model ?? d.model ?? (d.localId ? 'default model' : undefined);
+  const effort = session?.effort ?? d.effort;
+  const mode = permissionChoice(session?.permissionMode ?? d.permissionMode);
+  const u = session ? usageView(session.usage) : undefined;
+  // demo agents (and the canvas cache) only have the percent
+  const pct = u?.contextPct ?? d.usage?.contextPct;
   const tone = pct != null ? contextTone(pct) : 'normal';
-  const model = session?.model ?? agent.data.model ?? (agent.data.localId ? 'default model' : undefined);
-  const mode = session?.permissionMode && session.permissionMode !== 'default' ? session.permissionMode : undefined;
-  const cost = session?.usage.costUsd ?? u?.costUsd;
-  const turns = session?.usage.turns ?? u?.turns;
+  const cost = u?.costUsd ?? d.usage?.costUsd;
+  const turns = u?.turns ?? d.usage?.turns;
+  const t = subagentTally(subagents);
+
   return (
     <div className="ah-status" role="status" aria-label="Session status">
       <Chip size="condensed" color={TONE_CHIP[ring.tone]} variant={ring.tone === 'neutral' ? undefined : 'emphasized'}>
-        {STATUS_LABEL[agent.data.status]}
+        {STATUS_LABEL[d.status]}
       </Chip>
-      {model && <span title="Model">{model.replace(/^claude-/, '')}</span>}
-      {mode && (
-        <span title="Permission mode (--permission-mode)" style={mode === 'bypassPermissions' ? { color: 'var(--tone-critical)' } : undefined}>
-          {mode}
+      {model && (
+        <span className="ah-st" title={`Model in use${session?.modelSetting ? ` (chosen: ${session.modelSetting})` : ''}${session?.cliVersion ? ` · Claude Code ${session.cliVersion}` : ''}`}>
+          <AIModelIcon />
+          {modelLabel(model)}
+          {effort && <span className="ah-sub">·{effort}</span>}
         </span>
       )}
+      {mode.value !== 'default' && (
+        <span className={`ah-st ${mode.tone ? `tone-${mode.tone}` : ''}`} title={`Permission mode: ${mode.label} — ${mode.hint}`}>
+          <SecurityIcon />
+          {mode.short}
+        </span>
+      )}
+      {session?.restartPending?.length ? (
+        <span className="ah-st tone-warning" title={`${session.restartPending.join(', ')} applies with the next message (the CLI restarts with --resume)`}>
+          restart pending
+        </span>
+      ) : null}
       {pct != null && (
-        <span className={`ah-ctx tone-${tone}`} title="Context window in use">
-          <span className="ah-ctx-bar" aria-hidden>
-            <span style={{ width: `${Math.min(100, pct)}%` }} />
+        <>
+          <span className="ah-st-sep" aria-hidden />
+          <span
+            className={`ah-ctx tone-${tone}`}
+            title={u ? `Context: ${u.contextTokens.toLocaleString()} of ${u.contextWindow.toLocaleString()} tokens${u.windowGuessed ? ' (window assumed until the first turn ends)' : ''}${tone !== 'normal' ? ' — nearly full; Claude Code compacts automatically, or send /compact' : ''}` : 'Context window in use'}
+          >
+            <span className="ah-ctx-bar" aria-hidden>
+              <span style={{ width: `${Math.min(100, pct)}%` }} />
+            </span>
+            {u ? `${tokens(u.contextTokens)}/${tokens(u.contextWindow)}${u.windowGuessed ? '?' : ''}` : ''} {pct}%
           </span>
-          {pct}%
+        </>
+      )}
+      {u && u.input + u.output + u.cacheRead > 0 && (
+        <>
+          <span className="ah-st-sep" aria-hidden />
+          <span className="ah-st" title={`Tokens this session (subagents included): ${u.input.toLocaleString()} input (uncached), ${u.output.toLocaleString()} output`}>
+            <TokenIcon />↑{tokens(u.input + u.cacheRead + u.cacheWrite)} ↓{tokens(u.output)}
+          </span>
+          <span
+            className={`ah-st ${u.lastHitPct != null && u.lastHitPct < 50 && u.turns > 0 ? 'tone-warning' : ''}`}
+            title={`Prompt cache — latest call: ${u.lastHitPct ?? '–'}% read from cache. Session: ${u.cacheRead.toLocaleString()} read, ${u.cacheWrite.toLocaleString()} written, ${u.input.toLocaleString()} uncached (${u.totalHitPct ?? '–'}% hit)`}
+          >
+            <DatabaseIcon />
+            {u.lastHitPct != null ? `${u.lastHitPct}%` : '–'}
+          </span>
+        </>
+      )}
+      {cost != null && cost > 0 && (
+        <span className="ah-st" title="Cost of this session so far (USD, as reported by the CLI)">
+          {usd(cost)}
         </span>
       )}
-      {turns != null && turns > 0 && <span title="Finished turns">{turns === 1 ? '1 turn' : `${turns} turns`}</span>}
-      {cost != null && cost > 0 && <span title="Cost of this session so far (USD)">{usd(cost)}</span>}
-      {agent.data.status !== 'running' && agent.data.lastActivity && (
-        <span className="ah-ellipsis" title={agent.data.lastActivity}>
-          {agent.data.lastActivity}
+      {turns != null && turns > 0 && (
+        <span className="ah-st" title={u?.durationMs ? `Turns · time Claude worked (last turn ${duration(session?.usage.lastTurnMs ?? 0)})` : 'Finished turns'}>
+          {turns === 1 ? '1 turn' : `${turns} turns`}
+          {u?.durationMs ? ` · ${duration(u.durationMs)}` : ''}
+        </span>
+      )}
+      {t.total > 0 && (
+        <span className={`ah-st ${t.running ? 'is-live' : ''}`} title={`Subagents: ${t.text}`}>
+          <AgentIcon />
+          {t.running ? `${t.running}/${t.total}` : t.total}
+        </span>
+      )}
+      {d.status !== 'running' && d.lastActivity && (
+        <span className="ah-ellipsis" title={d.lastActivity}>
+          {d.lastActivity}
         </span>
       )}
     </div>
   );
 }
-
 const STATUS_LABEL: Record<Agent['data']['status'], string> = { running: 'Running', waiting: 'Waiting for you', idle: 'Idle', done: 'Done', failed: 'Failed' };

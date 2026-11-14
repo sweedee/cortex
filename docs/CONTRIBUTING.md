@@ -34,7 +34,7 @@ Shared files that many features touch. Keep changes there small and additive, id
 - An **optional** field on a kind's data schema needs no migration. A required or incompatible change needs a
   workspace version bump, a `MIGRATIONS` step, a fixture of the old format and a test. Never edit an old step.
 - Every skill an AI action inserts (`skill(id, label, 'name')`, kebab-case) gets a line in `SKILLS` in
-  `chat/ChatBox.tsx` (and an icon in `kinds/icons.tsx` if a fitting one exists).
+  `chat/skills.ts` (and an icon in `kinds/icons.tsx` if a fitting one exists).
 
 ## Kinds and actions
 

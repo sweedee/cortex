@@ -144,7 +144,22 @@ export const AgentDataSchema = z.object({
   error: z.string().optional(),
   startedAt: z.number().optional(),
   endedAt: z.number().optional(),
-  usage: z.object({ contextPct: z.number().optional(), costUsd: z.number().optional(), turns: count.optional() }).optional(),
+  usage: z
+    .object({
+      contextPct: z.number().optional(),
+      costUsd: z.number().optional(),
+      turns: count.optional(),
+      /** tokens in the context window now / the window size (unknown before the first result) */
+      contextTokens: count.optional(),
+      contextWindow: count.optional(),
+    })
+    .optional(),
+  /** `--effort` the session runs with (unset = CLI default) */
+  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
+  /** `--permission-mode` the session runs with (unset = CLI default) */
+  permissionMode: z.string().optional(),
+  /** subagents the session spawned: still running / all */
+  subagents: z.object({ running: count, total: count }).optional(),
 });
 
 export const PrDataSchema = z.object({
@@ -297,6 +312,8 @@ export const PrefsSchema = z.object({
   /** Claude Code model for new sessions; unset = the CLI's default */
   model: z.string().min(1).optional().catch(undefined),
   permissionMode: PermissionModeSchema.catch('default'),
+  /** Claude Code `--effort` for new sessions; unset = the CLI's default */
+  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
   /** PR comment that triggers the AI review; unset = main's config (`@claude review` / CORTEX_AI_REVIEW_COMMENT) */
   aiReviewComment: z.string().min(1).optional().catch(undefined),
   /** background refresh of the canvas caches (git stats, PR / ticket status), seconds */

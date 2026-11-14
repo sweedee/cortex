@@ -1,5 +1,6 @@
 /**
- * Global settings (HUD gear): Claude model / permission mode for new sessions, the AI-review
+ * Global settings (HUD gear): Claude model / effort / permission mode for new sessions (the chat
+ * box's pickers change the same values), the AI-review
  * comment, the refresh interval, notifications, plus read-only paths and the Jira mode.
  * Project settings (paths, commands) live on the project bubble instead.
  */
@@ -10,16 +11,17 @@ import { getState, setColorBy, setSettings, setSoundOn, setDesktopNotify, type C
 import { openForm, str, type FormValues } from '../ui/form';
 import { errorText } from '../ui/task';
 import type { Settings } from '../store';
+import { EFFORT_LEVELS, type ClaudeCatalog } from '../../../shared/integrations/claude';
+import { effortChoices, modelChoices, PERMISSION_CHOICES } from '../chat/sessionOptions';
 
-const PERMISSION_MODES: { value: Settings['permissionMode']; label: string }[] = [
-  { value: 'default', label: 'CLI default (no flag)' },
-  { value: 'manual', label: 'manual: ask before every tool' },
-  { value: 'acceptEdits', label: 'acceptEdits: edits run, other tools ask' },
-  { value: 'plan', label: 'plan: read-only planning' },
-  { value: 'auto', label: 'auto: Claude decides what needs asking' },
-  { value: 'dontAsk', label: "dontAsk: deny what isn't pre-approved" },
-  { value: 'bypassPermissions', label: 'bypassPermissions: run everything (careful)' },
-];
+const PERMISSION_MODES: { value: Settings['permissionMode']; label: string }[] = PERMISSION_CHOICES.map((c) => ({ value: c.value, label: c.value === 'default' ? 'CLI default (no flag)' : `${c.label}: ${c.hint}` }));
+/** select value for "no flag" (a select can't hold '') */
+const DEFAULT = 'default';
+
+/** Model select options: the CLI's models (or the aliases) plus the current custom value. */
+export const modelOptions = (catalog: ClaudeCatalog | undefined, current?: string) =>
+  modelChoices(catalog, current).map((c) => ({ value: c.value || DEFAULT, label: c.value ? `${c.label}${c.hint ? ` — ${c.hint}` : ''}` : 'CLI default (no flag)' }));
+const EFFORT_OPTIONS = effortChoices().map((c) => ({ value: c.value || DEFAULT, label: c.value ? `${c.label}: ${c.hint}` : 'CLI default (no flag)' }));
 
 export const COLOR_BY: { value: ColorBy; label: string }[] = [
   { value: 'project', label: 'Project (one colour per project and everything linked to it)' },
@@ -30,8 +32,11 @@ export const COLOR_BY: { value: ColorBy; label: string }[] = [
 /** Form values → the settings patch (pure, tested). Blank text = unset (CLI / main default). */
 export function settingsPatch(v: FormValues): Partial<Settings> {
   const mode = PERMISSION_MODES.find((m) => m.value === str(v, 'permissionMode'))?.value ?? 'default';
+  const model = str(v, 'modelCustom').trim() || str(v, 'model').trim();
+  const effort = EFFORT_LEVELS.find((e) => e === str(v, 'effort'));
   return {
-    model: str(v, 'model').trim() || undefined,
+    model: model && model !== DEFAULT ? model : undefined,
+    effort,
     permissionMode: mode,
     aiReviewComment: str(v, 'aiReviewComment').trim() || undefined,
     refreshSec: Math.round(Number(str(v, 'refreshSec'))),
@@ -45,11 +50,13 @@ export const validRefresh = (v: unknown) => {
 
 export async function openSettings() {
   const s = getState();
-  const [workspacePath, info, config] = await Promise.all([
+  const [workspacePath, info, config, catalog] = await Promise.all([
     native.workspace.path().catch((e: unknown) => `unknown (${errorText(e)})`),
     native.app.info().catch(() => undefined),
     loadIntegrationConfig().catch(() => undefined),
+    native.claude.catalog().catch(() => undefined),
   ]);
+  const models = modelOptions(catalog, s.settings.model);
   const jira = config
     ? [config.jira.cli === 'mock' ? 'mock (scripts/jira-mock)' : 'Atlassian CLI (acli)', config.jira.site && `site ${config.jira.site}`, config.jira.note].filter(Boolean).join(' · ')
     : 'unknown (desktop app only)';
@@ -59,7 +66,9 @@ export async function openSettings() {
     submitLabel: 'Save',
     values: {
       colorBy: s.colorBy,
-      model: s.settings.model ?? '',
+      model: s.settings.model ?? DEFAULT,
+      modelCustom: '',
+      effort: s.settings.effort ?? DEFAULT,
       permissionMode: s.settings.permissionMode,
       aiReviewComment: s.settings.aiReviewComment ?? '',
       refreshSec: String(s.settings.refreshSec),
@@ -71,8 +80,10 @@ export async function openSettings() {
     },
     fields: [
       { name: 'colorBy', label: 'Bubble colour', type: 'select', options: COLOR_BY, hint: 'What the colour of a bubble stands for on the canvas.' },
-      { name: 'model', label: 'Claude model', type: 'text', placeholder: 'CLI default', hint: 'An alias (opus, sonnet) or a full model id. Blank = whatever the claude CLI uses.' },
-      { name: 'permissionMode', label: 'Permission mode', type: 'select', options: PERMISSION_MODES, hint: 'claude --permission-mode for new sessions. Tool prompts show up as Allow / Deny on the agent bubble.' },
+      { name: 'model', label: 'Claude model', type: 'select', options: models, hint: 'claude --model for new sessions (also the model picker under the chat box). A running session changes its model from its own composer.' },
+      { name: 'modelCustom', label: 'Or a full model id', type: 'text', placeholder: 'e.g. claude-opus-5-5', hint: 'Overrides the selection above when filled.' },
+      { name: 'effort', label: 'Effort', type: 'select', options: EFFORT_OPTIONS, hint: 'claude --effort for new sessions. Low to xhigh also change live in a running session; max only at start.' },
+      { name: 'permissionMode', label: 'Permission mode', type: 'select', options: PERMISSION_MODES, hint: 'claude --permission-mode for new sessions (changes live in a running session). Tool prompts show up as Allow / Deny on the agent bubble.' },
       { name: 'aiReviewComment', label: 'AI review comment', type: 'text', placeholder: config?.github.aiReviewComment ?? '@claude review', hint: 'Posted on a PR by “Request AI review”. Blank = the default shown.' },
       { name: 'refreshSec', label: 'Background refresh (seconds)', type: 'text', required: true, validate: validRefresh, hint: 'How often git / GitHub / Jira caches on the bubbles refresh (15 s while checks or builds run).' },
       { name: 'desktopNotify', label: 'Desktop notifications when Cortex is in the background', type: 'checkbox' },

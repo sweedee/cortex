@@ -77,13 +77,13 @@ describe('ClaudeSessions (fake claude process)', () => {
     expect(waiting.pendingQuestion).toMatchObject({ toolUseId: 'toolu_ask1', questions: [{ question: 'Which approach?', options: [{ label: 'Retry' }, { label: 'Queue' }] }] });
     // the control_request may arrive just after the tool_use; wait until it is parked
     await new Promise((r) => setTimeout(r, 100));
-    expect(m.answer(s.localId, 'toolu_ask1', { 'Which approach?': 'Queue' })).toEqual({ via: 'tool' });
+    expect(await m.answer(s.localId, 'toolu_ask1', { 'Which approach?': 'Queue' })).toEqual({ via: 'tool' });
     const idle = await until((x) => x.status === 'idle');
     expect(idle.lastText).toBe('You chose Queue');
     const q = m.session(s.localId).messages.find((x) => x.id === 'toolu_ask1');
     expect(q).toMatchObject({ status: 'ok', answers: { 'Which approach?': 'Queue' } });
     // nothing parked any more → fallback is a plain message
-    expect(m.answer(s.localId, 'toolu_ask1', { 'Which approach?': 'Retry' })).toEqual({ via: 'message' });
+    expect(await m.answer(s.localId, 'toolu_ask1', { 'Which approach?': 'Retry' })).toEqual({ via: 'message' });
     await until((x) => x.status === 'idle' && x.lastText!.startsWith('echo: My answers'));
     await m.stop(s.localId);
   }, 20_000);
@@ -145,6 +145,54 @@ describe('ClaudeSessions (fake claude process)', () => {
     expect(init.argv).toEqual(expect.arrayContaining(['--resume', idle.sessionId]));
     expect(await second.m.remove(s.localId)).toBe(true);
     expect(second.m.list()).toEqual([]);
+  }, 20_000);
+
+  it('changes model / permission mode / effort live; max effort restarts with the next message', async () => {
+    const { m, until, events } = manager();
+    const s = m.start({ cwd: dir, prompt: 'hello', model: 'haiku' });
+    const idle = await until((x) => x.status === 'idle');
+    expect(idle.usage).toMatchObject({ contextWindow: 200_000, turns: 1 });
+    expect(idle.usage.contextTokens).toBeGreaterThan(12_000);
+    expect(idle.cliVersion).toBe('0.0.0-fake');
+    expect(m.session(s.localId).commands?.map((c) => c.name)).toContain('fake-skill');
+    expect((await m.catalog()).models.map((x) => x.value)).toContain('sonnet');
+
+    expect(m.configure(s.localId, { model: 'sonnet', permissionMode: 'plan', effort: 'low' })).toEqual({ model: 'live', permissionMode: 'live', effort: 'live' });
+    const switched = await until((x) => x.model === 'claude-sonnet-fake' && x.permissionMode === 'plan');
+    expect(switched.restartPending).toBeUndefined();
+    expect(m.session(s.localId).messages.some((x) => x.role === 'note' && x.text.includes('claude-sonnet-fake'))).toBe(true);
+
+    expect(m.configure(s.localId, { effort: 'max' })).toEqual({ effort: 'restart' });
+    expect(m.list()[0]).toMatchObject({ effort: 'max', restartPending: ['effort'] });
+    await m.send(s.localId, 'next');
+    await until((x) => x.status === 'idle' && x.lastText === 'echo: next');
+    const inits = events.filter((e) => e.event.type === 'system' && (e.event as { subtype?: string }).subtype === 'init').map((e) => (e.event as unknown as { argv: string[] }).argv);
+    const last = inits.at(-1)!;
+    expect(last).toEqual(expect.arrayContaining(['--resume', idle.sessionId, '--effort', 'max', '--model', 'sonnet', '--permission-mode', 'plan']));
+    expect(m.list()[0].restartPending).toBeUndefined();
+    await m.stop(s.localId);
+    // no process: applies on resume
+    expect(m.configure(s.localId, { model: null })).toEqual({ model: 'next' });
+  }, 20_000);
+
+  it('tracks subagents and nests their tool calls', async () => {
+    const { m, until } = manager();
+    const s = m.start({ cwd: dir, prompt: 'agent please' });
+    const running = await until((x) => x.subagents.some((a) => a.status === 'running' && a.toolUses > 0));
+    expect(running.subagents[0]).toMatchObject({ toolUseId: 'toolu_task1', description: 'Map the code', type: 'Explore' });
+    const idle = await until((x) => x.status === 'idle');
+    expect(idle.subagents).toMatchObject([{ status: 'done', toolUses: 2, tokens: 19000 }]);
+    const nested = m.session(s.localId).messages.filter((x) => x.parent === 'toolu_task1');
+    expect(nested.map((x) => (x.role === 'tool' ? x.tool : x.role))).toEqual(['Glob', 'Read', 'assistant']);
+    expect(idle.lastText).toBe('The subagent found 2 files.');
+    await m.stop(s.localId);
+  }, 20_000);
+
+  it('probes the CLI for its catalog before any session', async () => {
+    const { m } = manager();
+    const cat = await m.catalog(dir);
+    expect(cat.commands.map((c) => c.name)).toEqual(['compact', 'review', 'fake-skill']);
+    expect(cat.cliVersion).toBe('0.0.0-fake');
   }, 20_000);
 
   it('reports a binary that cannot be started', async () => {

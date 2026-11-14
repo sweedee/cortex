@@ -3,6 +3,7 @@
  * which also checks them against the contract at compile time).
  */
 import { z } from 'zod';
+import { EFFORT_LEVELS } from './integrations/claude';
 
 // same rule as `absPath` in ./schemas.ts (not imported: schemas.ts imports this module)
 const absPath = z
@@ -80,7 +81,7 @@ export const integrationSchemas = {
     prompt: text.optional(),
     title: str(500).optional(),
     model: ref.optional(),
-    effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
+    effort: z.enum(EFFORT_LEVELS).optional(),
     permissionMode: z.enum(['acceptEdits', 'auto', 'bypassPermissions', 'manual', 'dontAsk', 'plan', 'default']).optional(),
     resume: z.string().regex(/^[\w-]{1,200}$/).optional(),
     addDirs: z.array(absPath).max(50).optional(),
@@ -103,6 +104,13 @@ export const integrationSchemas = {
   'claude:list': z.undefined(),
   'claude:transcript': z.object({ localId }),
   'claude:session': z.object({ localId }),
+  'claude:configure': z.object({
+    localId,
+    model: ref.nullable().optional(),
+    effort: z.enum(EFFORT_LEVELS).nullable().optional(),
+    permissionMode: z.enum(['acceptEdits', 'auto', 'bypassPermissions', 'manual', 'dontAsk', 'plan', 'default']).optional(),
+  }),
+  'claude:catalog': z.undefined(),
 
   'apps:start': z.object({ id: str(200), cwd: absPath, command: str(8192), env, urlHint: z.string().url().optional() }),
   'apps:stop': z.object({ id: str(200) }),

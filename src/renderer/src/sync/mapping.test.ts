@@ -17,6 +17,7 @@ const session = (over: Partial<ClaudeSessionSummary> = {}): ClaudeSessionSummary
   model: 'claude-x',
   status: 'running',
   pendingPermissions: [],
+  subagents: [],
   usage: { ...NO_USAGE, contextTokens: 50_000, costUsd: 0.25, turns: 2 },
   running: true,
   createdAt: '',
