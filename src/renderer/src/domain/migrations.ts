@@ -6,7 +6,7 @@
  * a version-n file into a version-(n+1) file, add a fixture + test. Never edit an old step.
  */
 import { z } from 'zod';
-import { ItemSchema, LinkSchema, PrefsSchema, WORKSPACE_VERSION, WorkspaceFileSchema } from './schemas';
+import { ItemSchema, KindSchema, LinkSchema, PrefsSchema, WORKSPACE_VERSION, WorkspaceFileSchema } from './schemas';
 import type { Item, Link, Prefs, Tone, Workspace } from './types';
 
 export const DEFAULT_PREFS: Prefs = { desktopNotify: false, soundOn: true, colorBy: 'project', permissionMode: 'default', refreshSec: 60, sidebarWidth: 360 };
@@ -247,8 +247,24 @@ function v1ToV2(file: Raw): Raw {
   return { ...file, version: 2, prefs: { ...V2_PREF_DEFAULTS, ...prefs } };
 }
 
+// ---- v2 → v3 -------------------------------------------------------------------------------
+// v3: the filter selects the kinds to SHOW (`kinds`, empty = all) instead of listing hidden ones
+// (`hiddenKinds`). "hid build" becomes "show every kind except build".
+
+function v2ToV3(file: Raw): Raw {
+  const prefs = file.prefs && typeof file.prefs === 'object' ? (file.prefs as Raw) : {};
+  const filter = prefs.filter && typeof prefs.filter === 'object' ? { ...(prefs.filter as Raw) } : null;
+  if (!filter) return { ...file, version: 3 };
+  const hidden = Array.isArray(filter.hiddenKinds) ? (filter.hiddenKinds as unknown[]) : [];
+  delete filter.hiddenKinds;
+  if (!Array.isArray(filter.kinds)) filter.kinds = hidden.length ? KindSchema.options.filter((k) => !hidden.includes(k)) : [];
+  // every kind selected = no restriction (and "show nothing" is not a thing)
+  if ((filter.kinds as unknown[]).length >= KindSchema.options.length) filter.kinds = [];
+  return { ...file, version: 3, prefs: { ...prefs, filter } };
+}
+
 /** `MIGRATIONS[n]` turns a version-n file into a version-(n+1) file. */
-export const MIGRATIONS: Record<number, Step> = { 0: v0ToV1, 1: v1ToV2 };
+export const MIGRATIONS: Record<number, Step> = { 0: v0ToV1, 1: v1ToV2, 2: v2ToV3 };
 
 /** Lift a raw file to the current version. Throws on files from the future or of no known shape. */
 export function migrate(raw: unknown, log: string[] = []): Raw {

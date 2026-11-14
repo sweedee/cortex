@@ -17,7 +17,6 @@ import {
   UndoIcon,
   VolumeIcon,
   VolumeOffIcon,
-  XmarkIcon,
   ZoomToFitIcon,
 } from '@dynatrace/strato-icons';
 import { useAppInfo } from '../data/app';
@@ -86,6 +85,20 @@ export function Hud() {
             </button>
           ))}
         </div>
+        <Tooltip text={nFilters ? `${visible.size} of ${live.length} shown. Filter by type, status, project…` : 'Filter by type, status, project…'}>
+          <Button
+            variant="default"
+            aria-label={`Filter, ${nFilters} active`}
+            aria-expanded={filterOpen}
+            className={`hud-bell hud-filter-btn ${filterOpen || nFilters ? 'is-on' : ''}`}
+            onClick={() => setFilterOpen((o) => !o)}
+          >
+            <Button.Prefix>
+              <FilterIcon />
+            </Button.Prefix>
+            {nFilters > 0 && <span className="hud-filter-count">{nFilters}</span>}
+          </Button>
+        </Tooltip>
         <Menu>
           <Menu.Trigger>
             <Button variant="default" aria-label={`Notifications, ${unread} unread`} className="hud-bell">
@@ -163,38 +176,6 @@ export function Hud() {
         </Tooltip>
       </div>
 
-      <div className="hud hud-legend" role="toolbar" aria-label="Filter bubbles">
-        <Tooltip text="Filter by type, status, project…">
-          <button className={`legend-item legend-filter ${filterOpen ? 'is-open' : ''} ${nFilters ? 'is-active' : ''}`} onClick={() => setFilterOpen((o) => !o)} aria-expanded={filterOpen}>
-            <FilterIcon />
-            <span>Filter</span>
-            {nFilters > 0 && <span className="legend-badge">{nFilters}</span>}
-          </button>
-        </Tooltip>
-        <span className="legend-sep" />
-        {KINDS.map((k) => {
-          const n = live.filter((i) => i.kind === k).length;
-          const off = filter.hiddenKinds.includes(k);
-          // 11 kinds: the legend only lists the ones on the canvas (the filter panel has all)
-          if (!n && !off) return null;
-          return (
-            <Tooltip key={k} text={`${off ? 'Show' : 'Hide'} ${kindLabel(k).toLowerCase()}s`}>
-              <button className={`legend-item ${off ? 'is-off' : ''}`} onClick={() => toggleKind(k)}>
-                {kindIcon(k, 14)}
-                <span>{n}</span>
-              </button>
-            </Tooltip>
-          );
-        })}
-        {nFilters > 0 && (
-          <span className="legend-shown">
-            {visible.size} of {live.length}
-            <button className="legend-clear" onClick={resetFilter} aria-label="Clear filters">
-              <XmarkIcon />
-            </button>
-          </span>
-        )}
-      </div>
       {filterOpen && <FilterPanel onClose={() => setFilterOpen(false)} />}
 
       <div className="hud hud-zoom">
@@ -238,7 +219,7 @@ function AppVersion() {
   );
 }
 
-/** Filter popover above the legend: text, type, status, project, notifications, archive. */
+/** Filter popover under the top-right toolbar: text, kinds to show, status, project, notifications, archive. */
 function FilterPanel({ onClose }: { onClose: () => void }) {
   const items = useStore((s) => s.items);
   const f = useStore((s) => s.filter);
@@ -251,7 +232,7 @@ function FilterPanel({ onClose }: { onClose: () => void }) {
     input.current?.focus();
     const down = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
-      if (!ref.current?.contains(t) && !t.closest('.legend-filter')) onClose();
+      if (!ref.current?.contains(t) && !t.closest('.hud-filter-btn')) onClose();
     };
     const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('pointerdown', down);
@@ -293,10 +274,10 @@ function FilterPanel({ onClose }: { onClose: () => void }) {
         aria-label="Filter by text"
       />
 
-      <div className="filter-label">Type</div>
+      <div className="filter-label">Show only {f.kinds.length === 0 && <span className="filter-any">everything</span>}</div>
       <div className="filter-chips">
         {KINDS.map((k) => {
-          const on = !f.hiddenKinds.includes(k);
+          const on = f.kinds.includes(k);
           return (
             <button key={k} className={`filter-chip ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={() => toggleKind(k)}>
               {kindIcon(k, 13)}
