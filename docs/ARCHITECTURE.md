@@ -77,7 +77,7 @@ that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#
 | `fs:readText` / `fs:writeText` | `{path}` / `{path, text}` | absolute paths; writes are atomic |
 | `fs:list` | `{dir, options?: {glob?}}` → `FsEntry[]` | `*`, `?`, `**`, `{a,b}`; skips `node_modules` / `.git` when recursing |
 | `fs:watch` / `fs:unwatch` | `{dir}` → `watchId` / `{watchId}` | recursive `fs.watch`, events via `fs:changed`; all watches close on reload |
-| `app:info` | → `{platform, userData, version, electron}` | |
+| `app:info` | → `{platform, userData, home, version, electron}` | |
 
 Events (main → renderer): `proc:output {id, stream, chunk}`, `proc:exit {id, code, signal, error?}`,
 `notify:clicked {itemId?}`, `fs:changed {watchId, dir, event, path}`. Subscribe through `native.*.onX(cb)`,
@@ -237,7 +237,13 @@ their own setters.
 
 - Single invalid items and dangling links are dropped (console warning + toast); an outdated
   `prefs.filter` is dropped.
-- A file that is not a workspace, or comes from a newer app version: demo data, a copy is written as
+- No file yet: the **first-run world** (`seed.ts` → `firstRunWorld()`): the demo world for the real
+  `sweedee/cortex-demo` repo when `~/Documents/cortex-demo` is a git checkout (`demoWorld(home)`: Jira CTX tickets,
+  worktrees, PRs #1–#3, their CI jobs, a test run, an app, `sweedee/cortex` read-only), else an empty canvas with a
+  welcome todo. *Reset workspace* loads it again. A stored workspace whose projects are all the old fake
+  `ctx-observability/*` repos is replaced by it (toast). The old fake world lives on as `testing/fakeWorld.ts`
+  for unit tests only.
+- A file that is not a workspace, or comes from a newer app version: the first-run world, a copy is written as
   `workspace.invalid-<time>.json`, warning toast. Unreadable JSON: main falls back to `.bak` first.
 - A migrated file is saved right away (the old one becomes `.bak`).
 - Autosave: 500 ms after a change of items, links or prefs, and on unload.
@@ -279,7 +285,7 @@ React) that invalidate what they change. In a component, `useOp(ghOps.prMerge)` 
 |---|---|---|
 | `data/git.ts` | `useGitStatus(dir)`, `useGitDiff(dir, base?)`, `useGitDiffStat(dir, base?)`, `useGitLog(dir, {range, limit})`, `useCurrentBranch(dir)`, `useRemoteRepo(dir)`, `useWorktrees(repoDir)` | `gitOps.worktreeAdd(repoDir, path, branch, base?, {newBranch})`, `worktreeRemove(repoDir, path, {force})`, `fetch(dir)`, `rebase(dir, onto)`, `rebaseAbort(dir)`, `push(dir, {setUpstream})`, `detect(dir)` → `{repo, branch}` \| null |
 | `data/gh.ts` | `usePr(repo, n)`, `usePrSummary(repo, n)`, `usePrDiff(repo, n)`, `usePrChecks(repo, n)` (polls while pending), `usePrList(repo, filter)`, `useRenovatePrs(repo)`, `useRun(repo, runId)` (polls until completed) | `ghOps.prCreate(req)`, `prMerge(repo, n, method, {deleteBranch})`, `prComment(repo, n, body)`, `requestAiReview(repo, n)` (uses the `aiReviewComment` setting), `prUpdateBranch(repo, n, {rebase})`, `prEdit({repo, number, base?, title?, body?})`, `runRerun(repo, runId, {failedOnly})` |
-| `data/jira.ts` | `useJiraIssue(key)`, `useJiraIssueSummary(key)`, `useJiraSearch(jql, limit?)` | `jiraOps.transition(key, status)`, `create(req)`, `comment(key, body)`, `edit(req)`; `jiraUrl(key)` = the browse URL (cached issue's `self`, else the configured site, else the mock's): the one place that builds Jira links |
+| `data/jira.ts` | `useJiraIssue(key)`, `useJiraIssueSummary(key)`, `useJiraSearch(jql, limit?)`, `loadJiraStatuses(project)` | `jiraOps.transition(key, status)`, `create(req)`, `comment(key, body)`, `edit(req)`; `jiraUrl(key)` = the browse URL (the configured site, e.g. from `acli jira auth status`, else the cached issue's `self`, else the mock's): the one place that builds Jira links |
 | `data/claude.ts` | `useClaudeSessions()`, `useClaudeSession(localId)` (messages, status, usage), `useClaudeTranscript(localId)` (raw events, appended live) | `claudeOps.start(req)`, `send(localId, text)`, `answer(localId, toolUseId, answers)`, `permission(localId, requestId, decision)`, `interrupt`, `stop`, `remove` |
 | `data/apps.ts` | `useApps()`, `useAppLog(id)` (appended live) | `appOps.start(req)`, `stop(id)`, `restart(id)`, `remove(id)` |
 | `data/tests.ts` | `useTestRuns()`, `useTestLog(id)` (appended live) | `testOps.run(req)`, `stop(id)` |
@@ -400,7 +406,7 @@ One folder per kind in `kinds/`. The table is the overview; the sections below l
 | pr | Retarget onto … (stacked child of a merged parent), Merge…, Rebase, Request AI review…, Address review / Review PR / Write description (AI), Open on GitHub | Overview · Files · GitHub |
 | agent | one per question option, Allow / Deny per permission, Interrupt, Stop, Send follow-up, Continue / Fork (AI), folder actions | Session (harness) · Details |
 | app | Open in browser, Preview, Restart / Stop / Start, Show log, Open folder | Preview · Log · Details |
-| build | Re-run… (Actions) or Open details / Open in Jenkins, Fix CI / Explain failure (AI) | Overview (jobs, steps) · Details / Jenkins (webview) |
+| build | Re-run… (GitHub Actions) or open the CI's details page (provider-aware label), Fix CI / Explain failure (AI) | Overview (jobs, steps) · details webview named after the CI provider |
 | deployment | Open, Edit… | Details (mocked status) · Preview |
 | todo | Edit, Mark done | title, markdown editor / preview |
 | testrun | Re-run, Stop, View output, Fix failing tests (AI) | summary, failing tests, live log |
@@ -417,10 +423,12 @@ count comes from `data.stats.renovatePrs`, kept current by the refresher. A proj
 
 ### ticket
 
-`kinds/ticket/`: own icon. *Change status…*: radio form → `jiraOps.transition`; the mock's invalid-transition
-error is shown inline, then `refreshTicket` writes the new status back. *Create worktree*: the project's flow,
+`kinds/ticket/`: own icon. *Change status…*: radio form of the project's statuses (`loadJiraStatuses` →
+`jira:statuses`; the mock's workflow when unknown; `statusOptions` in `model.ts`) → `jiraOps.transition`; Jira's
+rejection is shown inline, then `refreshTicket` writes the new status back. *Create worktree*: the project's flow,
 prefilled `<KEY>-<slug>`, sets `data.branch`, links `works on`. *Open in Jira*: `jiraUrl(key)`. *Mark done*
-transitions to Done in Jira, stepping through the workflow if the direct move is rejected, else completes
+transitions to the workflow's done status (first of category done, e.g. "Fertig"), stepping through the flow if
+the direct move is rejected, else completes
 locally with a warning toast. Sidebar Details: fields, ADF description via `adfToMarkdown` + `Markdown`, linked
 issues, comments + add comment, related canvas items including PRs of the ticket's worktrees; Jira tab:
 `WebPanel` with `partition="persist:jira"`.
@@ -484,12 +492,17 @@ issues, comments + add comment, related canvas items including PRs of the ticket
 
 ### build
 
-`kinds/build/`: `logic.ts` (ring, Jenkins detection, rerun mode, `gh run view` → data), `Sidebar.tsx`.
-*Re-run…* with a numeric `runId` (GitHub Actions): form with "only the failed jobs" → `ghOps.runRerun`, item
-back to queued. Without one (Jenkins / other CI via the checks API) the details page opens. *Open in Jenkins*
-when the URL looks like Jenkins, else *Open details*. Sidebar: state, conclusion, branch, PR, trigger,
-duration, stage; for Actions runs the jobs from `useRun` (polls while running, failed jobs with their steps),
-written back to the item; *Details* / *Jenkins* webview (`persist:ci`).
+`kinds/build/`: `logic.ts` (ring, CI provider, rerun mode, `gh run view` → data), `Sidebar.tsx`.
+**CI providers** (`ciProvider(data)`): `github-actions` (numeric `runId` + `owner/name` repo, or an
+`…/actions/runs/<id>` URL) is integrated: jobs / steps via `gh run view`, re-run via `gh run rerun`;
+`jenkins` (Jenkins-looking URL) and `other` (any other CI reporting through the GitHub checks API; named by its
+host) only have their details page. Each has a display name and a webview partition (`persist:github` /
+`persist:ci`). A new integrated provider adds an id there plus its data hook and rerun op.
+*Re-run…* for Actions: form with "only the failed jobs" → `ghOps.runRerun`, item back to queued; for others
+the details page opens. The open action (id `open`) is *Open in GitHub Actions* / *Open in Jenkins* / *Open
+details*. Sidebar: state, conclusion, provider, branch, PR, trigger, duration, stage; for Actions runs the jobs
+from `useRun` (polls while running, failed jobs with their steps), written back to the item; a details webview
+tab named after the provider.
 
 ### testrun
 
@@ -594,16 +607,40 @@ Field lists live in `shared/integrations/github.ts` (verified against gh 2.102).
 
 ### Jira
 
-`scripts/jira-mock` by default (Atlassian CLI surface).
+The **Atlassian CLI** `acli` (default; verified against acli 1.3.40 on a site with German locale and a
+company-managed Kanban project) or `scripts/jira-mock` with the same surface.
 
 | Channel | Command (`<cli> jira workitem …`) |
 |---|---|
 | `jira:search {jql, limit?}` → `JiraIssue[]` | `search --jql "<jql>" --json [--limit N]` |
 | `jira:view {key}` → `JiraIssue` | `view <KEY> --json --fields *all` |
-| `jira:transition {key, status}` | `transition --key <KEY> --status "<status>" --yes` |
+| `jira:statuses {project}` → `{name, category}[]` | `search --jql 'project = "<P>"' --json --paginate --fields key,status` → distinct statuses, ordered to do → in progress → done (`workflowStatuses`) |
+| `jira:transition {key, status}` | `transition --key <KEY> --status "<status>" --yes --json` |
 | `jira:create {project, type, summary, description?, assignee?, parent?}` → `JiraIssue` | `create --project X --type Story --summary … --json` |
-| `jira:comment {key, body}` → `JiraComment \| null` | `comment create --key K --body … --json` |
-| `jira:edit {key, summary?, description?, assignee?, labels?}` | `edit --key K [--summary …] [--description …] --yes` |
+| `jira:comment {key, body}` → `JiraComment \| null` | `comment create --key K --body … --json` (acli: `null`, it prints no comment) |
+| `jira:edit {key, summary?, description?, assignee?, labels?}` | `edit --key K [--summary …] [--description …] --yes --json` |
+
+What real acli does (captured in `src/main/services/__fixtures__/acli/`, replayed by `jira.acli.test.ts`):
+
+- `view` / `create` print REST v3 issue JSON (ADF, `status.statusCategory`, `parent`, `comment.comments`), but
+  `self` URLs point at Atlassian's API gateway (`https://jira-prod-….atl-paas.net/rest/api/3/…`), not the site.
+  Browse links therefore use `config.jira.site`, read at start from `acli jira auth status` (`Site: x.atlassian.net`;
+  `JiraService.site`, `initJira` in `services/index.ts`; `CORTEX_JIRA_SITE` overrides). `browseUrl(issue)` ignores
+  gateway hosts.
+- `search --json` prints an array. `--fields` accepts only key, summary, status, issuetype, assignee, priority,
+  labels, description, reporter (e.g. `updated`, `parent`, custom fields are rejected), so searches keep acli's
+  default fields and `fields.updated` is optional.
+- `transition`, `edit`, `comment create`, `assign` with `--json` print `{results: [{status, message, id}],
+  totalCount, successCount}` and **exit 0 even on FAILURE**; `JiraService` throws with the failure messages
+  ("jira transition: CTX-6: No allowed transitions found for given status"). Without `--json` a failure is a
+  `✗ Failure: …` line, also turned into an error. Errors of other commands (`✗ Error: …`, exit 1) lose that prefix.
+- Status names are the site's (localized: "In Arbeit", "Fertig"). acli has no command to list a workflow's
+  transitions, so *Change status…* offers the statuses the project's issues use (`jira:statuses`, cached 10 min)
+  and Jira decides; *Mark done* targets the first status of category done and walks the flow if needed.
+- `create --label` (not `--labels`) adds labels; `edit --labels` sets them.
+
+When acli cannot be started and `CORTEX_JIRA_CLI` is not set, `initJira` switches to the mock and sets
+`config.jira.note`; not logged in → a note too. Every `jira:*` handler waits for `initJira` first.
 
 The mock (`scripts/jira-mock/jira-mock.mjs`, plain ESM, no build) prints Jira Cloud REST v3 issue JSON (ADF
 descriptions / comments, `status.statusCategory`, `issuetype`, `priority`, `assignee`, `labels`, `parent`,
@@ -612,17 +649,17 @@ descriptions / comments, `status.statusCategory`, `issuetype`, `priority`, `assi
 `!=`, `in`, `not in`, `is [not] EMPTY`, `~`; fields assignee / reporter (`currentUser()`), project, status,
 statusCategory, key, type, priority, labels, parent, summary, text, sprint (`openSprints()`); `ORDER BY` is
 ignored (sorted by `updated`); `OR` is rejected. Workflow: To Do → In Progress → In Review → Done, back
-steps, Blocked from / to the open states, Done → To Do. Errors go to stderr with exit 1 (usage: 2). Data:
-`JIRA_MOCK_DB` (main passes `<userData>/jira-mock.json`), seeded with the demo's CTX tickets.
+steps, Blocked from / to the open states, Done → To Do. Errors go to stderr with exit 1 (usage: 2). Like acli,
+`transition` / `edit` / `comment create --json` print bulk results, and `jira auth status` prints a `Site:` line.
+Data: `JIRA_MOCK_DB` (main passes `<userData>/jira-mock.json`), seeded with made-up CTX-48xx tickets (used by
+tests and smoke runs).
 
 Main runs it as `<process.execPath> <app>/scripts/jira-mock/jira-mock.mjs` with `ELECTRON_RUN_AS_NODE=1`
 (no node on PATH needed). `exec:run` with `cmd: 'jira-mock'` maps to the same command. A packaged build
 must ship `scripts/jira-mock/` unpacked next to the app (packaging is not set up yet).
 
-**Swapping in the real Atlassian CLI:** install `acli`, `acli jira auth login`, then start Cortex with
-`CORTEX_JIRA_CLI=acli`. `JiraService` sends the same arguments to `acli`. Things to check then: the custom
-field ids (`JIRA_FIELDS` in `shared/integrations/jira.ts`), the workflow's status names, and the shape of
-`search --json` (the service accepts an array or `{issues: […]}`). Browse links follow the issues' `self` URL.
+Custom field ids (`JIRA_FIELDS`: story points `customfield_10016`, sprint `customfield_10020`) match the mock and
+are unverified on real sites (the demo's Kanban project has neither).
 
 ### Claude Code
 
@@ -676,17 +713,19 @@ The user's command line, through the shell.
 
 ### Config knobs
 
-Env, read once at start (`src/main/services/config.ts`): `CORTEX_JIRA_CLI=mock|acli`,
-`CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`, `CORTEX_CLAUDE_BIN`, `CORTEX_AI_REVIEW_COMMENT`,
-`CORTEX_RENOVATE_APP`. Defaults in `shared/integrations/config.ts`; `integrations:config` returns the effective
-values (Settings shows the Jira mode).
+Env, read once at start (`src/main/services/config.ts`): `CORTEX_JIRA_CLI=acli|mock` (default acli; smoke
+runs: mock), `CORTEX_JIRA_SITE`, `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`, `CORTEX_CLAUDE_BIN`,
+`CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, `CORTEX_USER_DATA`. Defaults in `shared/integrations/config.ts`;
+`integrations:config` returns the effective values once `initJira` is done (Settings shows the Jira CLI, site
+and `note`).
 
 ## Smoke runs
 
 `CORTEX_SMOKE=1 npm run dev` (or `npx electron-vite preview` for the build) loads the app, runs a probe from
 inside the page and quits. Main opens the page as `index.html#smoke`, which exposes `window.__cortexDebug`
 (`debug.ts`: store access, `runAction(id, actionId)`, `forms` = `formDriver`, `sendPrompt`, `chooseOption`,
-`openAdd`, `replaceWorld`, `refreshDue`, `showGallery`). Use a throw-away profile (`CORTEX_USER_DATA=<tmp>`).
+`openAdd`, `replaceWorld`, `resetToDemo`, `refreshDue`, `showGallery`). Use a throw-away profile
+(`CORTEX_USER_DATA=<tmp>`). Smoke runs use the Jira mock unless `CORTEX_JIRA_CLI` is set.
 
 | Variable | What it adds |
 |---|---|
@@ -695,16 +734,20 @@ inside the page and quits. Main opens the page as `index.html#smoke`, which expo
 | `CORTEX_SMOKE_GH_REPO=owner/name` | a read-only `gh pr list` |
 | `CORTEX_SMOKE_E2E=1` | a project on this repo + forced refresh; with `CORTEX_CLAUDE_BIN=<fake-claude.mjs>` chat → agent → question → answer and the agent harness via the DOM; an app with a tiny HTTP server (URL, preview, restart, stop, crash). `CORTEX_SMOKE_FINAL=app \| agent \| <item id>` picks the final view |
 | `CORTEX_SMOKE_GALLERY=1` | the viewer gallery: mermaid, CodeMirror, diff rendering and CSP violations |
+| `CORTEX_SMOKE_WORLD=1` | loads the first-run world (`resetToDemo`), one forced refresh with the real gh / git / Jira (read-only), then prints what each bubble shows and every warning logged meanwhile. Add `CORTEX_JIRA_CLI=acli` for the real Jira |
 | `CORTEX_SMOKE_REPO=1` | the real-repo click-through (`smokeRepo.ts`): a temp repo with a local bare `origin`, then project via Add, new worktree, launch app, run tests, commit → diff, record file → record bubble, todo add / edit, create PR up to the push, Jira status change, agent question (fake CLI), settings, worktree removal. Checklist on stdout, screenshots in `CORTEX_SMOKE_OUT` (default `<tmp>/cortex-smoke-*`). Start it with `GH_HOST=smoke.invalid` so gh never contacts GitHub |
 
 ## Where things live
 
 | | |
 |---|---|
-| Workspace file | `<userData>/workspace.json` (+ `.bak`); Windows `%APPDATA%\cortex` |
+| User data (`<userData>`) | `~/.cortex` (`lib/userData.ts`; `CORTEX_USER_DATA` overrides). Electron's `userData` path is set to it before the single-instance lock. First start after the move: when `~/.cortex/workspace.json` is missing and Electron's default folder (Windows `%APPDATA%\cortex`) has one, `workspace.json(.bak)`, `window-state.json`, `claude-sessions.json` and `jira-mock.json` are copied once |
+| Chromium data (cache, localStorage, webview logins) | Electron `sessionData`: Electron's default folder (`%APPDATA%\cortex`), or `<CORTEX_USER_DATA>/chromium`; kept out of `~/.cortex` |
+| Workspace file | `<userData>/workspace.json` (+ `.bak`) |
 | Window state | `<userData>/window-state.json` |
 | Jira mock data | `<userData>/jira-mock.json` (seeded on first use) |
 | Claude session metadata | `<userData>/claude-sessions.json` |
+| Demo repo (first-run world) | `~/Documents/cortex-demo` (clone of `sweedee/cortex-demo`), worktrees in `~/Documents/wt/cortex-demo/` |
 | Build output | `out/main`, `out/preload/index.cjs`, `out/renderer` |
 | Static assets | `public/` (renderer `publicDir`); reference them with `asset('brand/…')` from `native.ts`, not `/brand/…`, so they resolve under `file://` too |
 | Separate profile | `CORTEX_USER_DATA=<dir>` |

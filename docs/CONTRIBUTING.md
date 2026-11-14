@@ -42,7 +42,9 @@ Shared files that many features touch. Keep changes there small and additive, id
   (`logic.ts` / `model.ts`, unit-tested). See "How to add a kind" in ARCHITECTURE.md.
 - **AI** actions only insert a skill into the chat box. **UI** actions do the real thing with `openForm`,
   `runTask` and `data/*Ops`, and update the item through the store (`patchData`, `addItem`, `archive`).
-- Demo data has fake repos and paths. Actions that need a real checkout or repo are disabled with a reason;
+- The first-run demo world (`seed.ts`) is real (`sweedee/cortex-demo`, Jira CTX); unit tests use the fake world
+  in `testing/fakeWorld.ts`. Items without a real checkout or repo (fake repos, unset or `~/…` paths) still
+  happen: actions that need one are disabled with a reason;
   sidebars show a hint ("Set the project's base checkout in Settings…") or an inline error. Never crash and
   never leave a spinner running.
 - UI style: flat, dark-first, small radii, no glass or gradients, colours from Strato tokens. Check Strato
@@ -57,7 +59,9 @@ Shared files that many features touch. Keep changes there small and additive, id
 - **Never cause real-world side effects while testing**: no real PR create / merge / comment, no push to a
   real remote, no real Jira, no real (paid) Claude session. Read-only `gh` / `git` calls are fine.
   - Claude: `CORTEX_CLAUDE_BIN=<abs path>/src/main/services/__fixtures__/fake-claude.mjs`.
-  - Jira: the mock is the default (`<userData>/jira-mock.json`).
+  - Jira: the app uses the real `acli` by default. Unit tests build `JiraService` with the mock
+    (`CORTEX_JIRA_CLI: 'mock'`) or a replaying runner over `__fixtures__/acli/`; smoke runs use the mock unless
+    `CORTEX_JIRA_CLI` is set. Never construct services with the default config in a test.
   - git push: point `origin` at a local bare repo (the repo smoke does this).
   - gh: `GH_HOST=smoke.invalid` makes every gh call fail locally instead of reaching GitHub.
 - Always use a throw-away profile: `CORTEX_USER_DATA=<temp dir>`.
