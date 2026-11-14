@@ -1,7 +1,7 @@
 /** Jira (`native.jira.*`, the mock CLI or acli): issues, searches, and the write ops. */
 import { useQuery } from '@tanstack/react-query';
 import type { IntegrationConfig } from '../../../shared/integrations/config';
-import { jiraBrowseUrl, summarizeIssue, type JiraIssue } from '../../../shared/integrations/jira';
+import { jiraBrowseUrl, summarizeIssue, type JiraIssue, type JiraStatusOption } from '../../../shared/integrations/jira';
 import type { JiraCreateIssueRequest, JiraEditIssueRequest } from '../../../shared/ipc';
 import { native } from '../native';
 import { invalidate, ready } from './ops';
@@ -23,13 +23,27 @@ export function useJiraSearch(jql: string | undefined, limit?: number) {
 }
 
 /**
- * Browse URL of an issue key: the cached issue's site (REST `self`), else the configured Jira site
- * (`integrations:config`, prefetched by `startSync`), else the mock's. The one place that builds Jira links.
+ * Browse URL of an issue key: the configured Jira site (`integrations:config`, prefetched by `startSync`;
+ * for acli from `acli jira auth status`), else the cached issue's REST `self`, else the mock's. The one
+ * place that builds Jira links.
  */
 export function jiraUrl(key: string): string {
   const issue = queryClient.getQueryData<JiraIssue>(qk.jira.issue(key));
   const config = queryClient.getQueryData<IntegrationConfig>(qk.app.config());
   return jiraBrowseUrl(key, { issue, site: config?.jira.site });
+}
+
+/**
+ * The project's workflow statuses (`jira:statuses`: the statuses its issues use, to do → done), cached
+ * for 10 minutes; [] when Jira is unreachable (callers fall back to the mock's workflow).
+ */
+export function loadJiraStatuses(project: string): Promise<JiraStatusOption[]> {
+  return queryClient
+    .fetchQuery({ queryKey: qk.jira.statuses(project), queryFn: () => native.jira.statuses(project), staleTime: 10 * 60_000 })
+    .catch((e: unknown) => {
+      console.warn('[jira] statuses', project, e);
+      return [];
+    });
 }
 
 /** Writes. Each invalidates the issue and every search. */

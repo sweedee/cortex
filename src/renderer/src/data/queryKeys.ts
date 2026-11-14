@@ -50,6 +50,7 @@ export const qk = {
     /** every search (prefix) */
     searches: () => ['jira', 'search'] as const,
     search: (jql: string, limit?: number) => ['jira', 'search', jql, limit ?? null] as const,
+    statuses: (project: string) => ['jira', 'statuses', project] as const,
   },
   claude: {
     all: ['claude'] as const,

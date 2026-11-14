@@ -108,7 +108,7 @@ function integrationFallbacks(): Pick<CortexApi, 'integrations' | 'git' | 'gh' |
     integrations: group('integrations', ['config']),
     git: group('git', ['isRepo', 'currentBranch', 'remoteRepo', 'worktreeList', 'worktreeAdd', 'worktreeRemove', 'status', 'diff', 'diffStat', 'log', 'fetch', 'rebase', 'rebaseAbort', 'push']),
     gh: group('gh', ['prList', 'prView', 'prCreate', 'prMerge', 'prComment', 'prUpdateBranch', 'prEdit', 'prDiff', 'prChecks', 'runView', 'runRerun', 'renovatePrs']),
-    jira: group('jira', ['search', 'view', 'transition', 'create', 'comment', 'edit']),
+    jira: group('jira', ['search', 'view', 'transition', 'create', 'comment', 'edit', 'statuses']),
     claude: { ...group('claude', ['start', 'send', 'answer', 'permission', 'interrupt', 'stop', 'remove', 'transcript', 'session']), list: empty },
     apps: { ...group('apps', ['start', 'stop', 'restart', 'log', 'remove']), list: empty },
     tests: { ...group('tests', ['run', 'stop', 'log']), list: empty },

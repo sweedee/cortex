@@ -44,7 +44,9 @@ export async function openSettings() {
     native.app.info().catch(() => undefined),
     loadIntegrationConfig().catch(() => undefined),
   ]);
-  const jira = config ? (config.jira.cli === 'mock' ? `mock (scripts/jira-mock, site ${config.jira.site}); start with CORTEX_JIRA_CLI=acli for the real Atlassian CLI` : `${config.jira.cli} (Atlassian CLI)`) : 'unknown (desktop app only)';
+  const jira = config
+    ? [config.jira.cli === 'mock' ? 'mock (scripts/jira-mock)' : 'Atlassian CLI (acli)', config.jira.site && `site ${config.jira.site}`, config.jira.note].filter(Boolean).join(' · ')
+    : 'unknown (desktop app only)';
   await openForm({
     title: 'Settings',
     description: 'Apply to new agent sessions and the whole canvas. Project paths and commands are in each project’s own settings.',

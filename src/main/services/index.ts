@@ -19,11 +19,12 @@ export interface ServicePaths {
 
 type Send = <C extends EventChannel>(channel: C, payload: EventChannels[C]) => void;
 
-export function createServices(paths: ServicePaths, send: Send) {
-  const config = resolveConfig();
+export function createServices(paths: ServicePaths, send: Send, env: NodeJS.ProcessEnv = process.env) {
+  const config = resolveConfig(env);
   // CORTEX_CLAUDE_BIN may point at a node script (e.g. the fake CLI fixture): run it with this runtime
   const claudeScript = /\.[cm]?js$/i.test(config.claude.bin);
-  const jira = new JiraService(jiraCliSpec(config, paths), { cwd: paths.userData });
+  const jira = new JiraService(jiraCliSpec(config, paths, env), { cwd: paths.userData });
+  let jiraReady: Promise<void> | null = null;
   const services = {
     config,
     git: new GitService(),
@@ -43,6 +44,31 @@ export function createServices(paths: ServicePaths, send: Send) {
     resolveExec(req: ExecRequest): ExecSpawn {
       if (req.cmd !== 'jira-mock') return req;
       return { ...req, cmd: jira.command, args: [...jira.prefix, ...req.args], env: { ...jira.env, ...req.env } };
+    },
+    /**
+     * Once: reads the Jira site from `acli jira auth status` (`integrations:config` waits for it). When acli
+     * cannot be started and no CLI was chosen with CORTEX_JIRA_CLI, Jira falls back to the mock.
+     */
+    initJira(): Promise<void> {
+      jiraReady ??= (async () => {
+        if (config.jira.cli !== 'acli') return;
+        try {
+          const site = await jira.site();
+          if (site && !env['CORTEX_JIRA_SITE']) config.jira.site = site;
+          if (!site) config.jira.note = 'acli is not logged in: run "acli jira auth login"';
+        } catch (e) {
+          const why = e instanceof Error ? e.message : String(e);
+          if (config.jira.explicit) {
+            config.jira.note = `acli could not be started: ${why}`;
+            return;
+          }
+          config.jira.cli = 'mock';
+          if (!env['CORTEX_JIRA_SITE']) config.jira.site = env['JIRA_MOCK_SITE'] || 'https://example.atlassian.net';
+          config.jira.note = 'acli not found on PATH: using the Jira mock';
+          jira.setSpec(jiraCliSpec(config, paths, env));
+        }
+      })();
+      return jiraReady;
     },
     stopAll() {
       services.claude.stopAll();
