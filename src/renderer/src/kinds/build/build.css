@@ -1,0 +1,79 @@
+/* Build sidebar (kinds/build). Flat, small radii, Strato tokens. */
+
+.build-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--ink-subdued);
+}
+.build-state.is-error {
+  color: var(--dt-colors-text-critical-default, #f2545b);
+  word-break: break-word;
+}
+.build-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.build-wrap {
+  overflow-wrap: anywhere;
+}
+.build-url {
+  margin-top: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.build-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--dt-colors-text-primary-default, #4aa8ff);
+  cursor: pointer;
+}
+.build-link:hover {
+  text-decoration: underline;
+}
+.build-icon {
+  flex: none;
+  display: flex;
+}
+.build-job.is-failed > .sidebar-row {
+  background: var(--dt-colors-background-container-critical-default, rgba(255, 77, 109, 0.12));
+}
+.build-steps {
+  margin: 2px 0 6px 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ink-subdued);
+}
+.build-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.build-steps li.is-failed {
+  color: var(--dt-colors-text-critical-default, #f2545b);
+  font-weight: 600;
+}
+.build-steps li.is-running {
+  color: var(--ink);
+}
+.build-tone-success {
+  color: var(--dt-colors-icon-success-default, #2fd18b);
+}
+.build-tone-critical {
+  color: var(--dt-colors-icon-critical-default, #ff4d6d);
+}
+.build-tone-running {
+  color: var(--dt-colors-icon-primary-default, #4aa8ff);
+}
+.build-tone-neutral {
+  color: var(--dt-colors-icon-neutral-default, #6b7088);
+}

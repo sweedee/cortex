@@ -1,30 +1,12 @@
 import { AiIcon, CheckmarkIcon, CycleIcon } from '@dynatrace/strato-icons';
-import type { ItemOf, Segment } from '../../domain';
-import { openDialog, patchData } from '../../store';
-import { external, placeholder, skill, toast } from '../common';
+import { external, skill } from '../common';
 import { PullRequestIcon } from '../icons';
-import type { KindModule } from '../types';
+import type { Action, KindModule } from '../types';
+import { openMerge, rebasePr, triggerAiReview } from './actions';
+import { ghBlocked, isMergeable, mergeBlocked, prRing, prUrl } from './logic';
+import { PrSidebar } from './Sidebar';
 
-type Pr = ItemOf<'pr'>;
-
-export const isMergeable = ({ data: d }: Pr) =>
-  d.state === 'open' && !d.isDraft && d.reviewDecision === 'APPROVED' && d.mergeable === 'MERGEABLE' && (d.checks?.state ?? 'success') === 'success';
-
-export function prRing(pr: Pr): Segment[] {
-  const d = pr.data;
-  if (d.state === 'merged') return [{ tone: 'success', label: 'Merged' }];
-  if (d.state === 'closed') return [{ tone: 'neutral', label: 'Closed' }];
-  if (isMergeable(pr)) return [{ tone: 'success', label: 'Approved, checks green, mergeable' }];
-  const out: Segment[] = [];
-  if (d.isDraft) out.push({ tone: 'neutral', label: 'Draft' });
-  else if (d.reviewDecision === 'APPROVED') out.push({ tone: 'success', label: d.reviews ? `Approved (${d.reviews.approved} / ${d.reviews.requested})` : 'Approved' });
-  else if (d.reviewDecision === 'CHANGES_REQUESTED') out.push({ tone: 'warning', label: 'Changes requested' });
-  else out.push({ tone: 'pending', label: d.reviews ? `Review pending (${d.reviews.requested} reviewer${d.reviews.requested === 1 ? '' : 's'})` : 'Review pending' });
-  if (d.mergeable === 'CONFLICTING') out.push({ tone: 'warning', label: 'Merge conflict' });
-  if (d.checks?.state === 'failure') out.push({ tone: 'critical', label: d.checks.failed ? `${d.checks.failed} check${d.checks.failed === 1 ? '' : 's'} failing` : 'Checks failing' });
-  else if (d.checks?.state === 'pending') out.push({ tone: 'running', label: 'Checks running' });
-  return out;
-}
+export { isMergeable, prRing } from './logic';
 
 const repoName = (repo: string) => repo.split('/').pop() ?? repo;
 
@@ -49,37 +31,47 @@ export const pr: KindModule<'pr'> = {
     ];
   },
 
-  actions: ([p]) => {
-    const mergeable = isMergeable(p);
+  actions: ([p], ctx) => {
+    const blocked = ghBlocked(p.data);
     const conflicted = p.data.mergeable === 'CONFLICTING';
+    const merge: Action = {
+      id: 'merge',
+      label: 'Merge…',
+      type: 'direct',
+      icon: <CheckmarkIcon />,
+      primary: isMergeable(p),
+      disabled: mergeBlocked(p.data),
+      run: () => void openMerge(p, ctx),
+    };
+    const rebase: Action = {
+      id: 'rebase',
+      label: conflicted ? 'Rebase (resolve conflicts)' : 'Rebase',
+      type: conflicted ? 'skill' : 'direct',
+      ...(conflicted ? { skill: 'rebase' } : {}),
+      icon: <CycleIcon />,
+      primary: conflicted && !blocked,
+      disabled: blocked,
+      run: () => void rebasePr(p),
+    };
     return [
-      external('github', 'Open in GitHub', (i) => (i.kind === 'pr' ? `github.com/${i.data.repo}/pull/${i.data.number}` : '')),
+      merge,
+      rebase,
       {
-        id: 'merge',
-        label: 'Merge',
+        id: 'ai-review',
+        label: 'Request AI review…',
         type: 'direct',
-        icon: <CheckmarkIcon />,
-        primary: mergeable,
-        disabled: mergeable ? undefined : conflicted ? 'Has merge conflicts' : 'Not approved or checks not green',
-        run: () =>
-          openDialog({
-            type: 'confirm',
-            title: `Merge #${p.data.number}?`,
-            body: `Squash-merge “${p.title}” into ${p.data.baseBranch} and delete the branch.`,
-            confirm: 'Squash and merge',
-            onConfirm: () => {
-              patchData<'pr'>(p, { state: 'merged' });
-              toast(`#${p.data.number} merged`, p.title);
-            },
-          }),
+        icon: <AiIcon />,
+        disabled: blocked,
+        run: () => void triggerAiReview(p),
       },
-      conflicted ? skill('conflicts', 'Resolve conflicts', 'resolve-conflicts', { primary: true }) : placeholder('rebase', 'Rebase', <CycleIcon />),
-      placeholder('ai-review', 'Request AI review', <AiIcon />),
-      skill('address', 'Address review', 'address-review'),
+      skill('address', 'Address review', 'address-review', { primary: p.data.reviewDecision === 'CHANGES_REQUESTED' }),
       skill('review', 'Review PR', 'review-pr'),
       skill('describe', 'Write description', 'describe-pr'),
+      external('github', 'Open on GitHub', (i) => (i.kind === 'pr' ? prUrl(i.data) : '')),
     ];
   },
+
+  Sidebar: PrSidebar,
 
   addable: {
     label: 'Import pull request…',
@@ -97,3 +89,4 @@ export const pr: KindModule<'pr'> = {
     },
   },
 };
+
