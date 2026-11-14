@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { Chip } from '@dynatrace/strato-components/content';
 import { TextArea } from '@dynatrace/strato-components/forms';
-import { ExternalLinkIcon, SorterIcon } from '@dynatrace/strato-icons';
+import { ExternalLinkIcon, StepIcon } from '@dynatrace/strato-icons';
 import { adfToMarkdown, summarizeIssue, type JiraIssue } from '../../../../shared/integrations/jira';
 import { Markdown, WebPanel } from '../../components/viewers';
 import { jiraOps, useJiraIssue } from '../../data/jira';
@@ -30,7 +30,7 @@ function Fields({ item, issue }: { item: SidebarProps<'ticket'>['item']; issue?:
       actions={
         <Button size="condensed" onClick={() => void openChangeStatus(item)}>
           <Button.Prefix>
-            <SorterIcon />
+            <StepIcon />
           </Button.Prefix>
           Change status…
         </Button>
