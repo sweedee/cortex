@@ -729,11 +729,13 @@ body {
 /* ---- chat dock ----------------------------------------------------------------------- */
 
 .chat-dock {
+  /* centred in the canvas area left of the open sidebar (--sidebar-space is set by overlays/Sidebar.tsx) */
+  --dock-room: calc(100vw - var(--sidebar-space, 0px));
   position: fixed;
-  left: 50%;
+  left: max(176px, calc(var(--dock-room) / 2));
   bottom: 22px;
   transform: translateX(-50%);
-  width: min(720px, calc(100vw - 32px));
+  width: min(720px, max(320px, calc(var(--dock-room) - 32px)));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -744,7 +746,7 @@ body {
 .chat-actions {
   display: flex;
   flex-wrap: wrap;
-  max-width: calc(100vw - 32px);
+  max-width: max(320px, calc(var(--dock-room) - 32px));
   justify-content: center;
   align-items: center;
   gap: 6px;

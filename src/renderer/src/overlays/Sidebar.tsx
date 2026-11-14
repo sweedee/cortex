@@ -46,8 +46,10 @@ export function Sidebar() {
   }, []);
   const width = drag ?? (wide ? wideW() : clampW(stored));
   useLayoutEffect(() => {
-    currentW = inspected ? width : 0;
-  }, [inspected, width]);
+    currentW = inspected && item ? width : 0;
+    // the chat dock (and anything else docked at the bottom) centres in the space left of the sidebar
+    document.documentElement.style.setProperty('--sidebar-space', `${currentW ? currentW + MARGIN * 2 : 0}px`);
+  }, [inspected, item, width]);
   const layout = useMemo(() => ({ wide, setWide: (w: boolean) => setWide(w), width }), [wide, setWide, width]);
 
   if (!inspected || !item) return null;
