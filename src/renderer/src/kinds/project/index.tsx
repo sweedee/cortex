@@ -1,10 +1,11 @@
 import { PlusIcon, SettingIcon, WorkflowIcon } from '@dynatrace/strato-icons';
-import type { Segment } from '../../domain';
-import { place } from '../../layout';
-import { openDialog } from '../../store';
-import { external, skill } from '../common';
+import type { ItemOf, Segment } from '../../domain';
+import { external, openInEditorAction, openPathAction, skill } from '../common';
 import type { KindModule } from '../types';
+import { ProjectSidebar } from './Sidebar';
 import { openProjectSettings } from './settings';
+import { openNewWorktree } from './worktreeFlow';
+import { hasBaseDir, SET_BASE_HINT } from './worktreeModel';
 
 export { openProjectSettings } from './settings';
 
@@ -52,27 +53,34 @@ export const project: KindModule<'project'> = {
 
   subtitle: (p) => p.data.repo,
 
-  actions: () => [
-    skill('plan-feature', 'Plan a feature', 'plan-feature', { primary: true }),
-    skill('create-ticket', 'Create ticket', 'create-ticket'),
-    skill('triage', 'Triage tickets', 'triage-tickets'),
-    skill('renovate', 'Review Renovate PRs', 'review-renovate'),
-    {
-      id: 'new-wt',
-      label: 'New worktree',
-      type: 'direct',
-      icon: <PlusIcon />,
-      run: ([p]) => openDialog({ type: 'add', kind: 'worktree', at: place.near(p.id) }),
-    },
-    external('repo', 'Open repo', (i) => `github.com/${i.kind === 'project' ? i.data.repo : ''}`),
-    {
-      id: 'settings',
-      label: 'Settings…',
-      type: 'direct',
-      icon: <SettingIcon />,
-      run: ([p]) => void openProjectSettings(p.kind === 'project' ? p : undefined),
-    },
-  ],
+  actions: ([p]) => {
+    const renovate = p.data.stats?.renovatePrs ?? 0;
+    const base = p.data.baseDir;
+    const noBase = hasBaseDir(p.data) ? undefined : SET_BASE_HINT;
+    return [
+      skill('create-ticket', 'Create ticket', 'create-ticket', { primary: true }),
+      skill('renovate', renovate > 0 ? `Review Renovate PRs (${renovate})` : 'Review Renovate PRs', 'review-renovate'),
+      {
+        id: 'new-wt',
+        label: 'New worktree…',
+        type: 'direct',
+        icon: <PlusIcon />,
+        run: ([x]) => void openNewWorktree(x as ItemOf<'project'>),
+      },
+      external('repo', 'Open repo', (i) => (i.kind === 'project' ? `https://github.com/${i.data.repo}` : ''), { disabled: p.data.repo.startsWith('unknown/') ? 'No GitHub repo set' : undefined }),
+      openPathAction('folder', 'Open folder', (i) => (i.kind === 'project' ? i.data.baseDir : undefined), { disabled: noBase }),
+      openInEditorAction('editor', 'Open in editor', (i) => (i.kind === 'project' ? i.data.baseDir : undefined), { disabled: base ? noBase : SET_BASE_HINT }),
+      {
+        id: 'settings',
+        label: 'Settings…',
+        type: 'direct',
+        icon: <SettingIcon />,
+        run: ([x]) => void openProjectSettings(x.kind === 'project' ? x : undefined),
+      },
+    ];
+  },
+
+  Sidebar: ProjectSidebar,
 
   addable: {
     label: 'Add project…',

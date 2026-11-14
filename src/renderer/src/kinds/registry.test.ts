@@ -102,7 +102,7 @@ describe('ring derivation', () => {
       ['neutral', 2],
     ]);
     expect(testrunRing(seed('tr-4821', 'testrun')).map((s) => s.tone)).toEqual(['critical', 'success', 'neutral']);
-    expect(viewOf(seed('d-ingest-prod', 'deployment'), ctx).badge).toEqual({ label: 'prod', tone: 'warning' });
+    expect(viewOf(seed('d-ingest-prod', 'deployment'), ctx).badge).toEqual({ label: 'prod', tone: 'critical' });
     expect(viewOf(seed('t-4802', 'ticket'), ctx).ring).toEqual([{ tone: 'critical', label: 'Blocker · To Do' }]);
   });
 

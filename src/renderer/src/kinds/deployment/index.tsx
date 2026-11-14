@@ -1,11 +1,13 @@
 import { EditIcon } from '@dynatrace/strato-icons';
-import type { DeploymentData, ItemOf, Segment, Tone } from '../../domain';
-import { external, placeholder } from '../common';
+import type { ItemOf, Segment } from '../../domain';
+import { external } from '../common';
 import { RocketIcon } from '../icons';
 import type { KindModule } from '../types';
+import { openDeploymentForm } from './form';
+import { guessStage, mockStatus, stageLabel, STAGE_TONE } from './model';
+import { DeploymentSidebar } from './Sidebar';
 
-export const stageLabel = (d: DeploymentData) => (d.stage === 'custom' ? (d.stageLabel ?? 'custom') : d.stage);
-const STAGE_TONE: Record<DeploymentData['stage'], Tone> = { dev: 'primary', staging: 'pending', prod: 'warning', custom: 'neutral' };
+export { stageLabel } from './model';
 
 export function deploymentRing({ data }: ItemOf<'deployment'>): Segment[] {
   switch (data.health) {
@@ -20,9 +22,7 @@ export function deploymentRing({ data }: ItemOf<'deployment'>): Segment[] {
   }
 }
 
-const guessStage = (url: string): DeploymentData['stage'] => (/\bdev\b|dev\.|localhost/i.test(url) ? 'dev' : /stag/i.test(url) ? 'staging' : 'prod');
-
-/** Where a project runs (dev / staging / prod …). Health is mocked until there is an integration. */
+/** Where a project runs (dev / staging / prod …). Health is mocked until there is an integration (see `model.ts` `mockStatus`). */
 export const deployment: KindModule<'deployment'> = {
   kind: 'deployment',
   label: 'Deployment',
@@ -33,17 +33,25 @@ export const deployment: KindModule<'deployment'> = {
   ring: deploymentRing,
   badge: ({ data }) => ({ label: stageLabel(data), tone: STAGE_TONE[data.stage] }),
   subtitle: (d) => d.data.url,
-  facts: ({ data }) => [
+  facts: ({ id, data }) => [
     ['Stage', stageLabel(data)],
     ['URL', data.url],
-    ['Version', data.version ?? '–'],
+    ['Version', mockStatus(id, Date.now(), data).version],
     ['Health', `${data.health ?? 'unknown'} (mocked)`],
   ],
 
   actions: () => [
     external('open', 'Open', (i) => (i.kind === 'deployment' ? i.data.url : ''), { primary: true }),
-    placeholder('edit', 'Edit…', <EditIcon />),
+    {
+      id: 'edit',
+      label: 'Edit…',
+      type: 'direct',
+      icon: <EditIcon />,
+      run: ([d]) => void openDeploymentForm({ deployment: d as ItemOf<'deployment'> }),
+    },
   ],
+
+  Sidebar: DeploymentSidebar,
 
   addable: {
     label: 'Add deployment…',
