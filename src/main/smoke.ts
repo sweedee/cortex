@@ -43,7 +43,19 @@ const PROBE = `(async () => {
     const off = c.on('test:state', (s) => { seen.push(s.status); if (s.status !== 'running') { off(); resolve({ seen, summary: s.summary }); } });
     c.tests.run({ id: 'smoke', cwd: repo, command: 'node -e "console.log(String.fromCharCode(35)+\\' pass 1\\')"' }).catch((e) => { off(); resolve('ERROR: ' + e.message); });
   }));
-  // CORTEX_SMOKE_E2E=1 (dev only, uses window.__cortexDebug): renderer flows end to end. Start with
+  // CORTEX_SMOKE_GALLERY=1: every viewer with sample data (mermaid, CodeMirror, diff…) under the real CSP
+  if (${JSON.stringify(process.env['CORTEX_SMOKE_GALLERY'] === '1')} && window.__cortexDebug) {
+    await step('gallery: viewers render under the CSP', async () => {
+      const violations = [];
+      document.addEventListener('securitypolicyviolation', (e) => violations.push(e.violatedDirective + ' ' + e.blockedURI));
+      await window.__cortexDebug.showGallery();
+      const t0 = Date.now();
+      const q = (s) => document.querySelector(s);
+      while (Date.now() - t0 < 20000 && !(q('.cm-editor') && q('svg[id^="mermaid"], .mermaid svg, [class*="mermaid"] svg') && q('.cxv-diff-hunk'))) await new Promise((r) => setTimeout(r, 200));
+      return { codemirror: !!q('.cm-editor'), mermaid: !!q('svg[id^="mermaid"], .mermaid svg, [class*="mermaid"] svg'), diff: !!q('.cxv-diff-hunk'), cspMeta: q('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')?.slice(0, 60), violations };
+    });
+  }
+  // CORTEX_SMOKE_E2E=1 (dev, or a build opened with #smoke; uses window.__cortexDebug): renderer flows end to end. Start with
   // CORTEX_CLAUDE_BIN=<fake-claude.mjs> so no real (paid) Claude session is started.
   const d = window.__cortexDebug;
   if (${JSON.stringify(process.env['CORTEX_SMOKE_E2E'] === '1')} && d) {

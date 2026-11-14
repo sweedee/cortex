@@ -116,7 +116,9 @@ export function createMainWindow(): BrowserWindow {
   }
 
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (!app.isPackaged && devUrl) void win.loadURL(devUrl);
-  else void win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
+  // #smoke exposes the renderer's debug handle (debug.ts) to the smoke probe, also in a build
+  const smoke = process.env['CORTEX_SMOKE'] === '1';
+  if (!app.isPackaged && devUrl) void win.loadURL(smoke ? `${devUrl}#smoke` : devUrl);
+  else void win.loadFile(join(import.meta.dirname, '../renderer/index.html'), smoke ? { hash: 'smoke' } : undefined);
   return win;
 }
