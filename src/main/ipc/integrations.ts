@@ -20,6 +20,7 @@ export function registerIntegrations(ctx: IpcContext, s: Services) {
   handle(ctx, 'git:fetch', ({ dir, ...opts }) => git.fetch(dir, opts));
   handle(ctx, 'git:rebase', ({ dir, onto }) => git.rebase(dir, onto));
   handle(ctx, 'git:rebaseAbort', ({ dir }) => git.rebaseAbort(dir));
+  handle(ctx, 'git:push', ({ dir, ...opts }) => git.push(dir, opts));
 
   handle(ctx, 'gh:prList', ({ repo, ...filter }) => gh.prList(repo, filter));
   handle(ctx, 'gh:prView', ({ repo, number }) => gh.prView(repo, number));

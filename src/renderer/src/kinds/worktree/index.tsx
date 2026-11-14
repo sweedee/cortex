@@ -1,9 +1,11 @@
-import { CodeIcon, DeleteIcon, DesktopIcon, TerminalIcon, UploadIcon } from '@dynatrace/strato-icons';
+import { CodeIcon, DeleteIcon, DesktopIcon, UploadIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { openDialog, removeItems } from '../../store';
-import { placeholder, skill, toast } from '../common';
+import { openInEditorAction, openPathAction, skill } from '../common';
 import { FlaskIcon } from '../icons';
 import type { KindModule } from '../types';
+import { createPr, launchApp, removeWorktree, runTests } from './actions';
+import { launchDisabled, pathDisabled, prDisabled, removeDisabled, testsDisabled } from './model';
+import { WorktreeSidebar } from './Sidebar';
 
 export function worktreeRing({ data }: ItemOf<'worktree'>): Segment[] {
   const g = data.git;
@@ -33,36 +35,53 @@ export const worktree: KindModule<'worktree'> = {
     ['Base', data.baseBranch],
   ],
 
-  actions: () => [
-    skill('implement', 'Implement', 'implement', { primary: true }),
-    skill('self-review', 'Review', 'self-review'),
-    skill('rebase', 'Rebase', 'rebase'),
-    placeholder('create-pr', 'Create PR…', <UploadIcon />),
-    placeholder('launch', 'Launch app', <DesktopIcon />),
-    placeholder('tests', 'Run tests', <FlaskIcon />),
-    placeholder('ide', 'Open in IDE', <TerminalIcon />, { type: 'external' }),
-    {
-      id: 'remove-wt',
-      label: 'Remove worktree',
-      type: 'direct',
-      icon: <DeleteIcon />,
-      danger: true,
-      run: ([w]) =>
-        openDialog({
-          type: 'confirm',
-          title: 'Remove worktree?',
-          body: `git worktree remove ${w.kind === 'worktree' ? w.data.path : ''}. Uncommitted changes are lost.`,
-          confirm: 'Remove',
-          danger: true,
-          onConfirm: () => {
-            removeItems([w.id]);
-            toast('Worktree removed', w.title);
-          },
-        }),
-    },
-  ],
+  actions: ([w], ctx) => {
+    const project = ctx.projectOf(w);
+    return [
+      {
+        id: 'create-pr',
+        label: 'Create PR…',
+        type: 'direct',
+        icon: <UploadIcon />,
+        primary: true,
+        disabled: prDisabled(w, project),
+        run: ([x]) => void createPr(x as ItemOf<'worktree'>, ctx),
+      },
+      skill('rebase', 'Rebase', 'rebase'),
+      {
+        id: 'launch',
+        label: 'Launch app',
+        type: 'direct',
+        icon: <DesktopIcon />,
+        disabled: launchDisabled(w, project),
+        run: ([x]) => void launchApp(x as ItemOf<'worktree'>, ctx),
+      },
+      {
+        id: 'tests',
+        label: 'Run tests',
+        type: 'direct',
+        icon: <FlaskIcon />,
+        disabled: testsDisabled(w, project),
+        run: ([x]) => void runTests(x as ItemOf<'worktree'>, ctx),
+      },
+      skill('review', 'Review', 'review'),
+      openInEditorAction('ide', 'Open in editor', (i) => (i.kind === 'worktree' ? i.data.path : undefined), { disabled: pathDisabled(w) }),
+      openPathAction('folder', 'Open folder', (i) => (i.kind === 'worktree' ? i.data.path : undefined), { disabled: pathDisabled(w) }),
+      {
+        id: 'remove-wt',
+        label: 'Remove worktree…',
+        type: 'direct',
+        icon: <DeleteIcon />,
+        danger: true,
+        disabled: removeDisabled(w, project),
+        run: ([x]) => void removeWorktree(x as ItemOf<'worktree'>, ctx),
+      },
+    ];
+  },
 
   complete: () => ({}),
+
+  Sidebar: WorktreeSidebar,
 
   addable: {
     label: 'Create worktree…',

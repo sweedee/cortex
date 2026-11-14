@@ -412,6 +412,7 @@ branches, remotes, labels) are rejected when they start with `-`, so they can't 
 | `git:fetch` | `{dir, remote?, prune?}` | `git fetch [--prune] <remote \| --all>` |
 | `git:rebase` | `{dir, onto}` → `{ok: true} \| {ok: false, conflicts}` | `git rebase <onto>`; on conflicts the rebase is left stopped |
 | `git:rebaseAbort` | `{dir}` | `git rebase --abort` |
+| `git:push` | `{dir, remote?, setUpstream?}` | `git push [-u] <remote or origin> HEAD` (Phase 3B; used before `gh pr create`) |
 
 All git calls run with `GIT_EDITOR=true`, `GIT_TERMINAL_PROMPT=0` (never wait for an editor or a password).
 
@@ -547,3 +548,24 @@ edit (`form.ts`, also used to add a deployment from the project sidebar; custom 
 Sidebar tabs: Details (URL, stage, project, status section labelled "mock") and Preview (`WebPanel`, wide).
 `model.ts` `mockStatus(id, now, known)` is deterministic per item id plus a 15 s jitter on the response time; it is the
 single place to replace with a real health check (same `DeploymentStatus` shape).
+### Kind: worktree
+
+`kinds/worktree/`: `index.tsx` (module), `actions.tsx` (UI actions), `Sidebar.tsx` (tabs), `model.ts` (pure helpers, tested).
+
+- **Actions**: Create PR (UI), Rebase (AI `rebase`), Launch app (UI), Run tests (UI), Review (AI `review`), Open in editor, Open folder, Remove worktree (UI). Path-dependent actions are disabled with a reason for demo items (non-absolute path), a missing repo, start or test command.
+- **Create PR**: form (title from the ticket summary or branch, body with the ticket key and link, base branch, draft, *Stack on PR* = select of open PRs of the project, which replaces the base with that PR's `headBranch`). Submit = `gitOps.push(path, {setUpstream})` then `ghOps.prCreate`; then a `pr` item (`stackedOn` = parent item id) linked "from branch" to the worktree, "implements" to the ticket and "stacked on" to the parent PR. A known PR number is updated instead of duplicated.
+- **Launch app / Run tests**: reuse the `app` / `testrun` item linked to the worktree (or with `worktreeId`), else create one (links "runs" / "tests"). Data: `procId` = item id, `command` (project start / test command), `cwd` = worktree path, `worktreeId`; the runner id is the item id (`appOps.start`, `testOps.run`); state then follows `sync/live.ts`. A running item is only revealed.
+- **Remove**: form with *Force* (shown when the checkout has changes), `gitOps.worktreeRemove(project.baseDir, path, {force})`, then `archive()` (undo toast). Demo items are only archived.
+- **Sidebar**: tabs *Changes* (wide `DiffViewer` of `useGitDiff`; "vs base" = merge base with `baseBranch`, "Uncommitted" = merge base with `HEAD`; untracked files are not in a diff) and *Stats* (git facts, changed files with status letters, diffstat vs base, commits since base, linked items, refresh). Errors are shown inline.
+
+### Kind: record
+
+`kinds/record/`: `index.tsx`, `Sidebar.tsx`, `useRecordFile.ts`, `discovery.ts`, `model.ts`.
+
+- **Sidebar**: live markdown viewer of `data.path` (`fs.readText`; `fs:watch` on its folder + `fs:changed`); task checkboxes write back; *Edit* toggles a `CodeEditor` (Ctrl+S / Save; a disk change during editing offers to load the new version). The item's step count follows the file. Demo records (non-absolute path) show a hint. *View* opens the sidebar (the prototype `RecordDialog` is no longer reached).
+- **Actions**: plan → Grill (`grill`), brainstorm → Plan (`plan`), grill → Implement (`implement`), verification none; Approve (draft plan), Open in editor, Open folder.
+- **Discovery** (`startRecordDiscovery()`, called from `sync/startSync`): per project with an absolute `baseDir`, lists `<baseDir>/records` with glob `**/*.md` (branch folders may contain `/`), watches the folder (re-scan debounced; a missing folder is polled every 30 s) and applies `planDiscovery`: record type from the file name prefix (plan / brainstorm / grill / verif), key = normalised path (no duplicates), `ticketBranch` = folder, linked to the ticket (`data.branch`, or the key) and to the worktree whose branch equals the folder (`/` may be flattened to `-`).
+
+### Kind: todo
+
+`kinds/todo/`: sidebar with an inline title, a markdown `CodeEditor` and a *Preview* toggle (task boxes toggle the body); the body autosaves into the item (600 ms debounce, flushed on close). *Edit* opens the sidebar; *Mark done* is the shared complete (done + archive with undo). Adding from the canvas opens a small form (title, notes, project; defaults to the selection's project), places the todo where clicked and opens its sidebar.

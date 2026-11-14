@@ -40,6 +40,7 @@ export const integrationSchemas = {
   'git:fetch': z.object({ dir: absPath, remote: ref.optional(), prune: z.boolean().optional() }),
   'git:rebase': z.object({ dir: absPath, onto: ref }),
   'git:rebaseAbort': z.object({ dir: absPath }),
+  'git:push': z.object({ dir: absPath, remote: ref.optional(), setUpstream: z.boolean().optional() }),
 
   'gh:prList': z.object({
     repo,

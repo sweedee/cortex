@@ -1,8 +1,10 @@
 import { CheckmarkIcon, DocumentIcon, ViewIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, RecordData, Segment } from '../../domain';
-import { openDialog, patchData } from '../../store';
-import { skill, toast } from '../common';
+import { inspect, patchData, select } from '../../store';
+import { openInEditorAction, openPathAction, skill, toast } from '../common';
 import type { Action, KindModule } from '../types';
+import { dirOf, isAbsolutePath, recordTypeOf } from './model';
+import { RecordSidebar } from './Sidebar';
 
 const TYPE_LABEL: Record<RecordData['recordType'], string> = { plan: 'Plan', brainstorm: 'Brainstorm', grill: 'Grill', verification: 'Verification' };
 
@@ -23,26 +25,23 @@ export function recordRing({ data }: ItemOf<'record'>): Segment[] {
 export const recordPath = (baseDir: string | undefined, ticketBranch: string | undefined, name: string) =>
   [baseDir ?? '<project>', 'records', ticketBranch, name].filter(Boolean).join('/');
 
-const guessType = (name: string): RecordData['recordType'] =>
-  /^brainstorm/i.test(name) ? 'brainstorm' : /^grill/i.test(name) ? 'grill' : /^verif/i.test(name) ? 'verification' : 'plan';
+const guessType = (name: string): RecordData['recordType'] => recordTypeOf(/\.md$/i.test(name) ? name : `${name}.md`) ?? 'plan';
 
 /** The workflow step after this record: plan → grill, brainstorm → plan, grill → implement. */
-function nextSteps(r: ItemOf<'record'>): Action[] {
-  const approved = r.data.status !== 'draft';
+export function nextSteps(r: ItemOf<'record'>): Action[] {
   switch (r.data.recordType) {
     case 'plan':
-      return [
-        skill('grill', 'Grill the plan', 'grill-plan'),
-        skill('implement-plan', 'Implement plan', 'implement-plan', { disabled: approved ? undefined : 'Approve the plan first' }),
-      ];
+      return [skill('grill', 'Grill', 'grill')];
     case 'brainstorm':
-      return [skill('write-plan', 'Turn into a plan', 'write-plan')];
+      return [skill('plan', 'Plan', 'plan')];
     case 'grill':
-      return [skill('implement-plan', 'Implement', 'implement-plan')];
+      return [skill('implement', 'Implement', 'implement')];
     case 'verification':
       return [];
   }
 }
+
+const fileOf = (i: { kind: string; data?: unknown }) => (i.kind === 'record' ? (i.data as RecordData).path : undefined);
 
 export const record: KindModule<'record'> = {
   kind: 'record',
@@ -63,26 +62,43 @@ export const record: KindModule<'record'> = {
     ['Path', data.path],
   ],
 
-  actions: ([r]) => [
-    { id: 'view', label: 'View', type: 'view', icon: <ViewIcon />, primary: true, run: ([x]) => openDialog({ type: 'record', itemId: x.id }) },
-    ...nextSteps(r),
-    ...(r.data.status === 'draft' && r.data.recordType === 'plan'
-      ? [
-          {
-            id: 'approve',
-            label: 'Approve',
-            type: 'direct' as const,
-            icon: <CheckmarkIcon />,
-            run: () => {
-              patchData<'record'>(r, { status: 'approved' });
-              toast('Plan approved', r.title);
+  actions: ([r]) => {
+    const missing = isAbsolutePath(r.data.path) ? undefined : 'No file on disk (demo data)';
+    return [
+      {
+        id: 'view',
+        label: 'View',
+        type: 'view',
+        icon: <ViewIcon />,
+        primary: true,
+        run: ([x]) => {
+          inspect(x.id);
+          select([x.id]);
+        },
+      },
+      ...nextSteps(r),
+      ...(r.data.status === 'draft' && r.data.recordType === 'plan'
+        ? [
+            {
+              id: 'approve',
+              label: 'Approve',
+              type: 'direct' as const,
+              icon: <CheckmarkIcon />,
+              run: () => {
+                patchData<'record'>(r, { status: 'approved' });
+                toast('Plan approved', r.title);
+              },
             },
-          },
-        ]
-      : []),
-  ],
+          ]
+        : []),
+      openInEditorAction('editor', 'Open in editor', fileOf, { disabled: missing }),
+      openPathAction('folder', 'Open folder', (i) => (isAbsolutePath(fileOf(i)) ? dirOf(fileOf(i)!) : undefined), { disabled: missing }),
+    ];
+  },
 
   complete: () => ({ status: 'done' }),
+
+  Sidebar: RecordSidebar,
 
   addable: {
     label: 'New record…',

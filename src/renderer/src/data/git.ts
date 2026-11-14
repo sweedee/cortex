@@ -57,6 +57,10 @@ export const gitOps = {
     await invalidate(qk.git.dir(dir));
     return r;
   },
+  async push(dir: string, opts?: { remote?: string; setUpstream?: boolean }) {
+    await native.git.push(dir, opts);
+    await invalidate(qk.git.dir(dir));
+  },
   async rebaseAbort(dir: string) {
     await native.git.rebaseAbort(dir);
     await invalidate(qk.git.dir(dir));

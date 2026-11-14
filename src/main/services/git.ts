@@ -126,6 +126,11 @@ export class GitService {
     throw new CliError('git', ['rebase', onto], r);
   }
 
+  /** `git push [-u] <remote> HEAD`: pushes the current branch under its own name */
+  async push(dir: string, opts: { remote?: string; setUpstream?: boolean } = {}): Promise<void> {
+    await this.git(dir, ['push', ...(opts.setUpstream ? ['-u'] : []), opts.remote ?? 'origin', 'HEAD'], 300_000);
+  }
+
   async rebaseAbort(dir: string): Promise<void> {
     await this.git(dir, ['rebase', '--abort']);
   }

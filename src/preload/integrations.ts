@@ -24,6 +24,7 @@ export function integrationsApi(invoke: Invoke, on: On, eventChannels: readonly 
       fetch: (dir, opts = {}) => invoke('git:fetch', { dir, ...opts }),
       rebase: (dir, onto) => invoke('git:rebase', { dir, onto }),
       rebaseAbort: (dir) => invoke('git:rebaseAbort', { dir }),
+      push: (dir, opts = {}) => invoke('git:push', { dir, ...opts }),
     },
     gh: {
       prList: (repo, filter = {}) => invoke('gh:prList', { repo, ...filter }),
