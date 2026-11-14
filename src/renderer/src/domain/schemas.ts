@@ -280,7 +280,8 @@ export const FilterSchema = z.object({
 export const ColorBySchema = z.enum(['none', 'project', 'ticket']);
 
 /** Claude Code `--permission-mode` for new sessions ('default' = the CLI asks for tools it may not run). */
-export const PermissionModeSchema = z.enum(['default', 'acceptEdits', 'plan', 'bypassPermissions', 'auto', 'dontAsk']);
+/** `claude --permission-mode` choices (Claude Code 2.1.325) plus `default` = don't pass the flag */
+export const PermissionModeSchema = z.enum(['default', 'manual', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']);
 
 export const PrefsSchema = z.object({
   /** OS notifications for new notices */

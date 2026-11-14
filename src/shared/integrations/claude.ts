@@ -120,6 +120,8 @@ export interface ClaudeSessionSummary {
   cwd: string;
   title: string;
   model?: string;
+  /** `--permission-mode` the session runs with (unset = the CLI's default) */
+  permissionMode?: string;
   status: ClaudeSessionStatus;
   /** "Editing src/x.ts", "Has a question for you", … */
   activity?: string;
@@ -141,7 +143,7 @@ export interface ClaudeSession extends ClaudeSessionSummary {
 
 export const NO_USAGE: SessionUsage = { contextTokens: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0, turns: 0 };
 
-export function newSession(init: { localId: string; cwd: string; title: string; sessionId?: string; model?: string; at?: string }): ClaudeSession {
+export function newSession(init: { localId: string; cwd: string; title: string; sessionId?: string; model?: string; permissionMode?: string; at?: string }): ClaudeSession {
   const at = init.at ?? new Date().toISOString();
   return {
     localId: init.localId,
@@ -149,6 +151,7 @@ export function newSession(init: { localId: string; cwd: string; title: string; 
     cwd: init.cwd,
     title: init.title,
     model: init.model,
+    ...(init.permissionMode ? { permissionMode: init.permissionMode } : {}),
     status: 'starting',
     pendingPermissions: [],
     usage: NO_USAGE,
@@ -282,8 +285,8 @@ export function applyClaudeEvent(session: ClaudeSession, event: ClaudeEvent): Cl
   switch (event.type) {
     case 'system': {
       if (event.subtype !== 'init') return base;
-      const e = event as { session_id: string; model: string };
-      return { ...base, sessionId: e.session_id ?? session.sessionId, model: e.model ?? session.model, status: session.status === 'waiting' ? 'waiting' : 'running' };
+      const e = event as { session_id: string; model: string; permissionMode?: string };
+      return { ...base, sessionId: e.session_id ?? session.sessionId, model: e.model ?? session.model, permissionMode: e.permissionMode ?? session.permissionMode, status: session.status === 'waiting' ? 'waiting' : 'running' };
     }
 
     case 'stream_event': {

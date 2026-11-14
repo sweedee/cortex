@@ -34,6 +34,8 @@ interface OpenForm {
   id: number;
   spec: FormSpec;
   resolve: (v: FormValues | null) => void;
+  /** set by the mounted dialog: fill values / submit programmatically (the smoke harness) */
+  drive?: { fill: (patch: FormValues) => Promise<void>; submit: () => Promise<string | null>; values: () => FormValues };
 }
 
 let stack: OpenForm[] = [];
@@ -55,6 +57,25 @@ function closeForm(id: number, result: FormValues | null) {
   emit();
   f?.resolve(result);
 }
+
+/**
+ * The open forms, newest last, for the dev smoke harness (`debug.ts`): read the title / values,
+ * fill fields and submit as if clicked. `submit` resolves with the validation or submit error
+ * (the dialog stays open then), or null when the form closed.
+ */
+export const formDriver = {
+  open: () => stack.map((f) => ({ title: f.spec.title, values: f.drive?.values() ?? null })),
+  async submit(patch: FormValues = {}, title?: string | RegExp): Promise<string | null> {
+    const f = [...stack].reverse().find((x) => !title || (typeof title === 'string' ? x.spec.title.includes(title) : title.test(x.spec.title)));
+    if (!f?.drive) throw new Error(`no open form${title ? ` matching ${String(title)}` : ''} (open: ${stack.map((x) => x.spec.title).join(' | ') || 'none'})`);
+    await f.drive.fill(patch);
+    return f.drive.submit();
+  },
+  cancel(title?: string) {
+    const f = [...stack].reverse().find((x) => !title || x.spec.title.includes(title));
+    if (f) closeForm(f.id, null);
+  },
+};
 
 /** Renders the open forms. Mount once. */
 export function FormHost() {
@@ -114,23 +135,41 @@ function FormDialog({ form }: { form: OpenForm }) {
     }
   };
 
-  const submit = async () => {
-    if (busy) return;
+  const busyRef = useRef(false);
+  const submit = async (): Promise<string | null> => {
+    if (busyRef.current) return 'busy';
     setTried(true);
     const errs = validateForm(spec.fields, latest.current);
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length) return Object.entries(errs).map(([k, v]) => `${k}: ${v}`).join('; ');
+    busyRef.current = true;
     setBusy(true);
     setFailure(null);
     const clean = cleanValues(latest.current);
     try {
       await spec.onSubmit(clean);
       closeForm(form.id, clean);
+      return null;
     } catch (e) {
       setFailure(errorText(e));
+      busyRef.current = false;
       setBusy(false);
+      return errorText(e);
     }
   };
+  // programmatic access for the smoke harness (formDriver); refreshed after every render
+  useEffect(() => {
+    form.drive = {
+      values: () => latest.current,
+      // like typing: set, run the derived-field hook, then re-apply what was given explicitly
+      fill: async (patch) => {
+        for (const [k, v] of Object.entries(patch)) set(k, v);
+        for (const k of Object.keys(patch)) await derive(k);
+        for (const [k, v] of Object.entries(patch)) set(k, v);
+      },
+      submit,
+    };
+  });
   const cancel = () => !busy && closeForm(form.id, null);
 
   return (
@@ -188,6 +227,14 @@ function Field({ field: f, value, error, onChange, onCommit, onEnter }: FieldPro
   };
   let control;
   switch (f.type) {
+    case 'info':
+      return (
+        <div className="form-field form-info">
+          <div className="form-info-label">{f.label}</div>
+          <div className="form-info-value">{s || '–'}</div>
+          {f.hint && <div className="form-hint">{f.hint}</div>}
+        </div>
+      );
     case 'textarea':
       control = <TextArea rows={f.rows ?? 4} value={s} placeholder={f.placeholder} onChange={(v: string) => onChange(v)} onBlur={() => onCommit()} />;
       break;

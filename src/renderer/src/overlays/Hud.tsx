@@ -13,6 +13,7 @@ import {
   NotificationOffIcon,
   PlusIcon,
   ResetIcon,
+  SettingIcon,
   UndoIcon,
   VolumeIcon,
   VolumeOffIcon,
@@ -20,6 +21,7 @@ import {
   ZoomToFitIcon,
 } from '@dynatrace/strato-icons';
 import { useAppInfo } from '../data/app';
+import { openSettings } from './settings';
 import { toggleDesktop, toggleSound } from '../desktop';
 import { camera } from '../layout';
 import { asset } from '../native';
@@ -152,6 +154,13 @@ export function Hud() {
             <AppVersion />
           </Menu.Content>
         </Menu>
+        <Tooltip text="Settings">
+          <Button variant="default" aria-label="Settings" className="hud-bell" onClick={() => void openSettings()}>
+            <Button.Prefix>
+              <SettingIcon />
+            </Button.Prefix>
+          </Button>
+        </Tooltip>
       </div>
 
       <div className="hud hud-legend" role="toolbar" aria-label="Filter bubbles">

@@ -3,7 +3,8 @@
  * Pure (no React), so it is unit-tested on its own.
  */
 
-export type FieldType = 'text' | 'textarea' | 'select' | 'checkbox' | 'directory' | 'file' | 'radio';
+/** `info` is a read-only line (label + the value from `default` / `values`); never validated. */
+export type FieldType = 'text' | 'textarea' | 'select' | 'checkbox' | 'directory' | 'file' | 'radio' | 'info';
 
 export type FieldValue = string | boolean;
 /** Values by field name: strings for every type except `checkbox` (boolean). */
@@ -73,7 +74,7 @@ export const isVisible = (f: FormFieldSpec, values: FormValues) => !f.when || f.
 export function validateForm(fields: FormFieldSpec[], values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const f of fields) {
-    if (!isVisible(f, values)) continue;
+    if (!isVisible(f, values) || f.type === 'info') continue;
     const v = values[f.name];
     if (f.required) {
       if (f.type === 'checkbox' ? v !== true : typeof v !== 'string' || !v.trim()) {

@@ -129,7 +129,7 @@ export class ClaudeSessions {
       const list = JSON.parse(readFileSync(file, 'utf8')) as StoredSession[];
       for (const s of list) {
         const session: ClaudeSession = {
-          ...newSession({ localId: s.localId, cwd: s.cwd, title: s.title, sessionId: s.sessionId, model: s.model, at: s.createdAt }),
+          ...newSession({ localId: s.localId, cwd: s.cwd, title: s.title, sessionId: s.sessionId, model: s.model, permissionMode: s.permissionMode, at: s.createdAt }),
           status: 'done',
           running: false,
           updatedAt: s.updatedAt,
@@ -320,7 +320,7 @@ export class ClaudeSessions {
     const existing = this.entries.get(localId);
     if (existing?.child) throw new Error(`Claude session "${localId}" is already running`);
     const title = req.title ?? (req.prompt ? req.prompt.split('\n')[0].slice(0, 80) : 'Claude session');
-    const session = newSession({ localId, cwd: req.cwd, title, sessionId: req.resume ?? existing?.session.sessionId, model: req.model });
+    const session = newSession({ localId, cwd: req.cwd, title, sessionId: req.resume ?? existing?.session.sessionId, model: req.model, permissionMode: req.permissionMode ?? this.opts.defaultPermissionMode });
     const e: Entry = existing ?? { session, req, events: [], asks: new Map(), stderr: new LogTail(16 * 1024), interrupting: false, stopping: false };
     if (existing) {
       e.req = { ...existing.req, ...req };
@@ -431,7 +431,7 @@ export class ClaudeSessions {
   /** the full session (with messages) rebuilt from the transcript */
   session(localId: string): ClaudeSession {
     const e = this.get(localId);
-    const base = newSession({ localId, cwd: e.session.cwd, title: e.session.title, sessionId: e.session.sessionId, model: e.session.model, at: e.session.createdAt });
+    const base = newSession({ localId, cwd: e.session.cwd, title: e.session.title, sessionId: e.session.sessionId, model: e.session.model, permissionMode: e.session.permissionMode, at: e.session.createdAt });
     if (e.events.length > 0) return e.session.messages.length ? e.session : replayTranscript(base, e.events, !!e.child);
     return { ...replayTranscript(base, this.transcript(localId), false), usage: e.session.usage };
   }

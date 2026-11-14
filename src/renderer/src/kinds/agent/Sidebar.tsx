@@ -425,7 +425,8 @@ function StatusLine({ agent, session }: { agent: Agent; session: ClaudeSession |
   const u = agent.data.usage;
   const pct = u?.contextPct;
   const tone = pct != null ? contextTone(pct) : 'normal';
-  const model = session?.model ?? agent.data.model;
+  const model = session?.model ?? agent.data.model ?? (agent.data.localId ? 'default model' : undefined);
+  const mode = session?.permissionMode && session.permissionMode !== 'default' ? session.permissionMode : undefined;
   const cost = session?.usage.costUsd ?? u?.costUsd;
   const turns = session?.usage.turns ?? u?.turns;
   return (
@@ -434,6 +435,11 @@ function StatusLine({ agent, session }: { agent: Agent; session: ClaudeSession |
         {STATUS_LABEL[agent.data.status]}
       </Chip>
       {model && <span title="Model">{model.replace(/^claude-/, '')}</span>}
+      {mode && (
+        <span title="Permission mode (--permission-mode)" style={mode === 'bypassPermissions' ? { color: 'var(--tone-critical)' } : undefined}>
+          {mode}
+        </span>
+      )}
       {pct != null && (
         <span className={`ah-ctx tone-${tone}`} title="Context window in use">
           <span className="ah-ctx-bar" aria-hidden>
