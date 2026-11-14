@@ -1,0 +1,81 @@
+/* App sidebar (kinds/app/Sidebar.tsx): the preview / log fill the sidebar body. */
+
+.sidebar-body:has(.ap) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-body:has(.ap) > .sidebar-tabs {
+  flex: 1;
+  min-height: 0;
+}
+.sidebar-tabpanel:has(> .ap) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: var(--dt-colors-text-neutral-default);
+}
+.ap-log {
+  padding: 10px;
+}
+.ap-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 14px;
+  text-align: center;
+  overflow: auto;
+}
+.ap-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--dt-colors-text-neutral-subdued);
+}
+.ap-title {
+  font-weight: 600;
+}
+.ap-critical {
+  color: var(--dt-colors-text-critical-default);
+}
+.ap-sub {
+  color: var(--dt-colors-text-neutral-subdued);
+}
+.ap-small {
+  font-size: 12px;
+  max-width: 320px;
+}
+.ap-mono {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+}
+.ap-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.ap-tail {
+  align-self: stretch;
+  height: auto;
+  max-height: 260px;
+  text-align: left;
+}
+.ap-error {
+  padding: 6px 10px;
+  border: 1px solid var(--dt-colors-border-critical-default);
+  border-radius: 4px;
+  color: var(--dt-colors-text-critical-default);
+  background: var(--dt-colors-background-container-critical-default);
+}
