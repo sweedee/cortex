@@ -14,7 +14,7 @@ the app theme. Styles: `viewers.css`.
 | `<CodeEditor>` | `value`, `onChange?`, `language?: 'markdown' \| 'json' \| 'text'`, `readOnly?`, `placeholder?`, `onSave?(value)` (Ctrl/Cmd+S), `minHeight?`, `lineNumbers?`. CodeMirror 6, controlled by `value`. |
 | `<WebPanel>` | `src`, `partition?` (e.g. `persist:github`), `onNavigate?(url)`, `onOpenExternal?(url)`, `toolbar?` (default true), `viewport?: 'desktop' \| 'tablet' \| 'mobile'`, `viewportSwitcher?`. Electron `<webview>` with back/forward/reload/URL/loading/error+retry; falls back to an `<iframe>` (with a notice) outside Electron. Changing `src` or `partition` recreates the view. Type for `<webview>` is declared in `web/webview.d.ts`. |
 | `<LogView>` | `lines?: string[]` or `text?`, `follow?` (default true; scrolling up pauses, "Jump to latest" resumes), `maxLines?` (default 2000), `aria-label?`. ANSI colours via `anser`; bare `\r` progress rewrites collapse to the last frame. |
-| `ViewerGallery` (`Gallery.tsx`) | Dev-only demo of all of the above. Not mounted anywhere. |
+| `ViewerGallery` (`Gallery.tsx`) | Demo of all of the above with sample data. Mounted only by the smoke harness (`CORTEX_SMOKE_GALLERY=1`, `showGallery()` in `debug.ts`) to check rendering under the CSP. |
 
 Pure helpers (tested in `viewers.test.ts`): `parseDiffStats`, `toggleTask`, `findTaskLines`,
 `splitMermaid`, `tailLines`.
