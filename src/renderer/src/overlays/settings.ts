@@ -6,7 +6,7 @@
 import { loadIntegrationConfig } from '../data/app';
 import { toggleDesktop } from '../desktop';
 import { native } from '../native';
-import { getState, setSettings, setSoundOn, setDesktopNotify } from '../store';
+import { getState, setColorBy, setSettings, setSoundOn, setDesktopNotify, type ColorBy } from '../store';
 import { openForm, str, type FormValues } from '../ui/form';
 import { errorText } from '../ui/task';
 import type { Settings } from '../store';
@@ -19,6 +19,12 @@ const PERMISSION_MODES: { value: Settings['permissionMode']; label: string }[] =
   { value: 'auto', label: 'auto: Claude decides what needs asking' },
   { value: 'dontAsk', label: "dontAsk: deny what isn't pre-approved" },
   { value: 'bypassPermissions', label: 'bypassPermissions: run everything (careful)' },
+];
+
+export const COLOR_BY: { value: ColorBy; label: string }[] = [
+  { value: 'project', label: 'Project (one colour per project and everything linked to it)' },
+  { value: 'ticket', label: 'Ticket (one colour per ticket)' },
+  { value: 'none', label: 'Gray (no colouring)' },
 ];
 
 /** Form values → the settings patch (pure, tested). Blank text = unset (CLI / main default). */
@@ -52,6 +58,7 @@ export async function openSettings() {
     description: 'Apply to new agent sessions and the whole canvas. Project paths and commands are in each project’s own settings.',
     submitLabel: 'Save',
     values: {
+      colorBy: s.colorBy,
       model: s.settings.model ?? '',
       permissionMode: s.settings.permissionMode,
       aiReviewComment: s.settings.aiReviewComment ?? '',
@@ -63,6 +70,7 @@ export async function openSettings() {
       jira,
     },
     fields: [
+      { name: 'colorBy', label: 'Bubble colour', type: 'select', options: COLOR_BY, hint: 'What the colour of a bubble stands for on the canvas.' },
       { name: 'model', label: 'Claude model', type: 'text', placeholder: 'CLI default', hint: 'An alias (opus, sonnet) or a full model id. Blank = whatever the claude CLI uses.' },
       { name: 'permissionMode', label: 'Permission mode', type: 'select', options: PERMISSION_MODES, hint: 'claude --permission-mode for new sessions. Tool prompts show up as Allow / Deny on the agent bubble.' },
       { name: 'aiReviewComment', label: 'AI review comment', type: 'text', placeholder: config?.github.aiReviewComment ?? '@claude review', hint: 'Posted on a PR by “Request AI review”. Blank = the default shown.' },
@@ -75,6 +83,8 @@ export async function openSettings() {
     ],
     onSubmit: async (v) => {
       setSettings(settingsPatch(v));
+      const by = COLOR_BY.find((c) => c.value === str(v, 'colorBy'))?.value;
+      if (by && by !== getState().colorBy) setColorBy(by);
       if (v.soundOn !== getState().soundOn) setSoundOn(v.soundOn === true);
       if (v.desktopNotify !== getState().desktopNotify) {
         if (v.desktopNotify === true) await toggleDesktop();

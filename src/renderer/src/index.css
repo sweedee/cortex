@@ -1054,34 +1054,6 @@ body {
   align-items: center;
   gap: 10px;
 }
-.hud-colorby {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 4px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.hud-colorby-label {
-  padding: 0 6px 0 4px;
-  font-size: 11px;
-  color: var(--ink-faint);
-}
-.hud-colorby-opt {
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--ink-subdued);
-  font: 600 12px var(--dt-typography-text-base-default-family, system-ui), sans-serif;
-  cursor: pointer;
-}
-.hud-colorby-opt:hover,
-.hud-colorby-opt.is-on {
-  background: var(--surface-hover);
-  color: var(--ink);
-}
 .hud-bell {
   position: relative;
 }
@@ -1133,42 +1105,6 @@ body {
   opacity: 0.6;
 }
 
-.hud-legend {
-  left: 16px;
-  bottom: 22px;
-  display: flex;
-  flex-wrap: wrap;
-  /* never run under the chat box (720px, centred); wraps upwards instead */
-  max-width: max(150px, calc(50vw - 360px - 32px));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 4px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 8px;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--ink);
-  font: 600 12px var(--dt-typography-text-base-default-family, system-ui), sans-serif;
-  cursor: pointer;
-  font-variant-numeric: tabular-nums;
-}
-.legend-item svg {
-  color: var(--ink);
-}
-.legend-item:hover {
-  background: var(--surface-hover);
-}
-.legend-item.is-off {
-  opacity: 0.35;
-  text-decoration: line-through;
-}
 .hud-zoom {
   right: 16px;
   bottom: 22px;
@@ -1181,14 +1117,9 @@ body {
 }
 
 @media (max-width: 1100px) {
-  .hud-legend,
   .hud-zoom {
     bottom: auto;
     top: 64px;
-  }
-  .filter-panel {
-    bottom: auto;
-    top: 108px;
   }
 }
 
@@ -1343,13 +1274,13 @@ body {
   color: var(--ink-faint);
 }
 
-/* ---- legend: filter button ---------------------------------------------------------------- */
+/* ---- filter panel ------------------------------------------------------------------------- */
 
-.legend-filter.is-open,
-.legend-filter.is-active {
+/* the filter button's count, the toolbar toggle state, and the archive restore button */
+.hud-filter-btn.is-on {
   background: var(--surface-hover);
 }
-.legend-badge {
+.hud-filter-count {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -1361,22 +1292,6 @@ body {
   line-height: 16px;
   text-align: center;
 }
-.legend-sep {
-  width: 1px;
-  margin: 4px 2px;
-  background: var(--line);
-}
-.legend-shown {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 2px 0 8px;
-  border-left: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--ink-subdued);
-  font-variant-numeric: tabular-nums;
-}
-.legend-clear,
 .archive-restore {
   display: inline-flex;
   padding: 4px;
@@ -1386,19 +1301,17 @@ body {
   color: var(--ink-faint);
   cursor: pointer;
 }
-.legend-clear:hover,
 .archive-restore:hover {
   background: var(--surface-hover);
   color: var(--ink);
 }
 
-/* ---- filter panel ------------------------------------------------------------------------- */
-
 .filter-panel {
-  left: 16px;
-  bottom: 66px;
+  right: 16px;
+  top: 56px;
   width: 360px;
   max-height: calc(100vh - 150px);
+  z-index: 26;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 12px 14px 14px;

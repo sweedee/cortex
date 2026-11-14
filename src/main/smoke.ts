@@ -8,7 +8,12 @@ import { app, type BrowserWindow } from 'electron';
 import { runRepoSmoke } from './smokeRepo';
 
 /** a tiny HTTP server on a random port that prints its URL like a dev server (phase 3d app e2e) */
-const SMOKE_APP_CMD = `node -e "const s=require('http').createServer((q,r)=>r.end('<h1>hi from the smoke app</h1>'));s.listen(0,'127.0.0.1',()=>console.log('  Local: http://localhost:'+s.address().port+'/'))"`;
+// the page reports the colour scheme it sees (title + heading), so the preview's light / dark toggle can be checked.
+// base64 keeps the page free of quoting trouble in the shell command.
+const SMOKE_PAGE = Buffer.from(
+  '<!doctype html><title>?</title><h1 id=s>hi from the smoke app</h1><script>const m=matchMedia("(prefers-color-scheme: dark)");const f=()=>{const v=m.matches?"dark":"light";document.title=v;document.getElementById("s").textContent="hi from the smoke app, scheme: "+v;document.body.style.cssText=m.matches?"background:#111;color:#eee":"background:#fff;color:#111"};m.onchange=f;f()</script>',
+).toString('base64');
+const SMOKE_APP_CMD = `node -e "const h=Buffer.from('${SMOKE_PAGE}','base64').toString();const s=require('http').createServer((q,r)=>r.end(h));s.listen(0,'127.0.0.1',()=>console.log('  Local: http://localhost:'+s.address().port+'/'))"`;
 const SMOKE_CRASH_CMD = `node -e "console.log('boom: config missing');process.exit(2)"`;
 
 const PROBE = `(async () => {
@@ -139,6 +144,17 @@ const PROBE = `(async () => {
       d.inspect(a.id);
       const wv = await untilDom(() => $('webview'));
       const preview = { src: wv.getAttribute('src'), partition: wv.getAttribute('partition') };
+      // preview light / dark toggle: starts at the app's scheme, flips the page's prefers-color-scheme live
+      const pageScheme = async (want) => { for (let i = 0; i < 40; i++) { try { const v = await wv.executeJavaScript('document.title'); if (v === want) return v; } catch {} await sleep(250); } return 'timeout: wanted ' + want; };
+      const appTheme = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      const toggle = await untilDom(() => $('button[aria-label^="Preview color scheme"]'));
+      const other = appTheme === 'dark' ? 'light' : 'dark';
+      const schemeTest = { app: appTheme, initial: await pageScheme(appTheme) };
+      toggle.click();
+      schemeTest.toggled = await pageScheme(other);
+      toggle.click();
+      schemeTest.back = await pageScheme(appTheme);
+      preview.scheme = schemeTest;
       d.runAction(a.id, 'restart');
       const r2 = await until(() => d.itemById(a.id), (x) => x.data.state === 'running' && x.data.port && x.data.port !== port1);
       const pid2 = (await c.apps.list()).find((s) => s.id === a.id).pid;

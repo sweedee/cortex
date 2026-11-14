@@ -1,11 +1,11 @@
-import { EditIcon } from '@dynatrace/strato-icons';
+import { CheckmarkIcon, EditIcon, SquareIcon } from '@dynatrace/strato-icons';
 import type { ItemOf } from '../../domain';
 import { place } from '../../layout';
-import { addItem, getState, inspect, makeItem, select } from '../../store';
+import { addItem, getState, inspect, itemById, makeItem, patchData, select } from '../../store';
 import { openForm, str } from '../../ui/form';
 import { ChecklistIcon } from '../icons';
 import type { KindModule } from '../types';
-import { checklist, firstLine, handleOf, todoFromForm } from './model';
+import { checklist, firstLine, handleOf, quickChecklist, shortLabel, toggleChecklistItem, todoFromForm } from './model';
 import { TodoSidebar } from './Sidebar';
 
 /** Quick add: a title (and optional notes) in a small form, placed where the user clicked. */
@@ -54,7 +54,7 @@ export const todo: KindModule<'todo'> = {
     return c.total ? [['Checklist', `${c.done} / ${c.total}`]] : [];
   },
 
-  actions: () => [
+  actions: ([x]) => [
     {
       id: 'edit',
       label: 'Edit',
@@ -66,6 +66,17 @@ export const todo: KindModule<'todo'> = {
         select([x.id]);
       },
     },
+    // one action per checklist item (several items only): flips its box in the body
+    ...(x ? quickChecklist(x.data.body) : []).map((c) => ({
+      id: `check-${c.index}`,
+      label: shortLabel(c.text), // the icon shows the state (box / tick)
+      type: 'direct' as const,
+      icon: c.checked ? <CheckmarkIcon /> : <SquareIcon />,
+      run: ([t]: { id: string }[]) => {
+        const cur = itemById(t.id);
+        if (cur?.kind === 'todo') patchData<'todo'>(t.id, { body: toggleChecklistItem(cur.data.body, c.index) });
+      },
+    })),
   ],
 
   complete: () => ({ done: true }),

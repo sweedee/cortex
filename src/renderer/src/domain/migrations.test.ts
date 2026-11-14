@@ -3,7 +3,7 @@ import { SEED_ITEMS, SEED_LINKS } from '../seed';
 import v0 from './fixtures/workspace-v0.json';
 import v1 from './fixtures/workspace-v1.json';
 import { DEFAULT_PREFS, migrate, parseWorkspace } from './migrations';
-import { WORKSPACE_VERSION, WorkspaceSchema } from './schemas';
+import { KindSchema, WORKSPACE_VERSION, WorkspaceSchema } from './schemas';
 import type { Item, ItemOf, Kind } from './types';
 
 describe('migration v0 → v1 (phase-0a seed)', () => {
@@ -90,7 +90,7 @@ describe('migration v1 → v2 (phase-2b settings)', () => {
 
   it('adds the new prefs with their defaults and keeps the old ones', () => {
     expect(r.migrated).toBe(true);
-    expect(r.workspace.version).toBe(2);
+    expect(r.workspace.version).toBe(WORKSPACE_VERSION);
     expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, desktopNotify: true, soundOn: false, colorBy: 'ticket', permissionMode: 'default', refreshSec: 60, sidebarWidth: 360 });
     expect(r.workspace.prefs.model).toBeUndefined();
   });
@@ -141,5 +141,36 @@ describe('parseWorkspace', () => {
     expect(r.warnings.filter((w) => w.startsWith('dropped'))).toHaveLength(2);
     // the outdated filter goes, the rest of the prefs survives
     expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, soundOn: false, filter: undefined });
+  });
+});
+
+describe('migration v2 to v3 (filter selects kinds to show)', () => {
+  const file = (filter?: object) => ({ version: 2, items: SEED_ITEMS, links: SEED_LINKS, prefs: { ...DEFAULT_PREFS, ...(filter && { filter }) } });
+  const base = { status: [], projects: [], query: 'x', unreadOnly: false, showArchived: false };
+
+  it('turns hidden kinds into the complementary list of shown kinds', () => {
+    const r = parseWorkspace(file({ ...base, hiddenKinds: ['build', 'agent'] }));
+    expect(r.ok && r.migrated).toBe(true);
+    if (!r.ok) return;
+    const f = r.workspace.prefs.filter!;
+    expect(f.kinds).toHaveLength(KindSchema.options.length - 2);
+    expect(f.kinds).not.toContain('build');
+    expect(f.kinds).not.toContain('agent');
+    expect(f.kinds).toContain('pr');
+    expect(f).not.toHaveProperty('hiddenKinds');
+    expect(f.query).toBe('x');
+  });
+
+  it('nothing hidden (or everything hidden) = no restriction', () => {
+    for (const hiddenKinds of [[], [...KindSchema.options]]) {
+      const r = parseWorkspace(file({ ...base, hiddenKinds }));
+      expect(r.ok && r.workspace.prefs.filter?.kinds).toEqual([]);
+    }
+  });
+
+  it('keeps a file without a filter', () => {
+    const r = parseWorkspace(file());
+    expect(r.ok && r.workspace.version).toBe(3);
+    expect(r.ok && r.workspace.prefs.filter).toBeUndefined();
   });
 });

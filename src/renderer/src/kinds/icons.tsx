@@ -1,5 +1,7 @@
 /**
- * Icons that Strato does not have (same 16px stroke style), and the icon per skill.
+ * Icons that Strato does not have (archive, rocket, checklist, flask), and the icon per skill.
+ * Everything else must come from `@dynatrace/strato-icons`; sizing convention for all icons is the
+ * Strato `size` prop (a number in px, or 'small' = 16 / 'large' = 32; default 20), which these follow too.
  * Pure: kind modules import this, so it must not import the store or the registry.
  */
 import type { ReactElement } from 'react';
@@ -7,6 +9,7 @@ import {
   AiIcon,
   ChatIcon,
   CodeIcon,
+  CompareIcon,
   CrosshairIcon,
   CycleIcon,
   DuplicateIcon,
@@ -21,22 +24,22 @@ import {
 } from '@dynatrace/strato-icons';
 
 interface P {
-  size?: number;
+  size?: number | 'small' | 'large';
 }
-const svg = (s: number | undefined, children: ReactElement | ReactElement[]) => (
-  <svg width={s ?? 16} height={s ?? 16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    {children}
-  </svg>
-);
+const px = (s: P['size']) => (typeof s === 'number' ? s : s === 'small' ? 16 : s === 'large' ? 32 : 20);
+/** Shared wrapper for hand-drawn icons (16-unit outline, scaled to the Strato size convention). */
+export function StrokeIcon({ size, children }: P & { children: ReactElement | ReactElement[] }) {
+  return (
+    <svg width={px(size)} height={px(size)} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {children}
+    </svg>
+  );
+}
+const svg = (size: P['size'], children: ReactElement | ReactElement[]) => <StrokeIcon size={size}>{children}</StrokeIcon>;
 
+/** Pull request: Strato's compare icon (two branch nodes with arrows). */
 export function PullRequestIcon({ size }: P) {
-  return svg(size, [
-    <circle key="a" cx="4" cy="3.5" r="1.6" />,
-    <circle key="b" cx="4" cy="12.5" r="1.6" />,
-    <circle key="c" cx="12" cy="12.5" r="1.6" />,
-    <path key="d" d="M4 5.1v5.8M12 10.9V6.5c0-1.4-.9-2.3-2.3-2.3H7.5" />,
-    <path key="e" d="M9 2.6 7.3 4.2 9 5.8" />,
-  ]);
+  return <CompareIcon size={size} />;
 }
 
 /** Archive box. */
