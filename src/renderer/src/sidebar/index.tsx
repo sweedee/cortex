@@ -85,13 +85,13 @@ export function SidebarTabs({ tabs, initial, rememberAs }: { tabs: SidebarTab[];
   );
 }
 
-/** A titled block of the sidebar body. */
+/** A titled block of the sidebar body; `actions` (small buttons) sit on the right of the label. */
 export function SidebarSection({ label, children, actions }: { label?: ReactNode; children: ReactNode; actions?: ReactNode }) {
   return (
     <section className="sidebar-section">
       {(label || actions) && (
-        <div className="sidebar-label">
-          {label}
+        <div className={`sidebar-label ${actions ? 'has-actions' : ''}`}>
+          <span>{label}</span>
           {actions && <span className="sidebar-label-actions">{actions}</span>}
         </div>
       )}

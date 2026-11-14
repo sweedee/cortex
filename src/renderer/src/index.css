@@ -669,6 +669,22 @@ body {
   letter-spacing: 0.06em;
   color: var(--ink-faint);
 }
+.sidebar-label.has-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+.sidebar-label-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
 .sidebar-facts {
   display: grid;
   grid-template-columns: 1fr 1fr;

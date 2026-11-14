@@ -6,11 +6,11 @@ import { ExternalLinkIcon, SorterIcon } from '@dynatrace/strato-icons';
 import { adfToMarkdown, summarizeIssue, type JiraIssue } from '../../../../shared/integrations/jira';
 import { Markdown, WebPanel } from '../../components/viewers';
 import { jiraOps, useJiraIssue } from '../../data/jira';
-import { SidebarTabs, SummarySection } from '../../sidebar';
+import { SidebarSection, SidebarTabs, SummarySection } from '../../sidebar';
 import { useStore } from '../../store';
 import { agoText } from '../../tones';
 import { errorText, openUrl } from '../../ui/task';
-import { focusItem, mono, Note, Section, ToneChip, ValueRow } from '../project/parts';
+import { focusItem, mono, Note, ToneChip, ValueRow } from '../project/parts';
 import type { SidebarProps } from '../types';
 import { openChangeStatus, ticketUrl } from './actions';
 import { linkRows, personName, relatedIds } from './model';
@@ -25,7 +25,7 @@ function Fields({ item, issue }: { item: SidebarProps<'ticket'>['item']; issue?:
   const sprint = s?.sprint ?? d.sprint;
   const parent = f?.parent;
   return (
-    <Section
+    <SidebarSection
       label="Details"
       actions={
         <Button size="condensed" onClick={() => void openChangeStatus(item)}>
@@ -65,7 +65,7 @@ function Fields({ item, issue }: { item: SidebarProps<'ticket'>['item']; issue?:
           ))}
         </div>
       )}
-    </Section>
+    </SidebarSection>
   );
 }
 
@@ -73,7 +73,7 @@ function Links({ issue, onCanvas }: { issue: JiraIssue; onCanvas: (key: string) 
   const rows = linkRows(issue.fields);
   if (!rows.length) return null;
   return (
-    <Section label="Linked issues">
+    <SidebarSection label="Linked issues">
       {rows.map((r) => {
         const id = onCanvas(r.key);
         return (
@@ -85,7 +85,7 @@ function Links({ issue, onCanvas }: { issue: JiraIssue; onCanvas: (key: string) 
           </button>
         );
       })}
-    </Section>
+    </SidebarSection>
   );
 }
 
@@ -108,7 +108,7 @@ function Comments({ issue, itemKey }: { issue?: JiraIssue; itemKey: string }) {
     }
   };
   return (
-    <Section label={`Comments · ${issue?.fields.comment?.total ?? comments.length}`}>
+    <SidebarSection label={`Comments · ${issue?.fields.comment?.total ?? comments.length}`}>
       {issue && comments.length === 0 && <Note>No comments yet.</Note>}
       {comments.map((c) => (
         <div key={c.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
@@ -128,7 +128,7 @@ function Comments({ issue, itemKey }: { issue?: JiraIssue; itemKey: string }) {
           </Button>
         </div>
       </div>
-    </Section>
+    </SidebarSection>
   );
 }
 
@@ -137,7 +137,7 @@ function Related({ item, ctx }: SidebarProps<'ticket'>) {
   const rows = ids.map((id) => ctx.get(id)).filter((x): x is NonNullable<typeof x> => !!x && !x.archived);
   if (!rows.length) return null;
   return (
-    <Section label="On the canvas">
+    <SidebarSection label="On the canvas">
       {rows.map((r) => (
         <button key={r.id} className="sidebar-row" onClick={() => focusItem(r.id)} title={r.title}>
           <span className="sidebar-row-icon">{ctx.kind(r.kind).icon(13)}</span>
@@ -145,7 +145,7 @@ function Related({ item, ctx }: SidebarProps<'ticket'>) {
           <span className="sidebar-row-rel">{ctx.kind(r.kind).label}</span>
         </button>
       ))}
-    </Section>
+    </SidebarSection>
   );
 }
 
@@ -160,7 +160,7 @@ function Details(props: SidebarProps<'ticket'>) {
   return (
     <>
       <SummarySection item={item} ctx={ctx} />
-      <Section>
+      <SidebarSection>
         <ValueRow
           label="Key"
           actions={
@@ -175,12 +175,12 @@ function Details(props: SidebarProps<'ticket'>) {
         </ValueRow>
         {q.isLoading && <Note>Loading from Jira…</Note>}
         {q.isError && <Note tone="error">Could not load the issue from Jira ({errorText(q.error)}). Showing the cached values.</Note>}
-      </Section>
+      </SidebarSection>
       <Fields item={item} issue={issue} />
       {issue && (
-        <Section label="Description">
+        <SidebarSection label="Description">
           {description ? <Markdown source={description} onLinkClick={(h: string) => void openUrl(h)} /> : <Note>No description.</Note>}
-        </Section>
+        </SidebarSection>
       )}
       {issue && <Links issue={issue} onCanvas={onCanvas} />}
       <Comments issue={issue} itemKey={item.data.key} />

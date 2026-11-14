@@ -59,21 +59,6 @@ export function IconBtn({ label, onClick, children, disabled }: { label: string;
   );
 }
 
-/** A sidebar section whose header keeps the actions on the right. */
-export function Section({ label, actions, children }: { label?: ReactNode; actions?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="sidebar-section">
-      {(label || actions) && (
-        <div className="sidebar-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 24 }}>
-          <span>{label}</span>
-          {actions}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
 /** A text value that is edited in place; commits on blur / Enter when it changed. */
 export function InlineText({ value, placeholder, onCommit, label }: { value: string; placeholder?: string; onCommit: (v: string) => void; label: string }) {
   // (callers pass `key={value}` so an outside change resets the text)

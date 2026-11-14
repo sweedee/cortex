@@ -3,10 +3,10 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { Chip } from '@dynatrace/strato-components/content';
 import { EditIcon, ExternalLinkIcon } from '@dynatrace/strato-icons';
 import { WebPanel } from '../../components/viewers';
-import { ConnectionsSection, SidebarTabs, SummarySection } from '../../sidebar';
+import { ConnectionsSection, SidebarSection, SidebarTabs, SummarySection } from '../../sidebar';
 import { agoText } from '../../tones';
 import { openUrl } from '../../ui/task';
-import { focusItem, Note, Section, ToneChip, ValueRow } from '../project/parts';
+import { focusItem, Note, ToneChip, ValueRow } from '../project/parts';
 import type { SidebarProps } from '../types';
 import { openDeploymentForm } from './form';
 import { HEALTH_TONE, mockStatus, stageLabel, STAGE_TONE } from './model';
@@ -28,7 +28,7 @@ function Details({ item, ctx }: SidebarProps<'deployment'>) {
   return (
     <>
       <SummarySection item={item} ctx={ctx} />
-      <Section
+      <SidebarSection
         label="Deployment"
         actions={
           <Button size="condensed" onClick={() => void openDeploymentForm({ deployment: item })}>
@@ -63,8 +63,8 @@ function Details({ item, ctx }: SidebarProps<'deployment'>) {
             'none'
           )}
         </ValueRow>
-      </Section>
-      <Section
+      </SidebarSection>
+      <SidebarSection
         label="Status"
         actions={
           <Chip size="condensed" color="neutral" title="Generated locally, not a real health check">
@@ -79,7 +79,7 @@ function Details({ item, ctx }: SidebarProps<'deployment'>) {
         <ValueRow label="Last deployed">{agoText(st.deployedAt, now)}</ValueRow>
         <ValueRow label="Response time">{st.health === 'down' ? 'no response' : `${st.responseMs} ms`}</ValueRow>
         <Note>Simulated from the item id; there is no health check behind it yet.</Note>
-      </Section>
+      </SidebarSection>
       <ConnectionsSection item={item} ctx={ctx} />
     </>
   );
