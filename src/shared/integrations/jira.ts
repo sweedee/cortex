@@ -77,7 +77,8 @@ export interface JiraIssue {
     labels?: string[];
     description?: JiraRichText;
     created?: string;
-    updated: string;
+    /** missing in `acli … search --json` (search only allows a few fields) */
+    updated?: string;
     parent?: JiraIssueRef | null;
     issuelinks?: JiraIssueLink[];
     comment?: { comments: JiraComment[]; total?: number; maxResults?: number; startAt?: number };
@@ -89,21 +90,77 @@ export interface JiraIssue {
 /** Custom field ids of the (mock) site; check a real site with `acli jira workitem view <KEY> --json --fields "*all"`. */
 export const JIRA_FIELDS = { storyPoints: 'customfield_10016', sprint: 'customfield_10020' } as const;
 
-/** Browse URL of an issue, from its `self` REST URL. */
+/**
+ * Browse URL of an issue, from its `self` REST URL. Empty when `self` points at Atlassian's API
+ * gateway (`*.atl-paas.net`, what acli's OAuth login returns) rather than the site.
+ */
 export function browseUrl(issue: Pick<JiraIssue, 'key' | 'self'>): string {
-  const m = /^(https?:\/\/[^/]+)\//.exec(issue.self);
-  return m ? `${m[1]}/browse/${issue.key}` : '';
+  const m = /^(https?:\/\/([^/]+))\//.exec(issue.self ?? '');
+  if (!m || /\.atl-paas\.net$/i.test(m[2])) return '';
+  return `${m[1]}/browse/${issue.key}`;
 }
 
 /**
- * Browse URL of an issue key: from the issue's REST `self` when known, else the configured site
- * (`integrations:config` → `jira.site`), else the mock's default site.
+ * Browse URL of an issue key: the configured site (`integrations:config` → `jira.site`, for acli read
+ * from `acli jira auth status`), else the issue's REST `self`, else the mock's default site.
  */
 export function jiraBrowseUrl(key: string, opts: { issue?: Pick<JiraIssue, 'key' | 'self'>; site?: string } = {}): string {
+  if (opts.site) return `${opts.site.replace(/\/+$/, '')}/browse/${key}`;
   const fromIssue = opts.issue ? browseUrl(opts.issue) : '';
-  if (fromIssue) return fromIssue;
-  const site = (opts.site || 'https://example.atlassian.net').replace(/\/+$/, '');
-  return `${site}/browse/${key}`;
+  return fromIssue || `https://example.atlassian.net/browse/${key}`;
+}
+
+/** `acli jira auth status` → `https://<site>` (line `Site: acme.atlassian.net`), or null. */
+export function parseAcliSite(text: string): string | null {
+  const m = /^\s*Site:\s*(\S+)\s*$/im.exec(text);
+  if (!m) return null;
+  return /^https?:\/\//i.test(m[1]) ? m[1].replace(/\/+$/, '') : `https://${m[1].replace(/\/+$/, '')}`;
+}
+
+/**
+ * What acli prints with `--json` for bulk-capable commands (`transition`, `edit`, `comment create`,
+ * `assign`): one result per work item. acli exits 0 even when a result is a FAILURE.
+ */
+export interface AcliBulkResult {
+  results: { status: 'SUCCESS' | 'FAILURE' | string; message: string; id: string }[];
+  totalCount: number;
+  successCount: number;
+}
+
+export function isAcliBulkResult(v: unknown): v is AcliBulkResult {
+  return !!v && typeof v === 'object' && Array.isArray((v as AcliBulkResult).results);
+}
+
+/** Failure messages of a bulk result ("CTX-1: No allowed transitions found for given status"). */
+export function bulkFailures(v: AcliBulkResult): string[] {
+  return v.results.filter((r) => r.status !== 'SUCCESS').map((r) => (r.id ? `${r.id}: ${r.message}` : r.message));
+}
+
+/** A status of a project's workflow (names are localized on real sites, e.g. "In Arbeit"). */
+export interface JiraStatusOption {
+  name: string;
+  category: JiraStatusCategory['key'];
+}
+
+const CATEGORY_ORDER: Record<string, number> = { new: 0, indeterminate: 1, done: 2, undefined: 3 };
+
+/**
+ * The statuses seen on a project's issues, deduped (case-insensitive) and ordered by category
+ * (to do → in progress → done), first-seen order inside a category. acli has no "list transitions"
+ * command, so this is how Cortex learns a real project's workflow.
+ */
+export function workflowStatuses(issues: Pick<JiraIssue, 'fields'>[], extra: JiraStatusOption[] = []): JiraStatusOption[] {
+  const seen = new Map<string, JiraStatusOption & { at: number }>();
+  const add = (o: JiraStatusOption) => {
+    const k = o.name.toLowerCase();
+    if (o.name && !seen.has(k)) seen.set(k, { ...o, at: seen.size });
+  };
+  for (const i of issues) {
+    const s = i.fields?.status;
+    if (s?.name) add({ name: s.name, category: s.statusCategory?.key ?? 'undefined' });
+  }
+  extra.forEach(add);
+  return [...seen.values()].sort((a, b) => (CATEGORY_ORDER[a.category] ?? 3) - (CATEGORY_ORDER[b.category] ?? 3) || a.at - b.at).map(({ name, category }) => ({ name, category }));
 }
 
 // ---- ADF ----------------------------------------------------------------------
@@ -239,9 +296,17 @@ export function summarizeIssue(issue: JiraIssue): JiraIssueSummary {
     epic: f.parent ? { key: f.parent.key, summary: f.parent.fields.summary } : undefined,
     storyPoints: typeof points === 'number' ? points : undefined,
     sprint: sprintName(f[JIRA_FIELDS.sprint]),
-    updated: f.updated,
+    updated: f.updated ?? '',
   };
 }
 
-/** The mock's (and the default) workflow; a real site's workflow is whatever Jira allows. */
+/** The mock's workflow; the fallback when a project's statuses are unknown. */
 export const JIRA_STATUSES = ['To Do', 'In Progress', 'In Review', 'Done', 'Blocked'] as const;
+
+export const MOCK_STATUS_OPTIONS: JiraStatusOption[] = [
+  { name: 'To Do', category: 'new' },
+  { name: 'In Progress', category: 'indeterminate' },
+  { name: 'In Review', category: 'indeterminate' },
+  { name: 'Blocked', category: 'indeterminate' },
+  { name: 'Done', category: 'done' },
+];

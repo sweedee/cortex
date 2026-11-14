@@ -73,6 +73,7 @@ export const integrationSchemas = {
   'jira:create': z.object({ project: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/), type: str(100), summary: str(1000), description: text.optional(), assignee: ref.optional(), parent: issueKey.optional() }),
   'jira:comment': z.object({ key: issueKey, body: text.min(1) }),
   'jira:edit': z.object({ key: issueKey, summary: str(1000).optional(), description: text.optional(), assignee: ref.optional(), labels: z.array(ref).optional() }),
+  'jira:statuses': z.object({ project: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/, 'expected a project key like CTX') }),
 
   'claude:start': z.object({
     cwd: absPath,

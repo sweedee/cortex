@@ -24,7 +24,7 @@ export class CliError extends Error {
   readonly stdout: string;
   /** `label` replaces the "<cmd> <subcommand>" prefix of the message (e.g. "jira transition" for the mock run through electron) */
   constructor(cmd: string, args: string[], r: ExecResult, label?: string) {
-    const detail = (r.stderr || r.stdout).trim().replace(/^Error: /, '') || (r.timedOut ? 'timed out' : `exit code ${r.code}`);
+    const detail = (r.stderr || r.stdout).trim().replace(/^(✗\s*)?(Error|Failure): /i, '') || (r.timedOut ? 'timed out' : `exit code ${r.code}`);
     // "gh pr create: …", "git worktree remove: …" (the subcommand, not its options / values)
     const sub = args.slice(0, args.findIndex((a) => a.startsWith('-')) >>> 0).slice(0, 3);
     super(`${label ?? [cmd, ...sub].join(' ')}: ${detail}`);

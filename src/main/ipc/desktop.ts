@@ -82,6 +82,7 @@ export function registerDesktop(ctx: IpcContext) {
   handle(ctx, 'app:info', () => ({
     platform: process.platform,
     userData: app.getPath('userData'),
+    home: app.getPath('home'),
     version: app.getVersion(),
     electron: process.versions.electron,
   }));

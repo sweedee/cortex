@@ -2,10 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG } from '../../shared/integrations/config';
 import { adfToMarkdown, browseUrl, summarizeIssue } from '../../shared/integrations/jira';
 import { runExec } from '../lib/exec';
-import { jiraCliSpec } from './config';
+import { jiraCliSpec, resolveConfig } from './config';
 import { JiraService } from './jira';
 
 const appRoot = process.cwd();
@@ -16,7 +15,7 @@ let db: string;
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'cortex-jira-'));
   db = join(dir, 'jira.json');
-  const spec = jiraCliSpec(DEFAULT_CONFIG, { appRoot, userData: dir }, { JIRA_MOCK_DB: db });
+  const spec = jiraCliSpec(resolveConfig({ CORTEX_JIRA_CLI: 'mock' }), { appRoot, userData: dir }, { JIRA_MOCK_DB: db });
   jira = new JiraService(spec, { cwd: dir });
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -70,13 +69,20 @@ describe('jira-mock + JiraService', () => {
     const created = await jira.create({ project: 'CTX', type: 'story', summary: 'Brand new', description: 'Line one\n\n- a\n- b', assignee: '@me', parent: 'CTX-4700' });
     expect(created.key).toBe('CTX-4841');
     expect(created.fields).toMatchObject({ summary: 'Brand new', status: { name: 'To Do' }, issuetype: { name: 'Story' }, assignee: { displayName: 'You' }, parent: { key: 'CTX-4700' } });
-    const c = await jira.comment('CTX-4841', 'Looks good');
-    expect(c).toMatchObject({ author: { displayName: 'You' }, body: { type: 'doc' } });
+    // like acli: a bulk result, no comment object
+    expect(await jira.comment('CTX-4841', 'Looks good')).toBeNull();
     await jira.edit({ key: 'CTX-4841', summary: 'Renamed', labels: ['x', 'y'] });
     const v = await jira.view('CTX-4841');
     expect(v.fields).toMatchObject({ summary: 'Renamed', labels: ['x', 'y'] });
     expect(v.fields.comment?.total).toBe(1);
     expect(adfToMarkdown(v.fields.description)).toBe('Line one\n\n- a\n- b');
+  });
+
+  it('reports the workflow statuses and the site like acli', async () => {
+    const st = await jira.statuses('CTX');
+    expect(st.map((s) => s.category)).toEqual(st.map((s) => s.category).sort((a, b) => ['new', 'indeterminate', 'done'].indexOf(a) - ['new', 'indeterminate', 'done'].indexOf(b)));
+    expect(st.map((s) => s.name)).toEqual(expect.arrayContaining(['To Do', 'In Progress', 'In Review', 'Done']));
+    expect(await jira.site()).toBe('https://example.atlassian.net');
   });
 
   it('behaves like a CLI: exit codes and stderr', async () => {

@@ -12,7 +12,7 @@
 import { shallow } from 'zustand/shallow';
 import { DEFAULT_PREFS, parseWorkspace, WORKSPACE_VERSION, type Workspace } from './domain';
 import { native } from './native';
-import { SEED_ITEMS, SEED_LINKS } from './seed';
+import { firstRunWorld } from './seed';
 import { appStore, getState, prefsOf, replaceWorld, type State } from './store';
 
 const SAVE_DELAY = 500;
@@ -24,21 +24,42 @@ export interface LoadReport {
   warning?: { title: string; message: string };
 }
 
-/** Load the stored workspace into the store (keeps the seed when nothing usable is stored). */
+/** Put the first-run world (demo repo if checked out, else empty) into the store. */
+async function loadFirstRun(prefs?: Workspace['prefs']): Promise<'demo' | 'empty'> {
+  const w = await firstRunWorld();
+  replaceWorld(w.items, w.links, prefs ?? prefsOf(getState()));
+  return w.kind;
+}
+
+/**
+ * The fake demo world of earlier versions (`ctx-observability/*` repos, `~/…` paths): nothing in it
+ * exists, so the refresher would only collect errors.
+ */
+export const isOldFakeDemo = (items: { kind: string; data: unknown }[]) => {
+  const projects = items.filter((i) => i.kind === 'project');
+  return projects.length > 0 && projects.every((p) => String((p.data as { repo?: string }).repo ?? '').startsWith('ctx-observability/'));
+};
+
+/** Load the stored workspace into the store (the first-run world when nothing usable is stored). */
 export async function loadWorkspace(): Promise<LoadReport> {
   let raw: unknown;
   try {
     raw = await native.workspace.load();
   } catch (err) {
-    console.warn('[workspace] load failed, using demo data', err);
+    console.warn('[workspace] load failed, using the first-run world', err);
+    await loadFirstRun();
     return { source: 'seed', warning: { title: 'Could not load the workspace', message: 'Showing the demo data instead.' } };
   }
-  if (raw == null) return { source: 'seed' };
+  if (raw == null) {
+    await loadFirstRun();
+    return { source: 'seed' };
+  }
 
   const r = parseWorkspace(raw);
   if (!r.ok) {
-    console.warn(`[workspace] invalid workspace file, using demo data: ${r.error}`);
+    console.warn(`[workspace] invalid workspace file, using the first-run world: ${r.error}`);
     const kept = await keepInvalidCopy(raw);
+    await loadFirstRun();
     return {
       source: 'seed',
       warning: { title: 'Workspace file could not be read', message: `Showing the demo data instead.${kept ? ` The file was kept as ${kept}.` : ''}` },
@@ -46,8 +67,12 @@ export async function loadWorkspace(): Promise<LoadReport> {
   }
   r.warnings.forEach((w) => console.warn(`[workspace] ${w}`));
   const { items, links, prefs } = r.workspace;
-  if (items.length) replaceWorld(items, links, prefs);
-  else replaceWorld(SEED_ITEMS, SEED_LINKS, prefs);
+  if (isOldFakeDemo(items)) {
+    const kind = await loadFirstRun(prefs);
+    saveNow(true);
+    return { source: 'seed', warning: { title: 'Replaced the old demo data', message: kind === 'demo' ? 'The fake demo repos are gone; the canvas now shows the real cortex-demo repo.' : 'The fake demo repos are gone. Add a project with a right-click on the canvas.' } };
+  }
+  replaceWorld(items, links, prefs);
   if (r.migrated) saveNow(true);
   const dropped = r.warnings.filter((w) => w.startsWith('dropped')).length;
   return {
@@ -103,7 +128,7 @@ export function startAutosave(): void {
   });
 }
 
-/** Throw away the stored workspace and go back to the demo world (prefs stay). */
-export function resetToDemo(): void {
-  replaceWorld(SEED_ITEMS, SEED_LINKS, { ...DEFAULT_PREFS, ...prefsOf(getState()), filter: undefined });
+/** Throw away the stored workspace and go back to the first-run world (prefs stay). */
+export async function resetToDemo(): Promise<void> {
+  await loadFirstRun({ ...DEFAULT_PREFS, ...prefsOf(getState()), filter: undefined });
 }

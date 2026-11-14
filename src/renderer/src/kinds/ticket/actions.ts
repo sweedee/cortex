@@ -1,15 +1,14 @@
 /** Ticket operations: change status, mark done (Jira first), open in Jira, refresh the cached fields. */
 import { queryClient } from '../../data/queryClient';
 import { qk } from '../../data/queryKeys';
-import { jiraOps, jiraUrl } from '../../data/jira';
+import { jiraOps, jiraUrl, loadJiraStatuses } from '../../data/jira';
 import { itemById, patchData } from '../../store';
 import type { ItemOf } from '../../domain';
 import { native } from '../../native';
 import { ticketPatch } from '../../sync/mapping';
 import { openForm, str } from '../../ui/form';
 import { archive, toast } from '../common';
-import { JIRA_STATUSES } from '../../../../shared/integrations/jira';
-import { transitionToDone } from './model';
+import { doneStatus, projectOfKey, statusOptions, transitionToDone } from './model';
 
 type Ticket = ItemOf<'ticket'>;
 
@@ -26,9 +25,13 @@ export async function refreshTicket(id: string): Promise<void> {
   queryClient.setQueryData(qk.jira.issue(cur.data.key), issue);
 }
 
-/** "Change status…": a radio of the workflow's statuses; Jira's rejection is shown inline in the form. */
+/**
+ * "Change status…": a radio of the project's workflow statuses (as Jira reports them, localized names
+ * included); Jira's rejection is shown inline in the form.
+ */
 export async function openChangeStatus(t: Ticket): Promise<void> {
   const current = t.data.status;
+  const statuses = statusOptions(await loadJiraStatuses(projectOfKey(t.data.key)), { name: current, category: t.data.statusCategory });
   await openForm({
     title: `Change status of ${t.data.key}`,
     description: t.title,
@@ -39,11 +42,11 @@ export async function openChangeStatus(t: Ticket): Promise<void> {
         label: 'Status',
         type: 'radio',
         required: true,
-        options: JIRA_STATUSES.map((s) => ({ value: s, label: s, hint: s.toLowerCase() === current.toLowerCase() ? 'current' : undefined })),
-        hint: 'Jira only allows some moves (e.g. To Do → In Progress → In Review → Done).',
+        options: statuses.map((s) => ({ value: s.name, label: s.name, hint: s.name.toLowerCase() === current.toLowerCase() ? 'current' : undefined })),
+        hint: 'The statuses used in this Jira project. Jira only allows the moves its workflow defines.',
       },
     ],
-    values: { status: JIRA_STATUSES.find((s) => s.toLowerCase() === current.toLowerCase()) ?? current },
+    values: { status: statuses.find((s) => s.name.toLowerCase() === current.toLowerCase())?.name ?? current },
     onSubmit: async (v) => {
       const status = str(v, 'status');
       if (status.toLowerCase() === current.toLowerCase()) throw new Error(`${t.data.key} is already ${current}.`);
@@ -60,12 +63,15 @@ export async function openChangeStatus(t: Ticket): Promise<void> {
  */
 export async function completeTickets(items: Ticket[]): Promise<void> {
   const warnings: string[] = [];
+  const doneName = new Map<string, string>();
   for (const t of items) {
+    const statuses = statusOptions(await loadJiraStatuses(projectOfKey(t.data.key)), { name: t.data.status, category: t.data.statusCategory });
+    doneName.set(t.id, doneStatus(statuses));
     if (t.data.statusCategory !== 'done') {
-      const r = await transitionToDone(t.data.key, t.data.status, jiraOps.transition);
+      const r = await transitionToDone(t.data.key, t.data.status, jiraOps.transition, statuses);
       if (!r.ok) warnings.push(`${t.data.key}: ${r.error}`);
     }
   }
-  archive(items, 'Completed', (i) => patchData(i.id, { status: 'Done', statusCategory: 'done' }));
+  archive(items, 'Completed', (i) => patchData(i.id, { status: doneName.get(i.id) ?? 'Done', statusCategory: 'done' }));
   if (warnings.length) toast('Jira did not accept the transition', `${warnings.join(' · ')} — marked done on the canvas only.`, 'warning');
 }

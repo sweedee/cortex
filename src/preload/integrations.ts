@@ -47,6 +47,7 @@ export function integrationsApi(invoke: Invoke, on: On, eventChannels: readonly 
       create: (req) => invoke('jira:create', req),
       comment: (key, body) => invoke('jira:comment', { key, body }),
       edit: (req) => invoke('jira:edit', req),
+      statuses: (project) => invoke('jira:statuses', { project }),
     },
     claude: {
       start: (req) => invoke('claude:start', req),

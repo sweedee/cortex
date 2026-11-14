@@ -138,6 +138,8 @@ export interface AppInfo {
   /** `process.platform` (win32, darwin, linux), or `browser` without the desktop shell */
   platform: string;
   userData: string;
+  /** the user's home folder (`os.homedir()`; '' in the browser) */
+  home?: string;
   version: string;
   electron?: string;
 }
@@ -241,7 +243,7 @@ import type { ClaudeAnswers, ClaudeEvent, ClaudeEventMessage, ClaudePermissionDe
 import type { IntegrationConfig } from './integrations/config';
 import type { GitDiffStat, GitLogEntry, GitRebaseResult, GitStatus, GitWorktree } from './integrations/git';
 import type { GhCheck, GhMergeMethod, GhPrListItem, GhPullRequest, GhRun, GhUpdateBranchResult } from './integrations/github';
-import type { JiraComment, JiraIssue } from './integrations/jira';
+import type { JiraComment, JiraIssue, JiraStatusOption } from './integrations/jira';
 import type { AppStartRequest, AppState, RunnerOutputEvent, TestRunRequest, TestState } from './integrations/runners';
 
 export interface GitDiffRequest {
@@ -342,6 +344,8 @@ export interface InvokeChannels {
   'jira:create': [JiraCreateIssueRequest, JiraIssue];
   'jira:comment': [{ key: string; body: string }, JiraComment | null];
   'jira:edit': [JiraEditIssueRequest, void];
+  /** statuses used in a project (its workflow as far as acli can tell), ordered to do → done */
+  'jira:statuses': [{ project: string }, JiraStatusOption[]];
 
   'claude:start': [ClaudeStartRequest, ClaudeSessionSummary];
   'claude:send': [{ localId: string; text: string }, ClaudeSessionSummary];
@@ -421,6 +425,7 @@ export interface CortexApi {
     create(req: JiraCreateIssueRequest): Promise<JiraIssue>;
     comment(key: string, body: string): Promise<JiraComment | null>;
     edit(req: JiraEditIssueRequest): Promise<void>;
+    statuses(project: string): Promise<JiraStatusOption[]>;
   };
   claude: {
     start(req: ClaudeStartRequest): Promise<ClaudeSessionSummary>;

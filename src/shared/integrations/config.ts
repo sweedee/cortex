@@ -15,10 +15,14 @@ export interface IntegrationConfig {
     renovateLabel: string;
   };
   jira: {
-    /** `mock` = `scripts/jira-mock` via node; `acli` = the real Atlassian CLI on PATH */
+    /** `acli` = the real Atlassian CLI on PATH (default); `mock` = `scripts/jira-mock` via node */
     cli: 'mock' | 'acli';
-    /** site used for browse URLs by the mock */
+    /** site for browse URLs (`https://acme.atlassian.net`); for acli read from `acli jira auth status`, '' = unknown */
     site: string;
+    /** the CLI was chosen with CORTEX_JIRA_CLI (no automatic fallback to the mock) */
+    explicit?: boolean;
+    /** why the effective setup differs from the default ("acli not found on PATH, using the mock") */
+    note?: string;
   };
   claude: {
     /** binary (resolved on PATH via cross-spawn) */
@@ -37,7 +41,7 @@ export interface IntegrationConfig {
 
 export const DEFAULT_CONFIG: IntegrationConfig = {
   github: { aiReviewComment: '@claude review', aiReviewBot: 'claude[bot]', renovateApp: 'renovate', renovateLabel: 'renovate' },
-  jira: { cli: 'mock', site: 'https://example.atlassian.net' },
+  jira: { cli: 'acli', site: '' },
   claude: { bin: 'claude', prefixArgs: [] },
   runners: { flushMs: 100, runningAfterMs: 8000 },
 };

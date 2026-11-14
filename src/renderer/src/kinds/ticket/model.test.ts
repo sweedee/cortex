@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { jiraBrowseUrl as jiraUrl } from '../../../../shared/integrations/jira';
-import { linkRows, relatedIds, stepsToDone, transitionToDone } from './model';
+import { doneStatus, linkRows, projectOfKey, relatedIds, statusOptions, stepsToDone, transitionToDone } from './model';
 
 describe('ticket model', () => {
   it('walks the workflow to Done', () => {
@@ -14,7 +14,36 @@ describe('ticket model', () => {
   it('builds browse urls', () => {
     expect(jiraUrl('CTX-1')).toBe('https://example.atlassian.net/browse/CTX-1');
     expect(jiraUrl('CTX-1', { site: 'https://acme.atlassian.net/' })).toBe('https://acme.atlassian.net/browse/CTX-1');
-    expect(jiraUrl('CTX-1', { issue: { key: 'CTX-1', self: 'https://x.atlassian.net/rest/api/3/issue/10001' }, site: 'https://other' })).toBe('https://x.atlassian.net/browse/CTX-1');
+    // the configured site wins (acli's `self` URLs point at the API gateway)
+    expect(jiraUrl('CTX-1', { issue: { key: 'CTX-1', self: 'https://x.atlassian.net/rest/api/3/issue/10001' }, site: 'https://other' })).toBe('https://other/browse/CTX-1');
+    expect(jiraUrl('CTX-1', { issue: { key: 'CTX-1', self: 'https://x.atlassian.net/rest/api/3/issue/10001' } })).toBe('https://x.atlassian.net/browse/CTX-1');
+    expect(jiraUrl('CTX-1', { issue: { key: 'CTX-1', self: 'https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10001' } })).toBe('https://example.atlassian.net/browse/CTX-1');
+  });
+
+  it('uses a real (localized) workflow', () => {
+    const real = [
+      { name: 'Backlog', category: 'new' as const },
+      { name: 'Selected for Development', category: 'new' as const },
+      { name: 'In Arbeit', category: 'indeterminate' as const },
+      { name: 'Fertig', category: 'done' as const },
+    ];
+    expect(doneStatus(real)).toBe('Fertig');
+    expect(stepsToDone('Backlog', real)).toEqual(['Selected for Development', 'In Arbeit', 'Fertig']);
+    expect(stepsToDone('Fertig', real)).toEqual([]);
+    expect(statusOptions(real, { name: 'In Arbeit' })).toBe(real);
+    expect(statusOptions(real, { name: 'Odd', category: 'new' }).at(-1)).toEqual({ name: 'Odd', category: 'new' });
+    expect(statusOptions([], { name: 'To Do' }).map((s) => s.name)).toContain('In Review');
+    expect(projectOfKey('CTX-12')).toBe('CTX');
+  });
+
+  it('marks done with the workflow’s done status', async () => {
+    const calls: string[] = [];
+    const real = [
+      { name: 'Backlog', category: 'new' as const },
+      { name: 'Fertig', category: 'done' as const },
+    ];
+    expect(await transitionToDone('K-1', 'Backlog', async (_k, s) => void calls.push(s), real)).toEqual({ ok: true, via: 'direct' });
+    expect(calls).toEqual(['Fertig']);
   });
 
   it('marks done directly, then step by step, then reports the error', async () => {

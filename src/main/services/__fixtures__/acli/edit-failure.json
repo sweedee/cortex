@@ -1,0 +1,11 @@
+{
+  "results": [
+    {
+      "status": "FAILURE",
+      "message": "Die Vorgänge existieren nicht oder sie haben keine Berechtigung sie zu sehen.",
+      "id": "CTX-999"
+    }
+  ],
+  "totalCount": 1,
+  "successCount": 0
+}

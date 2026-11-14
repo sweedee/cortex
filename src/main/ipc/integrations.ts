@@ -4,7 +4,12 @@ import { handle, type IpcContext } from './handle';
 
 /** `integrations:*`, `git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*`. */
 export function registerIntegrations(ctx: IpcContext, s: Services) {
-  handle(ctx, 'integrations:config', () => s.config);
+  void s.initJira();
+  // waits (at most 10 s) for the Jira site from `acli jira auth status`
+  handle(ctx, 'integrations:config', async () => {
+    await Promise.race([s.initJira(), new Promise((r) => setTimeout(r, 10_000))]);
+    return s.config;
+  });
 
   const { git, gh, jira, claude, apps, tests } = s;
   handle(ctx, 'git:isRepo', ({ dir }) => git.isRepo(dir));
@@ -35,12 +40,15 @@ export function registerIntegrations(ctx: IpcContext, s: Services) {
   handle(ctx, 'gh:runRerun', ({ repo, runId, failedOnly }) => gh.runRerun(repo, runId, { failedOnly }));
   handle(ctx, 'gh:renovatePrs', ({ repo }) => gh.renovatePrs(repo));
 
-  handle(ctx, 'jira:search', ({ jql, limit }) => jira.search(jql, { limit }));
-  handle(ctx, 'jira:view', ({ key }) => jira.view(key));
-  handle(ctx, 'jira:transition', ({ key, status }) => jira.transition(key, status));
-  handle(ctx, 'jira:create', (req) => jira.create(req));
-  handle(ctx, 'jira:comment', ({ key, body }) => jira.comment(key, body));
-  handle(ctx, 'jira:edit', (req) => jira.edit(req));
+  // after initJira: acli may have been swapped for the mock
+  const ready = () => s.initJira();
+  handle(ctx, 'jira:search', async ({ jql, limit }) => (await ready(), jira.search(jql, { limit })));
+  handle(ctx, 'jira:view', async ({ key }) => (await ready(), jira.view(key)));
+  handle(ctx, 'jira:transition', async ({ key, status }) => (await ready(), jira.transition(key, status)));
+  handle(ctx, 'jira:create', async (req) => (await ready(), jira.create(req)));
+  handle(ctx, 'jira:comment', async ({ key, body }) => (await ready(), jira.comment(key, body)));
+  handle(ctx, 'jira:edit', async (req) => (await ready(), jira.edit(req)));
+  handle(ctx, 'jira:statuses', async ({ project }) => (await ready(), jira.statuses(project)));
 
   handle(ctx, 'claude:start', (req) => claude.start(req));
   handle(ctx, 'claude:send', ({ localId, text }) => claude.send(localId, text));

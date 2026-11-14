@@ -1,0 +1,450 @@
+[
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10004",
+        "name": "Fertig",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10004",
+        "statusCategory": {
+          "colorName": "green",
+          "id": 3,
+          "key": "done",
+          "name": "Fertig",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/3"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10017",
+    "key": "CTX-14",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10017",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10005",
+        "name": "Backlog",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10005",
+        "statusCategory": {
+          "colorName": "blue-gray",
+          "id": 2,
+          "key": "new",
+          "name": "Zu erledigen",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/2"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10016",
+    "key": "CTX-13",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10016",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10005",
+        "name": "Backlog",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10005",
+        "statusCategory": {
+          "colorName": "blue-gray",
+          "id": 2,
+          "key": "new",
+          "name": "Zu erledigen",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/2"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10015",
+    "key": "CTX-12",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10015",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10005",
+        "name": "Backlog",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10005",
+        "statusCategory": {
+          "colorName": "blue-gray",
+          "id": 2,
+          "key": "new",
+          "name": "Zu erledigen",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/2"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10014",
+    "key": "CTX-11",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10014",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10005",
+        "name": "Backlog",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10005",
+        "statusCategory": {
+          "colorName": "blue-gray",
+          "id": 2,
+          "key": "new",
+          "name": "Zu erledigen",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/2"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10013",
+    "key": "CTX-10",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10013",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10003",
+        "name": "Selected for Development",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10003",
+        "statusCategory": {
+          "colorName": "blue-gray",
+          "id": 2,
+          "key": "new",
+          "name": "Zu erledigen",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/2"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10012",
+    "key": "CTX-9",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10012",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10003",
+        "name": "Selected for Development",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10003",
+        "statusCategory": {
+          "colorName": "blue-gray",
+          "id": 2,
+          "key": "new",
+          "name": "Zu erledigen",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/2"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10011",
+    "key": "CTX-8",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10011",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10004",
+        "name": "Fertig",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10004",
+        "statusCategory": {
+          "colorName": "green",
+          "id": 3,
+          "key": "done",
+          "name": "Fertig",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/3"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10010",
+    "key": "CTX-7",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10010",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "Dieser Vorgang wird gerade durch den Bearbeiter bearbeitet.",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/inprogress.png",
+        "id": "3",
+        "name": "In Arbeit",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/3",
+        "statusCategory": {
+          "colorName": "yellow",
+          "id": 4,
+          "key": "indeterminate",
+          "name": "In Arbeit",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/4"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10009",
+    "key": "CTX-6",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10009",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "Dieser Vorgang wird gerade durch den Bearbeiter bearbeitet.",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/inprogress.png",
+        "id": "3",
+        "name": "In Arbeit",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/3",
+        "statusCategory": {
+          "colorName": "yellow",
+          "id": 4,
+          "key": "indeterminate",
+          "name": "In Arbeit",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/4"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10008",
+    "key": "CTX-5",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10008",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "Dieser Vorgang wird gerade durch den Bearbeiter bearbeitet.",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/inprogress.png",
+        "id": "3",
+        "name": "In Arbeit",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/3",
+        "statusCategory": {
+          "colorName": "yellow",
+          "id": 4,
+          "key": "indeterminate",
+          "name": "In Arbeit",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/4"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10007",
+    "key": "CTX-4",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10007",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10004",
+        "name": "Fertig",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10004",
+        "statusCategory": {
+          "colorName": "green",
+          "id": 3,
+          "key": "done",
+          "name": "Fertig",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/3"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10006",
+    "key": "CTX-3",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10006",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/generic.png",
+        "id": "10004",
+        "name": "Fertig",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/10004",
+        "statusCategory": {
+          "colorName": "green",
+          "id": 3,
+          "key": "done",
+          "name": "Fertig",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/3"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10005",
+    "key": "CTX-2",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10005",
+    "transitions": null,
+    "versionedRepresentations": null
+  },
+  {
+    "changelog": null,
+    "editmeta": null,
+    "expand": "renderedFields,names,schema,operations,editmeta,changelog,versionedRepresentations",
+    "fields": {
+      "status": {
+        "description": "Dieser Vorgang wird gerade durch den Bearbeiter bearbeitet.",
+        "iconUrl": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/images/icons/statuses/inprogress.png",
+        "id": "3",
+        "name": "In Arbeit",
+        "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/status/3",
+        "statusCategory": {
+          "colorName": "yellow",
+          "id": 4,
+          "key": "indeterminate",
+          "name": "In Arbeit",
+          "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/statuscategory/4"
+        }
+      }
+    },
+    "fieldsToInclude": null,
+    "id": "10004",
+    "key": "CTX-1",
+    "names": null,
+    "operations": null,
+    "properties": null,
+    "renderedFields": null,
+    "schema": null,
+    "self": "https://jira-prod-eu-35-as-4.prod.atl-paas.net/rest/api/3/issue/10004",
+    "transitions": null,
+    "versionedRepresentations": null
+  }
+]

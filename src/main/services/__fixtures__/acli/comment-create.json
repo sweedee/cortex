@@ -1,0 +1,11 @@
+{
+  "results": [
+    {
+      "status": "SUCCESS",
+      "message": "Comment on work item CTX-13 has been successfully added",
+      "id": "CTX-13"
+    }
+  ],
+  "totalCount": 1,
+  "successCount": 1
+}

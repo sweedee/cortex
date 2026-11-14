@@ -8,7 +8,7 @@ tests, merge), and one chat box at the bottom starts and steers Claude Code agen
 @mention as context.
 
 It is an Electron desktop app (electron-vite, React 18, Dynatrace Strato UI) that drives the real tools:
-`git`, `gh`, the `claude` CLI and a Jira CLI (a local mock by default).
+`git`, `gh`, the `claude` CLI and the Atlassian CLI `acli` for Jira (a local mock when `acli` is missing).
 
 ## Requirements
 
@@ -17,7 +17,8 @@ It is an Electron desktop app (electron-vite, React 18, Dynatrace Strato UI) tha
 - **GitHub CLI** `gh` on `PATH`, logged in (`gh auth status`): PRs, checks, Actions runs, merges
 - **Claude Code CLI** `claude` on `PATH`, logged in: agent sessions (each session is one
   `claude -p --input-format stream-json …` process)
-- Optional: the **Atlassian CLI** `acli` for a real Jira (see [Jira](#jira-mock-or-acli))
+- **Atlassian CLI** `acli` on `PATH`, logged in (`acli jira auth login`): Jira work items. Without it Cortex
+  uses the bundled Jira mock (see [Jira](#jira-acli-or-the-mock))
 
 ## Install, run, build
 
@@ -35,12 +36,19 @@ npm run dev:web      # renderer only in a browser (native calls use the fallback
 After `npm ci` in a fresh clone or worktree, run `node node_modules/electron/install.js` if Electron
 complains that it failed to install.
 
-`CORTEX_USER_DATA=<dir>` runs with a separate profile (workspace, window state, Jira mock data).
+Cortex keeps its files in `~/.cortex` (workspace, window state, Claude session list, Jira mock data);
+`CORTEX_USER_DATA=<dir>` runs with a separate profile. Chromium's caches and the logins of the embedded GitHub /
+Jira pages stay in Electron's own folder (Windows `%APPDATA%\cortex`), not in `~/.cortex`. On the first start
+after the move, an existing `workspace.json` (and its siblings) is copied over from that old folder once.
 
 ## First run
 
-The canvas starts with a demo world (fake repos and paths; actions that need a real checkout are
-disabled and say why). To work on a real repo:
+The canvas starts with the **demo world** when the demo repo is checked out at `~/Documents/cortex-demo`:
+[sweedee/cortex-demo](https://github.com/sweedee/cortex-demo) (private; a tiny Node todo app with GitHub Actions
+CI), its worktrees in `~/Documents/wt/cortex-demo/`, the Jira project **CTX**, three open PRs (#2 stacked on
+#1, #3 with a failing test job), their CI jobs, a failed test run, a plan record, and `sweedee/cortex`
+read-only (no checkout set). Everything in it is real, so the background refresh only keeps it current.
+Without that checkout the canvas starts empty with a welcome todo. To work on your own repo:
 
 1. Right-click the canvas → *Add to canvas* → **Add project…**. Pick the repo's main clone as **Base checkout** with the
    folder picker: the GitHub repo (`owner/name` from `origin`), the default branch, a worktrees folder next
@@ -56,21 +64,30 @@ disabled and say why). To work on a real repo:
 
 The **gear** (top right) opens the global settings: Claude model and permission mode for new sessions,
 the AI-review comment, the refresh interval, notifications, and where the workspace file lives. Right-click
-the canvas → *Reset workspace to demo data* to start over.
+the canvas → *Reset workspace to demo data* to start over (demo world or empty, as on the first run).
 
-The workspace (bubbles, links, preferences) is saved to `<userData>/workspace.json` (Windows:
-`%APPDATA%\cortex\workspace.json`, previous version in `.bak`; versioned and migrated on load).
+The workspace (bubbles, links, preferences) is saved to `~/.cortex/workspace.json` (previous version in
+`.bak`; versioned and migrated on load). A workspace that still holds the old fake demo
+(`ctx-observability/*` repos) is replaced by the first-run world.
 
-## Jira: mock or acli
+## Jira: acli or the mock
 
-By default Jira is `scripts/jira-mock`, a small CLI with the same commands as the Atlassian CLI
-(`acli jira workitem search | view | transition | create | comment | edit`). It prints Jira Cloud REST v3
-issue JSON and keeps its data in `<userData>/jira-mock.json`, seeded with the demo tickets (CTX-…), with a
-To Do → In Progress → In Review → Done workflow that rejects invalid moves. Nothing leaves your machine.
+Jira goes through the **Atlassian CLI** (`acli jira workitem view | search | transition | create | comment |
+edit`, verified with acli 1.3.40). Log in once with `acli jira auth login`; Cortex reads the site for links from
+`acli jira auth status`. *Change status…* offers the statuses used in the ticket's Jira project (acli cannot
+list a workflow's transitions; the names are the site's, e.g. localized ones like *In Arbeit*), and Jira
+decides which moves are allowed. Settings → Jira shows the CLI, the site and any problem.
 
-To use a real Jira: install `acli`, run `acli jira auth login`, and start Cortex with
-`CORTEX_JIRA_CLI=acli`. Check the custom field ids and status names in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#jira) first. Settings → Jira shows which one is active.
+The **mock** (`scripts/jira-mock`) has the same commands, prints the same JSON and keeps its data in
+`~/.cortex/jira-mock.json`, seeded with made-up CTX-48xx tickets and a To Do → In Progress → In Review → Done
+workflow. It is used when `acli` is not on `PATH`, with `CORTEX_JIRA_CLI=mock`, and in smoke runs (they never
+touch a real Jira unless started with `CORTEX_JIRA_CLI=acli`). `CORTEX_JIRA_SITE=<url>` overrides the site.
+
+## CI
+
+Builds are GitHub Actions jobs (from `gh pr checks` / `gh run view`; re-run with `gh run rerun`). Other CI
+systems that report to GitHub through the checks API (Jenkins, Buildkite, …) show up as builds too; for them
+Cortex opens the details page (*Open in Jenkins* / *Open details*) instead of re-running.
 
 ## Interactions
 

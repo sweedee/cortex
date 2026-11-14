@@ -2,13 +2,28 @@
 import { app, BrowserWindow } from 'electron';
 import type { EventChannel, EventChannels } from '../shared/ipc';
 import { registerIpc } from './ipc';
+import { migrateUserData, resolveUserData } from './lib/userData';
 import { runSmoke } from './smoke';
 import { createMainWindow } from './window';
 
 let win: BrowserWindow | null = null;
 
-// an isolated profile (tests, smoke runs, a second dev instance): CORTEX_USER_DATA=<dir>
-if (process.env['CORTEX_USER_DATA']) app.setPath('userData', process.env['CORTEX_USER_DATA']);
+// Cortex's files in ~/.cortex (or CORTEX_USER_DATA=<dir> for an isolated profile: tests, smoke runs, a
+// second dev instance); Chromium's caches stay in Electron's default folder (see lib/userData.ts)
+{
+  const electronDefault = app.getPath('userData');
+  const paths = resolveUserData(process.env, electronDefault);
+  app.setPath('userData', paths.userData);
+  app.setPath('sessionData', paths.sessionData);
+  if (!process.env['CORTEX_USER_DATA']) {
+    try {
+      const copied = migrateUserData(electronDefault, paths.userData);
+      if (copied.length) console.log(`[cortex] moved to ${paths.userData}: ${copied.join(', ')} (copied from ${electronDefault})`);
+    } catch (e) {
+      console.warn('[cortex] could not copy the old user data', e);
+    }
+  }
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

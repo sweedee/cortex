@@ -12,6 +12,10 @@
  *
  * Data: $JIRA_MOCK_DB (or --db <file>), default ~/.cortex/jira-mock.json; seeded on first use.
  * Site for URLs: $JIRA_MOCK_SITE, default https://example.atlassian.net.
+ *   node jira-mock.mjs jira auth status
+ *
+ * Like acli 1.3, `transition`, `edit` and `comment create` with --json print a bulk result
+ * `{results: [{status: 'SUCCESS', message, id}], totalCount, successCount}`.
  * Exit codes: 0 ok, 1 error (not found, invalid transition, bad JQL), 2 usage error.
  * No dependencies; plain ESM so it runs with `node` (or Electron with ELECTRON_RUN_AS_NODE=1).
  */
@@ -326,7 +330,7 @@ function compileJql(db, jql) {
 
 // ---- argv ------------------------------------------------------------------------------------
 
-const BOOL_FLAGS = new Set(['json', 'yes', 'help', 'web', 'count']);
+const BOOL_FLAGS = new Set(['json', 'yes', 'help', 'web', 'count', 'paginate']);
 
 function parseArgs(argv) {
   const pos = [];
@@ -377,8 +381,15 @@ function resolveUser(db, v) {
   return u.accountId;
 }
 
+/** acli's `--json` output of bulk-capable commands */
+const bulk = (keys, message) => JSON.stringify({ results: keys.map((id) => ({ status: 'SUCCESS', message: message(id), id })), totalCount: keys.length, successCount: keys.length }, null, 2);
+
 function run(argv) {
   let args = argv;
+  if (args[0] === 'jira' && args[1] === 'auth' && args[2] === 'status') {
+    out(`✓ Authenticated\n  Site: ${SITE.replace(/^https?:\/\//, '')}\n  Email: you@example.com\n  Authentication Type: mock`);
+    return 0;
+  }
   if (args[0] === 'jira' && args[1] === 'workitem') args = args.slice(2);
   else if (args[0] === 'workitem') args = args.slice(1);
   const { pos, flags } = parseArgs(args);
@@ -424,7 +435,7 @@ function run(argv) {
         touch(i);
       }
       saveDb(file, db);
-      if (flags.json) out(JSON.stringify(keys.map((k) => ({ key: k.toUpperCase(), status: target, success: true }))));
+      if (flags.json) out(bulk(keys.map((k) => k.toUpperCase()), (k) => `Work item ${k} has been successfully transitioned to ${target}`));
       else for (const k of keys) out(`✓ Work item ${k.toUpperCase()} transitioned to ${target}`);
       return 0;
     }
@@ -476,7 +487,7 @@ function run(argv) {
       i.comments.push(c);
       touch(i);
       saveDb(file, db);
-      if (flags.json) out(JSON.stringify(issueJson(db, i).fields.comment.comments.at(-1), null, 2));
+      if (flags.json) out(bulk([i.key], (k) => `Comment on work item ${k} has been successfully added`));
       else out(`✓ Comment added to ${i.key}`);
       return 0;
     }
@@ -491,7 +502,7 @@ function run(argv) {
       if (flags.labels !== undefined) i.labels = fieldList(flags.labels) ?? [];
       touch(i);
       saveDb(file, db);
-      if (flags.json) out(JSON.stringify(issueJson(db, i), null, 2));
+      if (flags.json) out(bulk([i.key], (k) => `Work item ${k} has been successfully edited`));
       else out(`✓ Work item ${i.key} updated`);
       return 0;
     }
