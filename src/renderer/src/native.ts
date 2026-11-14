@@ -32,6 +32,7 @@ function browserFallback(): CortexApi {
       openPath: async () => ({ ok: false, error: 'not available in the browser' }),
       openInEditor: async () => ({ ok: false, error: 'not available in the browser' }),
     },
+    webview: { setColorScheme: async () => {} },
     notify: {
       desktop: async ({ title, body, tag, itemId }) => {
         if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;

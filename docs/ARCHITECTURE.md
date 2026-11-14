@@ -69,6 +69,7 @@ that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#
 | `shell:openExternal` | `{url}` | http(s) only |
 | `shell:openPath` | `{path}` → `{ok, error?}` | folder / file in the OS |
 | `shell:openInEditor` | `{path}` → `{ok, error?}` | `code <path>`, falls back to `openPath` |
+| `webview:setColorScheme` | `{webContentsId, scheme: "light" or "dark" or null}` | CDP `Emulation.setEmulatedMedia` (`prefers-color-scheme`) on an embedded webview guest only; used by the preview light / dark toggle (`WebPanel` `colorSchemeToggle`: app + deployment previews; default = the app theme) |
 | `notify:desktop` | `{title, body, tag?, itemId?}` | Electron `Notification`; click focuses the window and sends `notify:clicked` |
 | `workspace:load` | → `unknown \| null` | `<userData>/workspace.json`, falls back to `.bak` |
 | `workspace:save` | `{data}` | atomic (tmp + rename), serialized (last write wins), previous version kept as `.bak` |

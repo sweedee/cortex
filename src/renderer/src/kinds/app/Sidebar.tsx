@@ -93,7 +93,7 @@ function Preview({ app }: { app: App }) {
   if (state === 'running' && url) {
     return (
       <div className="ap">
-        <WebPanel src={url} partition="persist:apps" viewportSwitcher onOpenExternal={(u) => void openUrl(u)} />
+        <WebPanel src={url} partition="persist:apps" viewportSwitcher colorSchemeToggle onOpenExternal={(u) => void openUrl(u)} />
       </div>
     );
   }

@@ -35,6 +35,9 @@ const api: CortexApi = {
     openPath: (path) => invoke('shell:openPath', { path }),
     openInEditor: (path) => invoke('shell:openInEditor', { path }),
   },
+  webview: {
+    setColorScheme: (webContentsId, scheme) => invoke('webview:setColorScheme', { webContentsId, scheme }),
+  },
   notify: {
     desktop: (n) => invoke('notify:desktop', n),
     onClicked: (cb) => on('notify:clicked', cb),
