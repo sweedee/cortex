@@ -20,10 +20,10 @@ export const RECORD_HINT = 'This record has no file on disk (demo data). Records
 export function recordTypeOf(fileName: string): RecordType | undefined {
   const n = baseName(fileName).toLowerCase();
   if (!n.endsWith('.md')) return undefined;
-  if (/^plan/.test(n)) return 'plan';
-  if (/^brainstorm/.test(n)) return 'brainstorm';
-  if (/^grill/.test(n)) return 'grill';
-  if (/^verif/.test(n)) return 'verification';
+  if (n.startsWith('plan')) return 'plan';
+  if (n.startsWith('brainstorm')) return 'brainstorm';
+  if (n.startsWith('grill')) return 'grill';
+  if (n.startsWith('verif')) return 'verification';
   return undefined;
 }
 

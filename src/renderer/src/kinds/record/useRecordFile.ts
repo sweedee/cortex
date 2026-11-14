@@ -1,4 +1,4 @@
-/** Reads a text file and keeps it live: `fs:watch` on its folder, reload on `fs:changed`. */
+/** Reads a text file and keeps it live: `fs:watch` on its folder, reload on `fs:changed`. Re-mount (key) per path. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { native } from '../../native';
 import { errorText } from '../../ui/task';
@@ -41,11 +41,8 @@ export function useRecordFile(path: string | undefined): RecordFile {
   }, [real]);
 
   useEffect(() => {
-    setText(undefined);
-    setError(undefined);
-    setLoading(!!real);
     if (!real) return;
-    void read();
+    void read(); // oxlint-disable-line react/set-state-in-effect -- initial fetch of an external file
     let watchId: string | undefined;
     let gone = false;
     const target = normPath(real);

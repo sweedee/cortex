@@ -12,7 +12,7 @@ import { countSteps, isAbsolutePath, RECORD_HINT } from './model';
 import { useRecordFile } from './useRecordFile';
 import './record.css';
 
-export function RecordSidebar({ item, ctx }: SidebarProps<'record'>) {
+function RecordView({ item, ctx }: SidebarProps<'record'>) {
   const file = useRecordFile(item.data.path);
   const real = isAbsolutePath(item.data.path);
   const [editing, setEditing] = useState(false);
@@ -124,3 +124,6 @@ export function RecordSidebar({ item, ctx }: SidebarProps<'record'>) {
     </>
   );
 }
+
+/** One view per file: the file state resets when the path changes. */
+export const RecordSidebar = (props: SidebarProps<'record'>) => <RecordView key={props.item.data.path} {...props} />;
