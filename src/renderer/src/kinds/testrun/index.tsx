@@ -1,27 +1,34 @@
-import { CycleIcon } from '@dynatrace/strato-icons';
-import type { ItemOf, Segment } from '../../domain';
-import { placeholder, skill } from '../common';
+import { CycleIcon, DescriptionIcon, StopIcon } from '@dynatrace/strato-icons';
+import { testOps } from '../../data/tests';
+import type { ItemOf } from '../../domain';
+import { inspect, patchData } from '../../store';
+import { runTask } from '../../ui/task';
+import { skill, toast } from '../common';
 import { FlaskIcon } from '../icons';
 import type { KindModule } from '../types';
+import { rerunBlocked, runRequest, startPatch, stopBlocked, testrunRing } from './logic';
+import { TestRunSidebar } from './Sidebar';
 
-export function testrunRing({ data }: ItemOf<'testrun'>): Segment[] {
-  const s = data.summary;
-  switch (data.state) {
-    case 'running':
-      return [{ tone: 'running', label: 'Running' }];
-    case 'idle':
-      return [{ tone: 'neutral', label: 'Not run yet' }];
-    case 'stopped':
-      return [{ tone: 'neutral', label: 'Stopped' }];
-    case 'passed':
-    case 'failed': {
-      if (!s) return [{ tone: data.state === 'passed' ? 'success' : 'critical', label: data.state === 'passed' ? 'Passed' : 'Failed' }];
-      const out: Segment[] = [];
-      if (s.failed) out.push({ tone: 'critical', label: `${s.failed} failed`, weight: Math.max(s.failed, (s.passed + s.failed) * 0.15) });
-      if (s.passed) out.push({ tone: 'success', label: `${s.passed} passed`, weight: s.passed });
-      if (s.skipped) out.push({ tone: 'neutral', label: `${s.skipped} skipped`, weight: Math.max(s.skipped, (s.passed + s.failed) * 0.05) });
-      return out.length ? out : [{ tone: 'neutral', label: 'No tests' }];
-    }
+export { testrunRing } from './logic';
+
+type TestRun = ItemOf<'testrun'>;
+
+/** Re-run with the same command and directory; the item id is the runner id (`data.procId`). */
+export async function rerunTests(t: TestRun) {
+  const prev = { ...t.data };
+  patchData<'testrun'>(t, startPatch(t), { notice: undefined });
+  const ok = await runTask(`Running ${t.data.command}`, testOps.run(runRequest(t)), { quiet: true });
+  // could not start (bad cwd, spawn error): put the old state back
+  if (!ok) patchData<'testrun'>(t.id, { ...prev, procId: prev.procId });
+}
+
+export async function stopTests(t: TestRun) {
+  const id = t.data.procId ?? t.id;
+  const stopped = await runTask('Stopping tests', testOps.stop(id), { quiet: true });
+  if (stopped === false) {
+    // main does not run it (any more): reflect that
+    patchData<'testrun'>(t, { state: 'stopped' });
+    toast('The run had already ended', t.title, 'info');
   }
 }
 
@@ -47,8 +54,16 @@ export const testrun: KindModule<'testrun'> = {
     ];
   },
 
-  actions: ([t]) => [
-    ...(t.data.state === 'failed' ? [skill('fix-tests', 'Fix failing tests', 'fix-tests', { primary: true })] : []),
-    placeholder('rerun', 'Re-run', <CycleIcon />, { primary: t.data.state !== 'failed' }),
-  ],
+  actions: ([t]) => {
+    const running = t.data.state === 'running';
+    return [
+      ...(t.data.state === 'failed' ? [skill('fix-tests', 'Fix failing tests', 'fix-tests', { primary: true })] : []),
+      running
+        ? { id: 'stop', label: 'Stop', type: 'direct', icon: <StopIcon />, danger: true, disabled: stopBlocked(t.data), run: () => void stopTests(t) }
+        : { id: 'rerun', label: 'Re-run', type: 'direct', icon: <CycleIcon />, primary: t.data.state !== 'failed', disabled: rerunBlocked(t.data), run: () => void rerunTests(t) },
+      { id: 'details', label: 'View output', type: 'view', icon: <DescriptionIcon />, primary: running, run: () => inspect(t.id) },
+    ];
+  },
+
+  Sidebar: TestRunSidebar,
 };
