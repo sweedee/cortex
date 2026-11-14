@@ -38,9 +38,14 @@ async function launch(item: App, label: string, work: () => Promise<unknown>) {
   if (why) return toast(`Can't start ${a.title}`, why, 'warning');
   const before = { state: a.data.state, url: a.data.url, port: a.data.port };
   patchData<'app'>(a, { state: 'starting', procId: a.id, url: undefined, port: undefined }, { notice: undefined });
-  const ok = await runTask(`${label} ${a.title}`, async () => (await work(), true), { quiet: true });
-  // failed before main took it over (e.g. a bad cwd): back to what it was
-  if (!ok && fresh(a).data.state === 'starting') patchData<'app'>(fresh(a), before);
+  // spawning returns right away (progress shows on the ring and in the sidebar), so no progress toast
+  try {
+    await work();
+  } catch (e) {
+    toast(`${label} ${a.title} failed`, errorText(e), 'critical');
+    // failed before main took it over (e.g. a bad cwd): back to what it was
+    if (fresh(a).data.state === 'starting') patchData<'app'>(fresh(a), before);
+  }
 }
 
 export const startApp = (a: App) => launch(a, 'Starting', () => appOps.start(startRequest(fresh(a))));

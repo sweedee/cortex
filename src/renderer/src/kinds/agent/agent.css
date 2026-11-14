@@ -396,6 +396,12 @@
   color: var(--dt-colors-text-neutral-subdued);
   white-space: nowrap;
 }
+.ah-status > * {
+  flex: none;
+}
+.ah-status > .ah-ellipsis {
+  flex: 1 1 60px;
+}
 .ah-ctx {
   display: inline-flex;
   align-items: center;
