@@ -6,7 +6,7 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { CodeIcon, DeleteIcon, ExternalLinkIcon, FolderOpenIcon, SuccessIcon, UndoIcon } from '@dynatrace/strato-icons';
 import type { Item } from '../domain';
-import { insertSkill, patchData, removeItems, restoreItems, select, setArchived } from '../store';
+import { insertSkill, patchData, removeItems, restoreItems, restoreRemoved, select, setArchived } from '../store';
 import { openInEditor, openPath, openUrl } from '../ui/task';
 import { ArchiveIcon, skillIcon } from './icons';
 import type { Action, KindModule } from './types';
@@ -120,16 +120,36 @@ export const unarchiveAction: Action = {
   },
 };
 
+/** Remove bubbles (with their links) and offer "Undo" on the toast. */
+export function removeWithUndo(items: Item[]) {
+  const snapshot = removeItems(items.map((i) => i.id));
+  const toastId = showToast({
+    type: 'info',
+    title: `Removed ${plural(items.length, 'bubble')} from the canvas`,
+    message: 'Only from the canvas; nothing was deleted.',
+    lifespan: 6000,
+    actions: (
+      <Button
+        size="condensed"
+        onClick={() => {
+          restoreRemoved(snapshot);
+          select(snapshot.items.map((e) => e.item.id));
+          dismissToast(toastId);
+        }}
+      >
+        Undo
+      </Button>
+    ),
+  });
+}
+
 /** Take bubbles off the canvas (nothing outside Cortex is deleted). */
 export const removeAction: Action = {
   id: 'remove',
   label: 'Remove from canvas',
   type: 'direct',
   icon: <DeleteIcon />,
-  run: (items) => {
-    removeItems(items.map((i) => i.id));
-    showToast({ type: 'info', title: `Removed ${plural(items.length, 'bubble')} from the canvas`, message: 'Only from the canvas; nothing was deleted.', lifespan: 2500 });
-  },
+  run: (items) => removeWithUndo(items),
 };
 
 /** Primary first (enabled ones), otherwise stable. */

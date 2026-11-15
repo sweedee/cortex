@@ -13,6 +13,7 @@ import { kindIcon, kindLabel, sidebarOf, useCtx } from '../kinds/registry';
 import type { SidebarProps } from '../kinds/types';
 import { DefaultSidebar, SidebarLayoutContext } from '../sidebar';
 import { inspect, setSettings, useStore } from '../store';
+import { syncTooltip } from '../sync/status';
 
 const MIN_W = 280;
 const MARGIN = 16;
@@ -30,6 +31,7 @@ export function Sidebar() {
   const inspected = useStore((s) => s.inspected);
   const item = useStore((s) => (s.inspected ? s.items.find((i) => i.id === s.inspected) : undefined));
   const stored = useStore((s) => s.settings.sidebarWidth);
+  const syncStatus = useStore((s) => (s.inspected ? s.sync[s.inspected] : undefined));
   const ctx = useCtx();
   const [drag, setDrag] = useState<number | null>(null);
   // expanded for this item (a newly inspected item starts narrow again)
@@ -94,6 +96,11 @@ export function Sidebar() {
           <XmarkIcon />
         </button>
       </header>
+      {syncStatus?.error && (
+        <div className="sidebar-sync" role="status">
+          {syncTooltip(syncStatus)}
+        </div>
+      )}
       <div className="sidebar-body">
         <SidebarLayoutContext.Provider value={layout}>
           <Body item={item} ctx={ctx} />

@@ -322,6 +322,29 @@ body {
   }
 }
 
+/* sync failing badge */
+.bubble-sync {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--tone-warning);
+  color: #000;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--canvas-bg);
+  z-index: 2;
+  cursor: help;
+}
+.sidebar-sync {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--tone-warning);
+  font-size: 12px;
+}
+
 /* notification badge */
 .bubble-notice {
   position: absolute;

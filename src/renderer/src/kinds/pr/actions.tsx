@@ -24,7 +24,9 @@ export async function aiReviewComment(): Promise<string> {
   if (own) return own;
   try {
     return (await native.integrations.config()).github.aiReviewComment;
-  } catch {
+  } catch (e) {
+    console.warn('[pr] could not read the AI review comment from the config', e);
+    toast('Using the default AI review comment', `Could not read the configured comment (${errorText(e)}); using “@claude review”.`, 'warning');
     return '@claude review';
   }
 }

@@ -19,7 +19,8 @@ import { isRealPath, type Item, type ItemOf } from '../domain';
 import { isDesktop, native } from '../native';
 import { diffPatch, runPatch } from '../kinds/build/logic';
 import { planBuildSync } from '../kinds/pr/builds';
-import { getState, itemById, patchData } from '../store';
+import { getState, itemById, patchData, setSynced, setSyncError } from '../store';
+import { showToast } from '@dynatrace/strato-components/notifications';
 import { changes, prChecksRunning, prPatch, projectStatsPatch, ticketPatch, worktreeGitPatch } from './mapping';
 
 const TICK_MS = 5_000;
@@ -171,6 +172,14 @@ function dueAt(job: Job, intervalMs: number): number {
   return (own?.last ?? 0) + base * Math.min(2 ** fails, 30);
 }
 
+/** Keys (repo or item) that already got a "sync failing" toast; cleared on the next success. */
+const toasted = new Set<string>();
+const errorLine = (e: unknown) =>
+  ((e as Error)?.message ?? String(e))
+    .split('\n')[0]
+    .replace(/^Error invoking remote method '[^']+': /, '')
+    .replace(/^(?:(?:[A-Z]\w*)?Error: )+/, '');
+
 async function runJob(job: Job) {
   const t = track.get(job.id) ?? { last: 0, fails: 0 };
   t.last = Date.now();
@@ -179,12 +188,22 @@ async function runJob(job: Job) {
     await job.run();
     t.fails = 0;
     if (job.group) track.delete(job.group);
+    toasted.delete(job.group ?? job.id);
+    setSynced(job.id);
   } catch (e) {
     t.fails++;
     if (job.group) {
       const g = track.get(job.group) ?? { last: 0, fails: 0 };
       g.fails = Math.max(g.fails, t.fails);
       track.set(job.group, g);
+    }
+    const message = errorLine(e);
+    setSyncError(job.id, message);
+    const key = job.group ?? job.id;
+    if (!toasted.has(key)) {
+      toasted.add(key);
+      const what = job.group?.startsWith('gh:') ? job.group.slice(3) : (itemById(job.id)?.handle ?? job.id);
+      showToast({ type: 'warning', title: `Sync failing for ${what}`, message: `${message} Retrying in the background.`, lifespan: 6000 });
     }
     if (!t.logged) {
       t.logged = true;

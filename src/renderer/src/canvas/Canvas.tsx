@@ -22,7 +22,8 @@ import {
 } from '../layout';
 import { resetToDemo } from '../persist';
 import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, relatedItems, removeSelected } from '../actions';
-import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, removeItems, select, setHovered, useStore, useVisible, visibleSet } from '../store';
+import { removeWithUndo } from '../kinds/common';
+import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, select, setHovered, useStore, useVisible, visibleSet } from '../store';
 import { accentOf, groupFill, useItemColors } from '../visual';
 
 const metrics: Metrics = (it) => ({ r: radiusOf(it.kind), level: levelOf(it.kind) });
@@ -537,7 +538,7 @@ export function Canvas() {
                     </Menu.Prefix>
                     Zoom to
                   </Menu.Item>
-                  <Menu.Item onSelect={() => removeItems(menuSel.items.map((i) => i.id))}>
+                  <Menu.Item onSelect={() => removeWithUndo(menuSel.items)}>
                     <Menu.Prefix>
                       <DeleteIcon />
                     </Menu.Prefix>

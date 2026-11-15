@@ -61,6 +61,15 @@ export interface State {
   soundOn: boolean;
   /** Claude model / permission mode, AI review comment, refresh interval, sidebar width */
   settings: Settings;
+  /** background sync status per item id (ephemeral: never persisted) */
+  sync: Record<string, SyncStatus>;
+}
+
+/** Why the background refresh of an item is failing, and when it last worked. */
+export interface SyncStatus {
+  error?: { message: string; since: number; attempts: number };
+  /** last successful refresh (epoch ms) */
+  lastSyncedAt?: number;
 }
 
 const initial = (): State => ({
@@ -79,6 +88,7 @@ const initial = (): State => ({
   desktopNotify: false,
   soundOn: DEFAULT_PREFS.soundOn,
   settings: settingsOf(DEFAULT_PREFS),
+  sync: {},
 });
 
 /** The zustand store itself (for `subscribe(selector, listener)` and tests). */
@@ -275,8 +285,20 @@ export const addItem = (item: Item | NewItem, links: Omit<Link, 'id'>[] = []) =>
   return it;
 };
 
-export const removeItems = (ids: string[]) => {
+/** Exactly what `removeItems` took out (items carry their layout position and notice), with list indices. */
+export interface RemovedSnapshot {
+  items: { item: Item; index: number }[];
+  links: { link: Link; index: number }[];
+}
+
+/** Remove items and the links touching them. Returns a snapshot for `restoreRemoved`. */
+export const removeItems = (ids: string[]): RemovedSnapshot => {
   const gone = new Set(ids);
+  const { items, links } = getState();
+  const snapshot: RemovedSnapshot = {
+    items: items.flatMap((item, index) => (gone.has(item.id) ? [{ item, index }] : [])),
+    links: links.flatMap((link, index) => (gone.has(link.from) || gone.has(link.to) ? [{ link, index }] : [])),
+  };
   setState((s) =>
     withSelection(
       {
@@ -289,7 +311,46 @@ export const removeItems = (ids: string[]) => {
       false,
     ),
   );
+  return snapshot;
 };
+
+const reinsert = <T,>(list: T[], entries: { value: T; index: number }[]) => {
+  const out = [...list];
+  for (const e of [...entries].sort((a, b) => a.index - b.index)) out.splice(Math.min(e.index, out.length), 0, e.value);
+  return out;
+};
+
+/** Undo `removeItems`: put the items, their links, positions and notices back where they were. */
+export const restoreRemoved = (snap: RemovedSnapshot) =>
+  setState((s) => {
+    const have = new Set(s.items.map((i) => i.id));
+    const items = snap.items.filter((e) => !have.has(e.item.id));
+    const all = new Set([...have, ...items.map((e) => e.item.id)]);
+    const haveLinks = new Set(s.links.map((l) => l.id));
+    const links = snap.links.filter((e) => !haveLinks.has(e.link.id) && all.has(e.link.from) && all.has(e.link.to));
+    return {
+      ...s,
+      items: reinsert(
+        s.items,
+        items.map((e) => ({ value: e.item, index: e.index })),
+      ),
+      links: reinsert(
+        s.links,
+        links.map((e) => ({ value: e.link, index: e.index })),
+      ),
+    };
+  });
+
+/** Record a failed background refresh (keeps `since`, counts attempts). Returns the attempt count. */
+export function setSyncError(id: string, message: string): number {
+  const prev = getState().sync[id];
+  const attempts = (prev?.error?.attempts ?? 0) + 1;
+  setState((s) => ({ ...s, sync: { ...s.sync, [id]: { ...prev, error: { message, since: prev?.error?.since ?? Date.now(), attempts } } } }));
+  return attempts;
+}
+
+/** Record a successful background refresh (clears the error). */
+export const setSynced = (id: string, at = Date.now()) => setState((s) => ({ ...s, sync: { ...s.sync, [id]: { lastSyncedAt: at } } }));
 
 /** Archive (or restore) items. Archived items leave the canvas unless the filter shows them. */
 export const setArchived = (ids: string[], archived: boolean) => {

@@ -7,6 +7,7 @@ import type { ItemOf } from '../../domain';
 import { native } from '../../native';
 import { ticketPatch } from '../../sync/mapping';
 import { openForm, str } from '../../ui/form';
+import { errorText } from '../../ui/task';
 import { archive, toast } from '../common';
 import { doneStatus, projectOfKey, statusOptions, transitionToDone } from './model';
 
@@ -51,8 +52,13 @@ export async function openChangeStatus(t: Ticket): Promise<void> {
       const status = str(v, 'status');
       if (status.toLowerCase() === current.toLowerCase()) throw new Error(`${t.data.key} is already ${current}.`);
       await jiraOps.transition(t.data.key, status);
-      await refreshTicket(t.id).catch(() => patchData<'ticket'>(t.id, { status }));
-      toast(`${t.data.key} → ${status}`);
+      let refreshError: string | undefined;
+      await refreshTicket(t.id).catch((e: unknown) => {
+        refreshError = errorText(e);
+        patchData<'ticket'>(t.id, { status });
+      });
+      if (refreshError) toast(`${t.data.key} → ${status}`, `Changed in Jira, but the ticket could not be re-read (${refreshError}); showing the new status locally.`, 'warning');
+      else toast(`${t.data.key} → ${status}`);
     },
   });
 }

@@ -1,6 +1,8 @@
 import { memo } from 'react';
 import type { Item, Segment } from '../domain';
 import { getKind, type ItemView } from '../kinds/registry';
+import { useStore } from '../store';
+import { syncTooltip } from '../sync/status';
 import { TONE_COLOR } from '../tones';
 
 export interface BubbleProps {
@@ -90,6 +92,9 @@ export const Bubble = memo(function Bubble({ item, view, x, y, selected, lit, di
     .filter(Boolean)
     .join(' ');
 
+  const syncStatus = useStore((s) => s.sync[item.id]);
+  const syncError = syncStatus?.error ? syncTooltip(syncStatus) : undefined;
+
   return (
     <div
       className={cls}
@@ -114,6 +119,11 @@ export const Bubble = memo(function Bubble({ item, view, x, y, selected, lit, di
         {item.notice && !item.notice.read && !item.archived && (
           <span className={`bubble-notice tone-${item.notice.tone}`} style={{ left: r + r * 0.7071 - 7, top: r - r * 0.7071 - 7 }}>
             <span className="bubble-notice-pulse" />
+          </span>
+        )}
+        {syncError && (
+          <span className="bubble-sync" title={syncError} role="img" aria-label={syncError} style={{ left: r + r * 0.7071 - 7, top: r + r * 0.7071 - 7 }}>
+            !
           </span>
         )}
         {!mod.titleInside && (
