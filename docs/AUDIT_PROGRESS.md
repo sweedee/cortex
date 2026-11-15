@@ -58,6 +58,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 - 2026-11-15: item 14 done (443 tests pass); 8b, 12 and 15 resumed.
 - 2026-11-15: item 8b done in `802e413` (main/shared tests pass; renderer tests to re-run once 12 lands).
 - 2026-11-15: item 12 done in `d60dd92` (448/449 pass; the failure is `settings.test.ts` not yet updated for 8b's new keys). Follow-up agent fixes that and skips demo items in the refresher.
+- 2026-11-15: follow-up done in `10c6646`: settings test updated; demo tickets (`unknown/demo` project) skipped by ticket sync. 450 tests pass, lint clean; typecheck waits for item 15.
 
 ## Check by hand in the UI
 
