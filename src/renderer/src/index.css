@@ -81,6 +81,9 @@ body {
   left: 0;
   top: 0;
   transform-origin: 0 0;
+}
+/* own compositor layer only while the camera pans / zooms (Canvas.tsx toggles it) */
+.world.is-moving {
   will-change: transform;
 }
 .links {
@@ -130,6 +133,10 @@ body {
 .bubble-float {
   position: absolute;
   inset: 0;
+}
+/* only the selected and the running bubbles float: dozens of idle animations cost frames */
+.bubble.is-selected .bubble-float,
+.bubble.is-running .bubble-float {
   animation: float 7s ease-in-out infinite;
 }
 .bubble:nth-child(3n) .bubble-float {

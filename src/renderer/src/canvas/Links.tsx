@@ -1,9 +1,14 @@
+import { memo, useCallback, useLayoutEffect, useRef } from 'react';
 import type { Link } from '../domain';
 import type { ItemView } from '../kinds/registry';
 import { positionOf } from '../layout';
+import { linkPath, useOnPlace } from './positions';
 
-/** Curved connections between bubbles, drawn in world space beneath them. */
-export function Links({
+/**
+ * Curved connections between bubbles, drawn in world space beneath them. React renders the
+ * elements (which links, their state); the path geometry is written on every layout tick.
+ */
+export const Links = memo(function Links({
   links,
   views,
   active,
@@ -16,34 +21,34 @@ export function Links({
   active: Set<string>;
   hidden: Set<string>;
 }) {
+  const svg = useRef<SVGSVGElement>(null);
+  const draw = useCallback(() => {
+    const el = svg.current;
+    if (!el) return;
+    for (const g of el.children) {
+      const { from, to } = (g as SVGGElement).dataset;
+      const d = from && to ? linkPath(positionOf(from), positionOf(to)) : '';
+      for (const p of g.children) p.setAttribute('d', d);
+    }
+  }, []);
+  // after every render (new links) and on every tick (moved bubbles)
+  useLayoutEffect(draw);
+  useOnPlace(draw);
+
   const anyActive = active.size > 0;
   return (
-    <svg className="links" width="1" height="1" aria-hidden>
+    <svg ref={svg} className="links" width="1" height="1" aria-hidden>
       {links.map((l) => {
         if (hidden.has(l.from) || hidden.has(l.to)) return null;
-        const a = positionOf(l.from);
-        const b = positionOf(l.to);
-        if (!a || !b || a.x == null || b.x == null) return null;
-        const ax = a.x!,
-          ay = a.y!,
-          bx = b.x!,
-          by = b.y!;
-        const dx = bx - ax,
-          dy = by - ay;
-        const len = Math.hypot(dx, dy) || 1;
-        // bend a little, perpendicular to the line
-        const bend = Math.min(len * 0.12, 40);
-        const cx = (ax + bx) / 2 - (dy / len) * bend;
-        const cy = (ay + by) / 2 + (dx / len) * bend;
         const isActive = active.has(l.id);
         const live = views.get(l.from)?.running || views.get(l.to)?.running;
         return (
-          <g key={l.id} className={`link ${isActive ? 'is-active' : ''} ${anyActive && !isActive ? 'is-dimmed' : ''} ${live ? 'is-live' : ''}`}>
-            <path d={`M${ax},${ay} Q${cx},${cy} ${bx},${by}`} className="link-path" />
-            {live && <path d={`M${ax},${ay} Q${cx},${cy} ${bx},${by}`} className="link-flow" />}
+          <g key={l.id} data-from={l.from} data-to={l.to} className={`link ${isActive ? 'is-active' : ''} ${anyActive && !isActive ? 'is-dimmed' : ''} ${live ? 'is-live' : ''}`}>
+            <path className="link-path" />
+            {live && <path className="link-flow" />}
           </g>
         );
       })}
     </svg>
   );
-}
+});

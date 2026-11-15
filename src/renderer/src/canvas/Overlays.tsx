@@ -12,13 +12,14 @@ import { select } from '../store';
 import { agoText, TONE_CHIP } from '../tones';
 import { accentOf, NEUTRAL_ACCENT, stripes, useItemColors } from '../visual';
 
-export function HoverCard({ item, x, y, flip }: { item: Item; x: number; y: number; flip: boolean }) {
+/** `elRef` lets the canvas move the card with its bubble without re-rendering it. */
+export function HoverCard({ item, x, y, flip, elRef }: { item: Item; x: number; y: number; flip: boolean; elRef?: React.Ref<HTMLDivElement> }) {
   const colors = useItemColors();
   const view = useViews().get(item.id);
   const ctx = useCtx();
   const facts = factsOf(item, ctx);
   return (
-    <div className={`hover-card ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y, ['--accent' as string]: stripes(colors.get(item.id) ?? [NEUTRAL_ACCENT], 180) }}>
+    <div ref={elRef} className={`hover-card ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y, ['--accent' as string]: stripes(colors.get(item.id) ?? [NEUTRAL_ACCENT], 180) }}>
       <div className="hover-card-kind">
         {kindIcon(item.kind, 14)}
         <span>{kindLabel(item.kind)}</span>
@@ -76,6 +77,7 @@ export function InlineActions({
   x,
   y,
   flip,
+  elRef,
 }: {
   actions: Action[];
   items: Item[];
@@ -84,6 +86,8 @@ export function InlineActions({
   x: number;
   y: number;
   flip: boolean;
+  /** lets the canvas move the list with the selection without re-rendering it */
+  elRef?: React.Ref<HTMLDivElement>;
 }) {
   const [open, setOpen] = useState<{ id: string; up: boolean } | null>(null);
   const timer = useRef(0);
@@ -98,7 +102,7 @@ export function InlineActions({
     timer.current = window.setTimeout(() => setOpen(null), 180);
   };
   return (
-    <div className={`inline-actions ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y }} onPointerDown={(e) => e.stopPropagation()}>
+    <div ref={elRef} className={`inline-actions ${flip ? 'is-flipped' : ''}`} style={{ left: x, top: y }} onPointerDown={(e) => e.stopPropagation()}>
       {items.length > 1 && <span className="inline-actions-count">{items.length} selected</span>}
       {actions.map((a) => (
         <ActionButton key={a.id} action={a} items={items} placement={flip ? 'left' : 'right'} />

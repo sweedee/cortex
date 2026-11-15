@@ -4,13 +4,12 @@ import { getKind, type ItemView } from '../kinds/registry';
 import { useStore } from '../store';
 import { syncTooltip } from '../sync/status';
 import { TONE_COLOR } from '../tones';
+import { useBubblePosition } from './positions';
 
 export interface BubbleProps {
   item: Item;
   /** ring, short text, badge… derived by the kind module (same object until the item changes) */
   view: ItemView;
-  x: number;
-  y: number;
   selected: boolean;
   /** related to hover/selection, or mentioned in the chat box */
   lit: boolean;
@@ -71,7 +70,11 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
 /** icon size inside the disc, by bubble size */
 const iconSize = (r: number) => (r >= 50 ? 28 : r <= 28 ? 18 : 22);
 
-export const Bubble = memo(function Bubble({ item, view, x, y, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent }: BubbleProps) {
+/**
+ * One bubble. Its position is not a prop: the layout moves it on every tick by writing the
+ * transform directly (positions.ts), so the simulation does not re-render React.
+ */
+export const Bubble = memo(function Bubble({ item, view, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent }: BubbleProps) {
   const mod = getKind(item.kind);
   const r = mod.radius;
   const tone = view.ring[0]?.tone;
@@ -86,6 +89,7 @@ export const Bubble = memo(function Bubble({ item, view, x, y, selected, lit, di
     hitActive && 'is-hit-active',
     item.archived && 'is-archived',
     view.waiting && 'is-waiting',
+    view.running && 'is-running',
     tone === 'critical' && 'is-critical',
     isNew && 'is-new',
   ]
@@ -94,12 +98,14 @@ export const Bubble = memo(function Bubble({ item, view, x, y, selected, lit, di
 
   const syncStatus = useStore((s) => s.sync[item.id]);
   const syncError = syncStatus?.error ? syncTooltip(syncStatus) : undefined;
+  const ref = useBubblePosition(item.id, r);
 
   return (
     <div
+      ref={ref}
       className={cls}
       data-id={item.id}
-      style={{ transform: `translate(${x - r}px, ${y - r}px)`, width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'], ['--accent' as string]: accent }}
+      style={{ width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'], ['--accent' as string]: accent }}
     >
       <div className="bubble-float">
         <div className="bubble-disc" style={fill ? { background: fill } : undefined}>

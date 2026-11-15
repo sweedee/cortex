@@ -103,12 +103,36 @@ export function viewOf(item: Item, ctx: KindCtx): ItemView {
   };
 }
 
+/** Two views draw the same thing (so the old object can be kept and memoized bubbles skip a render). */
+export function sameView(a: ItemView, b: ItemView): boolean {
+  return (
+    a.short === b.short &&
+    a.subtitle === b.subtitle &&
+    a.waiting === b.waiting &&
+    a.running === b.running &&
+    a.badge?.label === b.badge?.label &&
+    a.badge?.tone === b.badge?.tone &&
+    a.ring.length === b.ring.length &&
+    a.ring.every((x, i) => x.tone === b.ring[i].tone && x.label === b.ring[i].label && x.weight === b.ring[i].weight)
+  );
+}
+
 let viewCache: { items: Item[]; links: Link[]; views: Map<string, ItemView> } | null = null;
-/** Views of all items, cached on (items, links): unchanged items keep their view object. */
+/**
+ * Views of all items, cached on (items, links). Items whose view did not change keep their
+ * view object, so a patch to one item re-renders only that item's bubble.
+ */
 export function viewsOf(s: Pick<State, 'items' | 'links'> = getState()): Map<string, ItemView> {
   if (viewCache && viewCache.items === s.items && viewCache.links === s.links) return viewCache.views;
   const ctx = ctxOf(s);
-  const views = new Map(s.items.map((i) => [i.id, viewOf(i, ctx)]));
+  const prev = viewCache?.views;
+  const views = new Map(
+    s.items.map((i) => {
+      const v = viewOf(i, ctx);
+      const old = prev?.get(i.id);
+      return [i.id, old && sameView(old, v) ? old : v];
+    }),
+  );
   viewCache = { items: s.items, links: s.links, views };
   return views;
 }

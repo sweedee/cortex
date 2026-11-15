@@ -1,5 +1,6 @@
 /** The few fixed controls around the canvas edge. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { Menu } from '@dynatrace/strato-components/navigation';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
@@ -43,19 +44,18 @@ import {
 import { accentOf, useItemColors } from '../visual';
 
 export function Hud() {
-  const items = useStore((s) => s.items);
+  // only what the toolbar shows: patches to items without a notice do not re-render it
+  const noticed = useStore(useShallow((s) => s.items.filter((i) => i.notice && !i.archived)));
+  const liveCount = useStore((s) => s.items.reduce((n, i) => n + (i.archived ? 0 : 1), 0));
   const filter = useStore((s) => s.filter);
   const desktopNotify = useStore((s) => s.desktopNotify);
   const soundOn = useStore((s) => s.soundOn);
   const visible = useVisible();
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const notices = items
-    .filter((i) => i.notice && !i.archived)
-    .sort((a, b) => Number(!!a.notice!.read) - Number(!!b.notice!.read) || b.notice!.at - a.notice!.at);
+  const notices = useMemo(() => [...noticed].sort((a, b) => Number(!!a.notice!.read) - Number(!!b.notice!.read) || b.notice!.at - a.notice!.at), [noticed]);
   const unread = notices.filter((i) => !i.notice!.read).length;
   const nFilters = activeFilterCount(filter);
-  const live = items.filter((i) => !i.archived);
 
   return (
     <>
@@ -68,7 +68,7 @@ export function Hud() {
       </div>
 
       <div className="hud hud-top-right">
-        <Tooltip text={nFilters ? `${visible.size} of ${live.length} shown. Filter by type, status, project…` : 'Filter by type, status, project…'}>
+        <Tooltip text={nFilters ? `${visible.size} of ${liveCount} shown. Filter by type, status, project…` : 'Filter by type, status, project…'}>
           <Button
             variant="default"
             aria-label={`Filter, ${nFilters} active`}

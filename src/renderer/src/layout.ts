@@ -1,6 +1,7 @@
 /**
- * Force layout (d3-force). Positions live here, outside React state; components
- * subscribe with useLayoutTick() and read `positionOf(id)`.
+ * Force layout (d3-force). Positions live here, outside React state. The canvas writes them
+ * to the DOM imperatively from `onTick` (bubbles, links); small overlays may re-render with
+ * useLayoutTick(). Read with `positionOf(id)`.
  */
 import { useEffect, useReducer } from 'react';
 import {
@@ -125,13 +126,14 @@ export const positionOf = (id: string) => nodes.get(id);
 
 /** Keep the simulation in sync with the store's items and links. */
 export function syncLayout(items: Item[], links: Link[], metrics: Metrics) {
-  let changed = false;
+  let added = 0,
+    removed = 0;
   const alive = new Set(items.map((i) => i.id));
   // oxlint-disable-next-line unicorn/no-useless-spread -- copy: we delete while iterating
-  for (const id of [...nodes.keys()]) if (!alive.has(id)) (nodes.delete(id), (changed = true));
+  for (const id of [...nodes.keys()]) if (!alive.has(id)) (nodes.delete(id), removed++);
   for (const it of items) {
     if (nodes.has(it.id)) continue;
-    changed = true;
+    added++;
     const { r, level } = metrics(it);
     // projects anchor their own cluster; everything else gravitates to its project's
     const cluster = it.projectId ?? (level === 0 ? it.id : undefined);
@@ -152,15 +154,29 @@ export function syncLayout(items: Item[], links: Link[], metrics: Metrics) {
       ...(pinned && { fx: pinned.x, fy: pinned.y }),
     });
   }
+  // an item patch (same nodes, same links) changes nothing here: don't re-initialise the forces
+  if (!added && !removed && links === lastLinks) return;
+  lastLinks = links;
   const simLinks: SimLink[] = links
     .filter((l) => nodes.has(l.from) && nodes.has(l.to))
     .map((l) => ({ id: l.id, source: l.from, target: l.to }));
   sim.nodes([...nodes.values()]);
   sim.force<ReturnType<typeof forceLink<Node, SimLink>>>('link')!.links(simLinks);
-  if (changed || simLinks.length !== lastLinkCount) sim.alpha(Math.max(sim.alpha(), 0.6)).restart();
+  const alpha = reheatAlpha(added, removed, simLinks.length - lastLinkCount);
+  if (alpha) sim.alpha(Math.max(sim.alpha(), alpha)).restart();
   lastLinkCount = simLinks.length;
 }
 let lastLinkCount = 0;
+let lastLinks: Link[] | null = null;
+
+/**
+ * How hard to reheat the simulation after the graph changed: a bubble or two (or a few
+ * links) only nudges the neighbourhood; bigger changes re-arrange more. 0 = no restart.
+ */
+export function reheatAlpha(added: number, removed: number, linkDelta: number): number {
+  if (!added && !removed && !linkDelta) return 0;
+  return added + removed <= 2 && Math.abs(linkDelta) <= 3 ? 0.3 : 0.6;
+}
 
 // ---- dragging ----------------------------------------------------------------------
 

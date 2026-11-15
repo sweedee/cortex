@@ -9,14 +9,15 @@ import { AiIcon, ArrowUpIcon, TerminalIcon, XmarkIcon } from '@dynatrace/strato-
 import { actionsForItem, actionsForSelection, sendPrompt, type Action } from '../actions';
 import type { Item } from '../domain';
 import { skillIcon } from '../kinds/icons';
-import { kindIcon, kindLabel } from '../kinds/registry';
-import { getState, mentionedIds, select, setDraft, setSearch, setSettings, useStore, useVisible } from '../store';
+import { kindIcon, kindLabel, useCtx } from '../kinds/registry';
+import { draftMentions, getState, mentionedIds, select, setDraft, setSearch, setSettings, useStore, useVisible } from '../store';
 import { useClaudeCatalog } from '../data/claude';
 import { SessionPickers } from './SessionPickers';
 import { slashOptions, type SlashOption } from './sessionOptions';
 import { accentOf, NEUTRAL_ACCENT, stripes, useItemColors } from '../visual';
 import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
+import { mentionIndex, mentionOptions } from './mentionOptions';
 import { SKILLS } from './skills';
 
 export { SKILLS } from './skills';
@@ -68,9 +69,16 @@ export function ChatBox() {
   const [active, setActive] = useState(0);
   const [caret, setCaret] = useState(0);
 
+  const ctx = useCtx();
   const handles = useMemo(() => new Map(items.map((i) => [i.handle.toLowerCase(), i])), [items]);
-  const mentioned = useMemo(() => mentionedIds(draft, items).map((id) => items.find((i) => i.id === id)!), [draft, items]);
-  const sel = actionsForSelection(selected);
+  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const mentionedList = useStore(draftMentions);
+  const mentioned = useMemo(() => mentionedList.map((id) => byId.get(id)).filter((i): i is Item => !!i), [mentionedList, byId]);
+  // the actions read items and links through the store; ctx changes with either
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const sel = useMemo(() => actionsForSelection(selected), [selected, ctx]);
+  // lower-cased handles and titles, built once per items change instead of per keystroke
+  const index = useMemo(() => mentionIndex(items), [items]);
 
   // focus requests (actions inserting a skill, "/" shortcut): caret to the end
   useEffect(() => {
@@ -92,22 +100,16 @@ export function ChatBox() {
     const before = text.slice(0, pos);
     const m = before.match(/(^|\s)@([^\s@]*)$/);
     if (m) {
-      const q = m[2].toLowerCase();
-      const options = items
-        .filter((i) => (visible.has(i.id) || !i.archived) && (i.handle.toLowerCase().includes(q) || i.title.toLowerCase().includes(q)))
-        .sort(
-          (a, b) =>
-            Number(visible.has(b.id)) - Number(visible.has(a.id)) ||
-            Number(selected.includes(b.id)) - Number(selected.includes(a.id)) ||
-            Number(b.handle.toLowerCase().startsWith(q)) - Number(a.handle.toLowerCase().startsWith(q)),
-        );
-      setPopup({ type: 'mention', start: pos - m[2].length - 1, query: m[2], options: options.slice(0, 7), hits: options.filter((o) => visible.has(o.id)).map((o) => o.id) });
+      const { options, hits } = mentionOptions(index, m[2], visible, selected, 7);
+      setPopup({ type: 'mention', start: pos - m[2].length - 1, query: m[2], options, hits });
       setActive(0);
       return;
     }
     const a = before.match(/(^|\s)[#!]([\w-]*)$/);
     if (a) {
-      const ment = mentionedIds(text, items).map((id) => items.find((i) => i.id === id)!);
+      const ment = mentionedIds(text, items)
+        .map((id) => byId.get(id))
+        .filter((i): i is Item => !!i);
       setPopup({ type: 'action', start: pos - a[2].length - 1, query: a[2], options: actionOptions(ment, a[2]) });
       setActive(0);
       return;
@@ -289,7 +291,8 @@ export function ChatBox() {
                 if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) refreshPopup(draft, e.currentTarget.selectionStart);
               }}
               onClick={(e) => refreshPopup(draft, e.currentTarget.selectionStart)}
-              onBlur={() => setTimeout(() => setPopup(null), 120)}
+              // popup rows keep the focus (mousedown preventDefault), so no delay is needed here
+              onBlur={() => setPopup(null)}
               onScroll={syncScroll}
               aria-label="Chat with Cortex"
             />
@@ -324,7 +327,7 @@ export function ChatBox() {
         </div>
 
         {popup && (popup.options.length > 0 || popup.type === 'action') && (
-          <div className="chat-popup" role="listbox" style={{ left: Math.min(popupX(draft, caret), 380) }}>
+          <div className="chat-popup" role="listbox" style={{ left: Math.min(popupX(draft, caret), 380) }} onMouseDown={(e) => e.preventDefault()}>
             <div className="chat-popup-head">
               {popup.type === 'mention' ? (
                 <>

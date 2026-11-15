@@ -174,6 +174,18 @@ export const toggleKind = (kind: Kind) => {
 export const itemById = (id: string) => getState().items.find((i) => i.id === id);
 
 const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+/** `@handle` as a whole token (optionally eating one trailing space); cached, drafts are re-matched per keystroke. */
+const mentionRes = new Map<string, RegExp>();
+export function mentionRe(handle: string, trailingSpace = false): RegExp {
+  const key = `${trailingSpace ? 1 : 0}${handle.toLowerCase()}`;
+  let re = mentionRes.get(key);
+  if (!re) {
+    if (mentionRes.size > 1000) mentionRes.clear();
+    re = new RegExp(`(^|\\s)@${esc(handle)}(?=\\s|$)${trailingSpace ? ' ?' : ''}`, 'i');
+    mentionRes.set(key, re);
+  }
+  return re;
+}
 /** at most this many bubbles get auto-mentioned; a big marquee or Ctrl+A should not flood the draft */
 const AUTO_MAX = 6;
 
@@ -183,7 +195,7 @@ function autoMention(s: State, ids: string[]): Pick<State, 'draft' | 'autoIds'> 
   let draft = s.draft;
   for (const id of s.autoIds) {
     const h = handle(id);
-    if (h) draft = draft.replace(new RegExp(`(^|\\s)@${esc(h)}(?=\\s|$) ?`, 'i'), '$1');
+    if (h) draft = draft.replace(mentionRe(h, true), '$1');
   }
   const present = new Set(mentionedIds(draft, s.items));
   const add = ids.length <= AUTO_MAX ? ids.filter((id) => !present.has(id) && handle(id)) : [];
@@ -227,7 +239,7 @@ export const setDraft = (draft: string, user = false) =>
     let rest = draft;
     for (const id of s.autoIds) {
       const h = s.items.find((i) => i.id === id)?.handle;
-      if (h) rest = rest.replace(new RegExp(`(^|\\s)@${esc(h)}(?=\\s|$)`, 'i'), '$1');
+      if (h) rest = rest.replace(mentionRe(h), '$1');
     }
     // a "#action" search being typed is not own text either
     rest = rest.replace(/(^|\s)[#!][\w-]*/g, '$1');
@@ -456,7 +468,29 @@ export function insertSkill(skill: string | null, ids: string[]) {
 
 /** Ids of items that the current draft mentions with @handle, in the order they appear. */
 export function mentionedIds(draft: string, items: Item[]): string[] {
+  if (!draft.includes('@')) return [];
   const handles = [...new Set([...draft.matchAll(/@([^\s@]+)/g)].map((m) => m[1].toLowerCase()))];
-  const byHandle = new Map(items.map((i) => [i.handle.toLowerCase(), i.id]));
+  const byHandle = handleIndex(items);
   return handles.map((h) => byHandle.get(h)).filter((id): id is string => !!id);
+}
+
+let handleCache: { items: Item[]; map: Map<string, string> } | null = null;
+/** lower-cased handle -> id, cached on the items array */
+function handleIndex(items: Item[]): Map<string, string> {
+  if (handleCache?.items !== items) handleCache = { items, map: new Map(items.map((i) => [i.handle.toLowerCase(), i.id])) };
+  return handleCache.map;
+}
+
+let draftMentionCache: { draft: string; items: Item[]; ids: string[] } | null = null;
+/**
+ * `mentionedIds` of the current draft as a store selector: the same array until the mentioned
+ * ids really change, so typing plain text does not re-render its subscribers.
+ */
+export function draftMentions(s: Pick<State, 'draft' | 'items'>): string[] {
+  const c = draftMentionCache;
+  if (c && c.draft === s.draft && c.items === s.items) return c.ids;
+  const ids = mentionedIds(s.draft, s.items);
+  const keep = c && c.ids.length === ids.length && c.ids.every((id, i) => id === ids[i]) ? c.ids : ids;
+  draftMentionCache = { draft: s.draft, items: s.items, ids: keep };
+  return draftMentionCache.ids;
 }

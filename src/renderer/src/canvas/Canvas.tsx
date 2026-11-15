@@ -3,8 +3,10 @@ import { Menu } from '@dynatrace/strato-components/navigation';
 import { DeleteIcon, PinOffIcon, ZoomToFitIcon, ChatIcon, LinkIcon, ResetIcon } from '@dynatrace/strato-icons';
 import { Backdrop } from './Backdrop';
 import { Bubble } from './Bubble';
+import { ChatThreads } from './ChatThreads';
 import { Links } from './Links';
 import { HoverCard, InlineActions } from './Overlays';
+import { placeAll, useFollow } from './positions';
 import { sidebarWidth } from '../overlays/Sidebar';
 import { kindIcon, levelOf, radiusOf, useViews } from '../kinds/registry';
 import type { Metrics } from '../layout';
@@ -17,13 +19,12 @@ import {
   positionOf,
   syncLayout,
   unpinAll,
-  useLayoutTick,
   warmUp,
 } from '../layout';
 import { resetToDemo } from '../persist';
 import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, relatedItems, removeSelected } from '../actions';
 import { removeWithUndo } from '../kinds/common';
-import { focusChat, getState, insertSkill, inspect, mentionedIds, openDialog, select, setHovered, useStore, useVisible, visibleSet } from '../store';
+import { draftMentions, focusChat, getState, insertSkill, inspect, openDialog, select, setHovered, useStore, useVisible, visibleSet } from '../store';
 import { accentOf, groupFill, useItemColors } from '../visual';
 
 const metrics: Metrics = (it) => ({ r: radiusOf(it.kind), level: levelOf(it.kind) });
@@ -38,29 +39,39 @@ const TOP_SPACE = 70;
 const MAX_RELATED = 6;
 /** px covered by the details sidebar on the right (0 when it is closed) */
 const rightSpace = () => (getState().inspected ? sidebarWidth() + 32 : 0);
+/** how long the world layer stays promoted (will-change) after the last pan / zoom step */
+const MOVING_MS = 200;
 
+/**
+ * The bubble canvas. It re-renders on store and camera changes only: layout ticks move
+ * bubbles, links and the overlays that follow them imperatively (positions.ts).
+ */
 export function Canvas() {
   const items = useStore((s) => s.items);
   const links = useStore((s) => s.links);
   const selected = useStore((s) => s.selected);
   const hovered = useStore((s) => s.hovered);
-  const draft = useStore((s) => s.draft);
+  // only the mentioned ids, not the draft: typing plain text does not re-render the canvas
+  const mentionedList = useStore(draftMentions);
   const visible = useVisible();
   const search = useStore((s) => s.search);
   const colors = useItemColors();
   const views = useViews();
-  useLayoutTick();
 
   const cam = useRef<Cam>({ x: window.innerWidth / 2, y: window.innerHeight / 2, k: 1 });
   const [, setCamTick] = useState(0);
   const rerender = useCallback(() => setCamTick((t) => t + 1), []);
   const root = useRef<HTMLDivElement>(null);
+  const world = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<MenuState>(null);
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [hoverShown, setHoverShown] = useState<string | null>(null);
   const firstIds = useRef<Set<string> | null>(null);
   const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+  const freshTimer = useRef(0);
+  const fitTimer = useRef(0);
+  const movingTimer = useRef(0);
 
   // ---- layout sync ------------------------------------------------------------------
   const booted = useRef(false);
@@ -76,11 +87,31 @@ export function Canvas() {
       fresh.forEach((id) => firstIds.current!.add(id));
       if (fresh.length) {
         setFreshIds(new Set(fresh));
-        setTimeout(() => setFreshIds(new Set()), 900);
+        clearTimeout(freshTimer.current);
+        freshTimer.current = window.setTimeout(() => setFreshIds(new Set()), 900);
       }
     }
+    // new bubbles (and their links) are mounted by now: put them in place before the paint
+    placeAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, links]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(freshTimer.current);
+      clearTimeout(fitTimer.current);
+      clearTimeout(movingTimer.current);
+      cancelAnimationFrame(anim.current);
+    },
+    [],
+  );
+
+  /** Promote the world to its own layer only while the camera moves (one huge layer otherwise). */
+  const moving = useCallback(() => {
+    world.current?.classList.add('is-moving');
+    clearTimeout(movingTimer.current);
+    movingTimer.current = window.setTimeout(() => world.current?.classList.remove('is-moving'), MOVING_MS);
+  }, []);
 
   // ---- camera -------------------------------------------------------------------------
   const anim = useRef(0);
@@ -93,12 +124,13 @@ export function Canvas() {
         const p = Math.min((t - t0) / ms, 1);
         const e = 1 - Math.pow(1 - p, 3);
         cam.current = { x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e, k: from.k + (target.k - from.k) * e };
+        moving();
         rerender();
         if (p < 1) anim.current = requestAnimationFrame(step);
       };
       anim.current = requestAnimationFrame(step);
     },
-    [rerender],
+    [rerender, moving],
   );
 
   const fitTo = useCallback(
@@ -153,11 +185,12 @@ export function Canvas() {
       const wx = (e.clientX - x) / k,
         wy = (e.clientY - y) / k;
       cam.current = { k: nk, x: e.clientX - wx * nk, y: e.clientY - wy * nk };
+      moving();
       rerender();
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [rerender]);
+  }, [rerender, moving]);
 
   // ---- pointer: pan, drag, marquee ------------------------------------------------------
   const gesture = useRef<
@@ -207,6 +240,7 @@ export function Canvas() {
       g.moved = true;
       cancelAnimationFrame(anim.current);
       cam.current = { ...cam.current, x: g.cx + dx, y: g.cy + dy };
+      moving();
       rerender();
     } else if (g.type === 'drag') {
       const dx = e.clientX - g.lx,
@@ -328,7 +362,7 @@ export function Canvas() {
     return m;
   }, [colors]);
   const hiddenSet = useMemo(() => new Set(items.filter((i) => !visible.has(i.id)).map((i) => i.id)), [items, visible]);
-  const mentioned = useMemo(() => new Set(mentionedIds(draft, items)), [draft, items]);
+  const mentioned = useMemo(() => new Set(mentionedList), [mentionedList]);
   const hits = useMemo(() => (search ? new Set(search.ids) : null), [search]);
   const focus = useMemo(() => {
     const f = new Set(selected);
@@ -352,51 +386,60 @@ export function Canvas() {
   const isDimmed = (id: string) => (hits ? !hits.has(id) : dimming && !lit.has(id) && !focus.has(id));
 
   const { x: cx, y: cy, k } = cam.current;
-  const sel = actionsForSelection(selected.filter((id) => !hiddenSet.has(id)));
+  // derived from the store only (not positions), so memoized across camera renders
+  const sel = useMemo(
+    () => actionsForSelection(selected.filter((id) => !hiddenSet.has(id))),
+    // items / links: the actions read them through the store
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, hiddenSet, items, links],
+  );
+  const selIds = useMemo(() => sel.items.map((i) => i.id), [sel]);
+  const related = useMemo(
+    () => relatedItems(selIds).filter((i) => !hiddenSet.has(i.id)).slice(0, MAX_RELATED),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selIds, hiddenSet, items, links],
+  );
 
-  // inline actions sit under the selection
   // inline actions: a vertical list beside the selection (flips left near the right edge)
-  let actionsAt: { x: number; y: number; flip: boolean } | null = null;
-  if (sel.items.length && !dragging) {
-    const b = bounds(sel.items.map((i) => i.id));
-    if (b) {
-      const right = toScreen(b.x1, b.y0);
-      const left = toScreen(b.x0, b.y0);
-      const flip = right.x + 16 + 230 > window.innerWidth - rightSpace();
-      const nRel = Math.min(relatedItems(sel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).length, MAX_RELATED);
-      const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + (nRel ? nRel * 30 + 30 : 0) + 10;
-      const y = Math.max(TOP_SPACE, Math.min(right.y, window.innerHeight - CHAT_SPACE - height));
-      actionsAt = { x: flip ? left.x - 16 : right.x + 16, y, flip };
-    }
-  }
+  const [actionsRef, actionsAt] = useFollow(() => {
+    if (!selIds.length || dragging) return null;
+    const b = bounds(selIds);
+    if (!b) return null;
+    const right = toScreen(b.x1, b.y0);
+    const left = toScreen(b.x0, b.y0);
+    const flip = right.x + 16 + 230 > window.innerWidth - rightSpace();
+    const nRel = related.length;
+    const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + (nRel ? nRel * 30 + 30 : 0) + 10;
+    const y = Math.max(TOP_SPACE, Math.min(right.y, window.innerHeight - CHAT_SPACE - height));
+    return { x: flip ? left.x - 16 : right.x + 16, y, flip };
+  });
 
   // hover card next to the bubble
-  let hoverCard: React.ReactNode = null;
   const hItem = hoverShown ? itemMap.get(hoverShown) : undefined;
-  if (hItem && !dragging && !menu && !selected.includes(hItem.id)) {
-    const p = positionOf(hItem.id);
-    if (p) {
-      const r = radiusOf(hItem.kind) * k;
-      const s = toScreen(p.x!, p.y!);
-      const flip = s.x + r + 300 > window.innerWidth - rightSpace();
-      hoverCard = <HoverCard item={hItem} x={flip ? s.x - r - 18 : s.x + r + 18} y={s.y} flip={flip} />;
-    }
-  }
+  const hoverItem = hItem && !dragging && !menu && !selected.includes(hItem.id) ? hItem : undefined;
+  const [hoverRef, hoverAt] = useFollow(() => {
+    const p = hoverItem && positionOf(hoverItem.id);
+    if (!hoverItem || p?.x == null || p.y == null) return null;
+    const r = radiusOf(hoverItem.kind) * cam.current.k;
+    const s = toScreen(p.x, p.y);
+    const flip = s.x + r + 300 > window.innerWidth - rightSpace();
+    return { x: flip ? s.x - r - 18 : s.x + r + 18, y: s.y, flip };
+  });
 
   // threads from the chat box to every mentioned bubble
-  const chatThreads = [...mentioned]
-    .filter((id) => !hiddenSet.has(id))
-    .map((id) => {
-      const p = positionOf(id);
-      return p ? { id, ...toScreen(p.x!, p.y!) } : null;
-    })
-    .filter(Boolean) as { id: string; x: number; y: number }[];
-  const chatEl = document.querySelector('.chatbox');
-  const chatRect = chatEl?.getBoundingClientRect();
+  const threadIds = useMemo(() => mentionedList.filter((id) => !hiddenSet.has(id)), [mentionedList, hiddenSet]);
 
   const menuItem = menu?.itemId ? itemMap.get(menu.itemId) : undefined;
-  const menuSel = menu?.itemId ? actionsForSelection(getState().selected) : null;
-  const menuRelated = menuSel ? relatedItems(menuSel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).slice(0, 8) : [];
+  const menuSel = useMemo(
+    () => (menu?.itemId ? actionsForSelection(selected) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [menu, selected, items, links],
+  );
+  const menuRelated = useMemo(
+    () => (menuSel ? relatedItems(menuSel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).slice(0, 8) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [menuSel, hiddenSet, items, links],
+  );
 
   return (
     <div
@@ -410,19 +453,15 @@ export function Canvas() {
       onContextMenu={onContextMenu}
     >
       <Backdrop cam={cam} />
-      <div className="world" style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}>
+      <div ref={world} className="world" style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}>
         <Links links={links} views={views} active={activeLinks} hidden={hiddenSet} />
         {items.map((it) => {
           if (hiddenSet.has(it.id)) return null;
-          const p = positionOf(it.id);
-          if (!p || p.x == null) return null;
           return (
             <Bubble
               key={it.id}
               item={it}
               view={views.get(it.id)!}
-              x={p.x}
-              y={p.y!}
               selected={selected.includes(it.id)}
               lit={lit.has(it.id) && !focus.has(it.id)}
               dimmed={isDimmed(it.id)}
@@ -437,29 +476,20 @@ export function Canvas() {
         })}
       </div>
 
-      {chatRect && chatThreads.length > 0 && (
-        <svg className="chat-threads" width="100%" height="100%" aria-hidden>
-          {chatThreads.map((t, i) => {
-            const ox = chatRect.left + chatRect.width / 2 + (i - (chatThreads.length - 1) / 2) * 26;
-            const oy = chatRect.top;
-            return <path key={t.id} d={`M${ox},${oy} C${ox},${oy - 120} ${t.x},${t.y + 140} ${t.x},${t.y}`} style={{ stroke: accentOf(colors, t.id) }} />;
-          })}
-        </svg>
-      )}
+      <ChatThreads ids={threadIds} colors={colors} cam={cam.current} />
 
-      {hoverCard}
+      {hoverItem && hoverAt && <HoverCard elRef={hoverRef} item={hoverItem} x={hoverAt.x} y={hoverAt.y} flip={!!hoverAt.flip} />}
       {actionsAt && (
         <InlineActions
           key={selected.join(',')}
+          elRef={actionsRef}
           actions={sel.actions}
           items={sel.items}
-          related={relatedItems(sel.items.map((i) => i.id))
-            .filter((i) => !hiddenSet.has(i.id))
-            .slice(0, MAX_RELATED)}
+          related={related}
           colors={colors}
           x={actionsAt.x}
           y={actionsAt.y}
-          flip={actionsAt.flip}
+          flip={!!actionsAt.flip}
         />
       )}
 
@@ -590,7 +620,8 @@ export function Canvas() {
                         onConfirm: () =>
                           void resetToDemo().then(() => {
                             unpinAll();
-                            setTimeout(() => fitTo(), 50);
+                            clearTimeout(fitTimer.current);
+                            fitTimer.current = window.setTimeout(() => fitTo(), 50);
                           }),
                       })
                     }
