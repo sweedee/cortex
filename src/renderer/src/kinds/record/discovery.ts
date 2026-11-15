@@ -41,7 +41,7 @@ export async function scanProject(project: Project): Promise<number> {
   try {
     // ask the parent first: a missing folder is normal and should not log an IPC error every poll
     if (!(await hasRecordsDir(baseDir))) return 0;
-    entries = await native.fs.list(dir, { glob: '**/*.md' });
+    entries = await native.fs.list({ dir, options: { glob: '**/*.md' } });
   } catch {
     return 0; // no records folder (yet)
   }
@@ -50,7 +50,7 @@ export async function scanProject(project: Project): Promise<number> {
     if (e.isDir) continue;
     let text: string | undefined;
     try {
-      text = await native.fs.readText(e.path);
+      text = await native.fs.readText({ path: e.path });
     } catch {
       /* unreadable: still list it */
     }
@@ -77,7 +77,7 @@ export async function scanProject(project: Project): Promise<number> {
 async function hasRecordsDir(baseDir: string, rel = userConfig().records.dir): Promise<boolean> {
   let dir = baseDir.replace(/[\\/]+$/, '');
   for (const seg of recordsSegments(rel)) {
-    const entries = await native.fs.list(dir, { glob: seg }).catch(() => []);
+    const entries = await native.fs.list({ dir, options: { glob: seg } }).catch(() => []);
     if (!entries.some((e) => e.isDir && e.name === seg)) return false;
     dir = `${dir}${sep(baseDir)}${seg}`;
   }
@@ -87,9 +87,9 @@ async function hasRecordsDir(baseDir: string, rel = userConfig().records.dir): P
 async function startWatch(project: Project, w: Watch) {
   try {
     if (!(await hasRecordsDir(current(project).data.baseDir ?? ''))) throw new Error('no records folder');
-    const id = await native.fs.watch(w.dir);
+    const id = await native.fs.watch({ dir: w.dir });
     if (w.stopped) {
-      void native.fs.unwatch(id);
+      void native.fs.unwatch({ watchId: id });
       return;
     }
     w.watchId = id;
@@ -111,7 +111,7 @@ function stopWatch(w: Watch) {
   w.stopped = true;
   if (w.timer) clearTimeout(w.timer);
   if (w.poll) clearInterval(w.poll);
-  if (w.watchId) void native.fs.unwatch(w.watchId).catch(() => {});
+  if (w.watchId) void native.fs.unwatch({ watchId: w.watchId }).catch(() => {});
 }
 
 /** Start / stop watchers so they match the projects' base directories. */

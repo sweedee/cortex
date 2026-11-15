@@ -83,7 +83,7 @@ async function keepInvalidCopy(raw: unknown): Promise<string | null> {
     const path = await native.workspace.path();
     if (!path.endsWith('.json')) return null;
     const copy = path.replace(/\.json$/, `.invalid-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-    await native.fs.writeText(copy, JSON.stringify(raw, null, 2));
+    await native.fs.writeText({ path: copy, text: JSON.stringify(raw, null, 2) });
     return copy.split(/[\\/]/).pop() ?? copy;
   } catch {
     return null; // browser fallback has no fs; the .bak in main still holds the previous version
@@ -106,7 +106,7 @@ function saveNow(force = false) {
   timer = undefined;
   if (!dirty && !force) return;
   dirty = false;
-  native.workspace.save(toWorkspace(getState())).catch((err: unknown) => console.warn('[workspace] save failed', err));
+  native.workspace.save({ data: toWorkspace(getState()) }).catch((err: unknown) => console.warn('[workspace] save failed', err));
 }
 
 let started = false;

@@ -11,7 +11,7 @@ import type { SyncJob } from '../types';
 async function refreshPr(id: string) {
   const p = currentItem(id, 'pr');
   if (!p) return;
-  const pr = await native.gh.prView(p.data.repo, p.data.number);
+  const pr = await native.gh.prView({ repo: p.data.repo, number: p.data.number });
   queryClient.setQueryData(qk.gh.pr(p.data.repo, p.data.number), pr);
   const cur = currentItem(id, 'pr');
   if (!cur) return;

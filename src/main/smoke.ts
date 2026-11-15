@@ -27,23 +27,23 @@ const PROBE = `(async () => {
   await step('exec.run git --version', async () => (await c.exec.run({ cmd: 'git', args: ['--version'], cwd: ${JSON.stringify(process.cwd())} })).stdout.trim());
   for (const cmd of ['gh', 'claude']) await step('exec.run ' + cmd + ' --version', async () => (await c.exec.run({ cmd, args: ['--version'], cwd: ${JSON.stringify(process.cwd())} })).stdout.trim().split(/\\r?\\n/)[0]);
   await step('exec.run rm (must be rejected)', () => c.exec.run({ cmd: 'rm', args: [], cwd: ${JSON.stringify(process.cwd())} }));
-  await step('fs.list *.json', async () => (await c.fs.list(${JSON.stringify(process.cwd())}, { glob: '*.json' })).map((e) => e.name));
+  await step('fs.list *.json', async () => (await c.fs.list({ dir: ${JSON.stringify(process.cwd())}, options: { glob: '*.json' } })).map((e) => e.name));
   await step('proc.list', () => c.proc.list());
   if (${JSON.stringify(!!process.env['CORTEX_USER_DATA'])}) {
-    await step('workspace save+load (temp userData)', async () => { await c.workspace.save({ version: 0, items: [], links: [], probe: 1 }); await c.workspace.save({ version: 0, items: [], links: [], probe: 2 }); return c.workspace.load(); });
+    await step('workspace save+load (temp userData)', async () => { await c.workspace.save({ data: { version: 0, items: [], links: [], probe: 1 } }); await c.workspace.save({ data: { version: 0, items: [], links: [], probe: 2 } }); return c.workspace.load(); });
   }
   // Phase 1 integrations (read-only)
   const repo = ${JSON.stringify(process.cwd())};
-  await step('git.status (this repo)', async () => { const s = await c.git.status(repo); return { branch: s.branch, files: s.files.length, ahead: s.ahead, behind: s.behind }; });
-  await step('git.remoteRepo', () => c.git.remoteRepo(repo));
-  await step('git.worktreeList', async () => (await c.git.worktreeList(repo)).length);
-  await step('git.log -n 2', async () => (await c.git.log(repo, { limit: 2 })).map((e) => e.subject));
-  await step('jira.search (mock)', async () => (await c.jira.search('assignee = currentUser() AND statusCategory != Done')).map((i) => i.key + ' ' + i.fields.status.name));
+  await step('git.status (this repo)', async () => { const s = await c.git.status({ dir: repo }); return { branch: s.branch, files: s.files.length, ahead: s.ahead, behind: s.behind }; });
+  await step('git.remoteRepo', () => c.git.remoteRepo({ dir: repo }));
+  await step('git.worktreeList', async () => (await c.git.worktreeList({ repoDir: repo })).length);
+  await step('git.log -n 2', async () => (await c.git.log({ dir: repo, limit: 2 })).map((e) => e.subject));
+  await step('jira.search (mock)', async () => (await c.jira.search({ jql: 'assignee = currentUser() AND statusCategory != Done' })).map((i) => i.key + ' ' + i.fields.status.name));
   await step('exec.run jira-mock view', async () => { const r = await c.exec.run({ cmd: 'jira-mock', args: ['jira', 'workitem', 'view', 'CTX-4821', '--json', '--fields', 'summary'], cwd: repo }); return r.code === 0 ? JSON.parse(r.stdout).fields.summary : r.stderr; });
   await step('integrations.config', async () => (await c.integrations.config()).github.aiReviewComment);
   await step('claude.list', async () => (await c.claude.list()).length);
   await step('on(unknown) must throw', () => { try { c.on('nope', () => {}); return 'did not throw'; } catch (e) { return 'threw: ' + e.message; } });
-  if (${JSON.stringify(process.env['CORTEX_SMOKE_GH_REPO'] ?? '')}) await step('gh.prList', async () => (await c.gh.prList(${JSON.stringify(process.env['CORTEX_SMOKE_GH_REPO'] ?? '')}, { state: 'all', limit: 2 })).map((p) => '#' + p.number + ' ' + p.state));
+  if (${JSON.stringify(process.env['CORTEX_SMOKE_GH_REPO'] ?? '')}) await step('gh.prList', async () => (await c.gh.prList({ repo: ${JSON.stringify(process.env['CORTEX_SMOKE_GH_REPO'] ?? '')}, state: 'all', limit: 2 })).map((p) => '#' + p.number + ' ' + p.state));
   await step('tests.run + app:state events', () => new Promise((resolve) => {
     const seen = [];
     const off = c.on('test:state', (s) => { seen.push(s.status); if (s.status !== 'running') { off(); resolve({ seen, summary: s.summary }); } });
@@ -98,10 +98,10 @@ const PROBE = `(async () => {
     const until = async (get, pred, ms = 20000) => { const t0 = Date.now(); for (;;) { const v = get(); if (pred(v)) return v; if (Date.now() - t0 > ms) throw new Error('timeout, last: ' + JSON.stringify(v && v.data)); await new Promise((r) => setTimeout(r, 100)); } };
     let wt;
     await step('e2e: project on this repo + worktree git refresh', async () => {
-      const remote = await c.git.remoteRepo(repo);
+      const remote = await c.git.remoteRepo({ dir: repo });
       const slug = remote || ${JSON.stringify(process.env['CORTEX_SMOKE_GH_REPO'] ?? '')};
       if (!slug) throw new Error('this checkout has no GitHub remote: set CORTEX_SMOKE_GH_REPO=owner/name');
-      const branch = await c.git.currentBranch(repo);
+      const branch = await c.git.currentBranch({ dir: repo });
       const p = d.addItem({ kind: 'project', handle: 'smoke-cortex', title: 'cortex (smoke)', data: { repo: slug, baseDir: repo, defaultBranch: 'main' } });
       wt = d.addItem({ kind: 'worktree', handle: 'wt/smoke', title: branch, projectId: p.id, data: { path: repo, branch: branch || 'HEAD', baseBranch: 'main' } });
       d.addLink(wt.id, p.id, 'belongs to');
@@ -115,7 +115,7 @@ const PROBE = `(async () => {
       const asked = { status: a1.data.status, question: a1.data.pendingQuestion.questions[0].question, options: a1.data.pendingQuestion.questions[0].options.map((o) => o.label), notice: a1.notice && a1.notice.text };
       d.chooseOption(a1, 'Queue');
       const a2 = await until(() => d.itemById(id), (a) => a && a.data.status === 'done');
-      const session = await c.claude.session(id);
+      const session = await c.claude.session({ localId: id });
       return { cwd: a2.data.cwd, sessionId: !!a2.data.sessionId, asked, done: { status: a2.data.status, lastActivity: a2.data.lastActivity, notice: a2.notice && a2.notice.text, usage: a2.data.usage }, promptSent: session.messages[0] && session.messages[0].text };
     });
     // phase 3d: the agent harness sidebar and the app kind, driven through the DOM / item actions
@@ -164,7 +164,7 @@ const PROBE = `(async () => {
     let probeNo = 0;
     const nodeEval = (code) => new Promise((resolve) => {
       const id = 'smoke-probe-' + (++probeNo);
-      const off = c.on('test:state', async (s) => { if (s.id === id && s.status !== 'running') { off(); resolve((await c.tests.log(id)).trim().split(/\\r?\\n/).pop()); } });
+      const off = c.on('test:state', async (s) => { if (s.id === id && s.status !== 'running') { off(); resolve((await c.tests.log({ id })).trim().split(/\\r?\\n/).pop()); } });
       c.tests.run({ id, cwd: repo, command: 'node -e "' + code + '"' }).catch((e) => { off(); resolve('ERROR: ' + e.message); });
     });
     const portState = (port) => nodeEval("require('net').connect(" + port + ",'127.0.0.1').on('connect',function(){console.log('open');process.exit(0)}).on('error',function(){console.log('closed')})");

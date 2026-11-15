@@ -17,7 +17,7 @@ async function refreshBuildRun(id: string) {
   const b = currentItem(id, 'build');
   if (!b) return;
   const runId = Number(b.data.runId);
-  const run = await native.gh.runView(b.data.repo, runId);
+  const run = await native.gh.runView({ repo: b.data.repo, runId });
   queryClient.setQueryData(qk.gh.run(b.data.repo, runId), run);
   const cur = currentItem(id, 'build');
   if (!cur) return;
@@ -27,7 +27,7 @@ async function refreshBuildRun(id: string) {
 
 /** The PR's checks → its existing build items (never creates any; that is the PR sidebar's "Add to canvas"). */
 async function refreshPrChecks(repo: string, number: number, branch: string) {
-  const checks = await native.gh.prChecks(repo, number);
+  const checks = await native.gh.prChecks({ repo, number });
   queryClient.setQueryData(qk.gh.checks(repo, number), checks);
   const items = getState().items;
   const pr =

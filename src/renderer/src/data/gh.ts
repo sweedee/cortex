@@ -9,41 +9,41 @@ import { qk, type PrFilter } from './queryKeys';
 
 /** Full PR (`gh pr view`): body, files, comments, reviews, mergeable, check rollup. */
 export function usePr(repo: string | undefined, number: number | undefined) {
-  return useQuery({ queryKey: qk.gh.pr(repo ?? '', number ?? 0), queryFn: () => native.gh.prView(repo!, number!), enabled: ready(repo, number) });
+  return useQuery({ queryKey: qk.gh.pr(repo ?? '', number ?? 0), queryFn: () => native.gh.prView({ repo: repo!, number: number! }), enabled: ready(repo, number) });
 }
 
 /** The same query reduced to `PrSummary` (state, checks rollup, behind, conflicts). */
 export function usePrSummary(repo: string | undefined, number: number | undefined) {
-  return useQuery({ queryKey: qk.gh.pr(repo ?? '', number ?? 0), queryFn: () => native.gh.prView(repo!, number!), enabled: ready(repo, number), select: summarizePr });
+  return useQuery({ queryKey: qk.gh.pr(repo ?? '', number ?? 0), queryFn: () => native.gh.prView({ repo: repo!, number: number! }), enabled: ready(repo, number), select: summarizePr });
 }
 
 export function usePrDiff(repo: string | undefined, number: number | undefined) {
-  return useQuery({ queryKey: qk.gh.prDiff(repo ?? '', number ?? 0), queryFn: () => native.gh.prDiff(repo!, number!), enabled: ready(repo, number), staleTime: 60_000 });
+  return useQuery({ queryKey: qk.gh.prDiff(repo ?? '', number ?? 0), queryFn: () => native.gh.prDiff({ repo: repo!, number: number! }), enabled: ready(repo, number), staleTime: 60_000 });
 }
 
 /** `gh pr checks`; polls every 15 s while any check is pending. */
 export function usePrChecks(repo: string | undefined, number: number | undefined) {
   return useQuery({
     queryKey: qk.gh.checks(repo ?? '', number ?? 0),
-    queryFn: () => native.gh.prChecks(repo!, number!),
+    queryFn: () => native.gh.prChecks({ repo: repo!, number: number! }),
     enabled: ready(repo, number),
     refetchInterval: (q) => pollWhile(!!q.state.data && rollupBuckets(q.state.data) === 'pending'),
   });
 }
 
 export function usePrList(repo: string | undefined, filter: PrFilter = {}) {
-  return useQuery({ queryKey: qk.gh.prList(repo ?? '', filter), queryFn: () => native.gh.prList(repo!, filter), enabled: ready(repo) });
+  return useQuery({ queryKey: qk.gh.prList(repo ?? '', filter), queryFn: () => native.gh.prList({ ...filter, repo: repo! }), enabled: ready(repo) });
 }
 
 export function useRenovatePrs(repo: string | undefined) {
-  return useQuery({ queryKey: qk.gh.renovate(repo ?? ''), queryFn: () => native.gh.renovatePrs(repo!), enabled: ready(repo) });
+  return useQuery({ queryKey: qk.gh.renovate(repo ?? ''), queryFn: () => native.gh.renovatePrs({ repo: repo! }), enabled: ready(repo) });
 }
 
 /** A workflow run with its jobs; polls while it is not completed. */
 export function useRun(repo: string | undefined, runId: number | undefined) {
   return useQuery({
     queryKey: qk.gh.run(repo ?? '', runId ?? 0),
-    queryFn: () => native.gh.runView(repo!, runId!),
+    queryFn: () => native.gh.runView({ repo: repo!, runId: runId! }),
     enabled: ready(repo, runId),
     refetchInterval: (q) => pollWhile(!!q.state.data && q.state.data.status !== 'completed'),
   });
@@ -57,22 +57,22 @@ export const ghOps = {
     return r;
   },
   async prMerge(repo: string, number: number, method: GhMergeMethod, opts?: { deleteBranch?: boolean }) {
-    await native.gh.prMerge(repo, number, method, opts);
+    await native.gh.prMerge({ repo, number, method, deleteBranch: opts?.deleteBranch });
     await invalidate(qk.gh.pr(repo, number), qk.gh.prs(repo));
   },
   async prComment(repo: string, number: number, body: string) {
-    const r = await native.gh.prComment(repo, number, body);
+    const r = await native.gh.prComment({ repo, number, body });
     await invalidate(qk.gh.pr(repo, number));
     return r;
   },
   /** Posts the AI-review trigger comment (config.json `github.aiReviewComment`). */
   async requestAiReview(repo: string, number: number) {
-    const r = await native.gh.prComment(repo, number, getState().settings.aiReviewComment);
+    const r = await native.gh.prComment({ repo, number, body: getState().settings.aiReviewComment });
     await invalidate(qk.gh.pr(repo, number));
     return r;
   },
   async prUpdateBranch(repo: string, number: number, opts?: { rebase?: boolean }) {
-    const r = await native.gh.prUpdateBranch(repo, number, opts);
+    const r = await native.gh.prUpdateBranch({ repo, number, rebase: opts?.rebase });
     await invalidate(qk.gh.pr(repo, number));
     return r;
   },
@@ -82,7 +82,7 @@ export const ghOps = {
     await invalidate(qk.gh.pr(req.repo, req.number), qk.gh.prs(req.repo));
   },
   async runRerun(repo: string, runId: number, opts?: { failedOnly?: boolean }) {
-    await native.gh.runRerun(repo, runId, opts);
+    await native.gh.runRerun({ repo, runId, failedOnly: opts?.failedOnly });
     await invalidate(qk.gh.run(repo, runId));
   },
 };

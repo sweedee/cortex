@@ -76,7 +76,7 @@ export async function openUrl(url: string) {
   if (!url) return failed('the link', 'No URL known.');
   const full = /^https?:\/\//i.test(url) ? url : `https://${url}`;
   try {
-    await native.shell.openExternal(full);
+    await native.shell.openExternal({ url: full });
   } catch (e) {
     failed(full, errorText(e));
   }
@@ -85,13 +85,13 @@ export async function openUrl(url: string) {
 /** Show a folder / file in the OS (Explorer, Finder). */
 export async function openPath(path: string) {
   if (!path) return failed('the folder', 'No path known.');
-  const r = await native.shell.openPath(path).catch((e: unknown) => ({ ok: false, error: errorText(e) }));
+  const r = await native.shell.openPath({ path }).catch((e: unknown) => ({ ok: false, error: errorText(e) }));
   if (!r.ok) failed(path, r.error);
 }
 
 /** Open a folder / file in the editor (`code <path>`, falls back to the OS). */
 export async function openInEditor(path: string) {
   if (!path) return failed('the folder', 'No path known.');
-  const r = await native.shell.openInEditor(path).catch((e: unknown) => ({ ok: false, error: errorText(e) }));
+  const r = await native.shell.openInEditor({ path }).catch((e: unknown) => ({ ok: false, error: errorText(e) }));
   if (!r.ok) failed(path, r.error);
 }

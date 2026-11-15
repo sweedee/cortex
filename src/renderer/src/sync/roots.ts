@@ -34,7 +34,7 @@ function push(items: readonly Item[]) {
   if (key === sent) return;
   sent = key;
   void native.fs
-    .setRoots(roots)
+    .setRoots({ roots })
     .then((refused) => {
       if (refused.length) console.warn('[roots] refused by main:', refused);
     })

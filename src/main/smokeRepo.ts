@@ -367,7 +367,7 @@ export async function runRepoSmoke(win: BrowserWindow, allowRoot: (dir: string) 
     const r = await page<{ badge: string; model: string; note: string; status: string; slash: string[] }>(`async (d, h) => {
       const id = h.agentId;
       // live model switch through the composer picker's op
-      const s = await window.cortex.claude.configure(id, { model: 'sonnet', permissionMode: 'acceptEdits', effort: 'high' });
+      const s = await window.cortex.claude.configure({ localId: id, model: 'sonnet', permissionMode: 'acceptEdits', effort: 'high' });
       const a = await h.until(() => d.itemById(id), (x) => /sonnet/.test(x.data.model || ''), 10000, 'model switched');
       await h.until(() => h.$('.ah-note'), Boolean, 10000, 'switch note');
       // / autocomplete in the sidebar composer

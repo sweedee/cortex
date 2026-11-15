@@ -1,70 +1,18 @@
 /**
- * Preload (sandboxed, CommonJS): exposes the typed bridge as `window.cortex`. It only
- * forwards to ipcRenderer; validation happens in main. Never expose ipcRenderer itself.
+ * Preload (sandboxed, CommonJS): exposes the typed bridge as `window.cortex`. The forwarders are
+ * generated from the channel lists in `shared/ipc.ts` (`shared/bridge.ts`), so only declared
+ * channels are reachable. It only forwards; validation happens in main. Never expose ipcRenderer itself.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CortexApi, EventChannel, EventChannels, InvokeChannel, Req, Res } from '../shared/ipc';
-import { EVENT_CHANNELS } from '../shared/ipc';
-import { integrationsApi } from './integrations';
+import { buildBridge, type BridgeOn } from '../shared/bridge';
 
-const invoke = <C extends InvokeChannel>(channel: C, req?: Req<C>) => ipcRenderer.invoke(channel, req) as Promise<Res<C>>;
-
-function on<C extends EventChannel>(channel: C, cb: (payload: EventChannels[C]) => void) {
-  const listener = (_e: Electron.IpcRendererEvent, payload: EventChannels[C]) => cb(payload);
+const on: BridgeOn = (channel, cb) => {
+  const listener = (_e: Electron.IpcRendererEvent, payload: Parameters<typeof cb>[0]) => cb(payload);
   ipcRenderer.on(channel, listener);
   return () => void ipcRenderer.removeListener(channel, listener);
-}
-
-const api: CortexApi = {
-  exec: {
-    run: (req) => invoke('exec:run', req),
-  },
-  proc: {
-    start: (req) => invoke('proc:start', req),
-    stop: (id) => invoke('proc:stop', { id }),
-    list: () => invoke('proc:list'),
-    onOutput: (cb) => on('proc:output', cb),
-    onExit: (cb) => on('proc:exit', cb),
-  },
-  dialog: {
-    pickDirectory: (req = {}) => invoke('dialog:pickDirectory', req),
-    pickFile: (req = {}) => invoke('dialog:pickFile', req),
-  },
-  shell: {
-    openExternal: (url) => invoke('shell:openExternal', { url }),
-    openPath: (path) => invoke('shell:openPath', { path }),
-    openInEditor: (path) => invoke('shell:openInEditor', { path }),
-  },
-  webview: {
-    setColorScheme: (webContentsId, scheme) => invoke('webview:setColorScheme', { webContentsId, scheme }),
-  },
-  notify: {
-    desktop: (n) => invoke('notify:desktop', n),
-    onClicked: (cb) => on('notify:clicked', cb),
-  },
-  workspace: {
-    load: () => invoke('workspace:load'),
-    save: (data) => invoke('workspace:save', { data }),
-    path: () => invoke('workspace:path'),
-  },
-  fs: {
-    readText: (path) => invoke('fs:readText', { path }),
-    writeText: (path, text) => invoke('fs:writeText', { path, text }),
-    list: (dir, options) => invoke('fs:list', { dir, options }),
-    watch: (dir) => invoke('fs:watch', { dir }),
-    unwatch: (watchId) => invoke('fs:unwatch', { watchId }),
-    onChanged: (cb) => on('fs:changed', cb),
-    setRoots: (roots) => invoke('fs:setRoots', { roots }),
-  },
-  app: {
-    info: () => invoke('app:info'),
-  },
-  config: {
-    get: () => invoke('config:get'),
-    update: (patch, opts = {}) => invoke('config:update', { patch, ifUnset: opts.ifUnset }),
-    onChanged: (cb) => on('config:changed', cb),
-  },
-  ...integrationsApi(invoke, on, EVENT_CHANNELS),
 };
 
-contextBridge.exposeInMainWorld('cortex', api);
+contextBridge.exposeInMainWorld(
+  'cortex',
+  buildBridge((channel, req) => ipcRenderer.invoke(channel, req), on),
+);

@@ -103,7 +103,7 @@ function apply(state: UserConfigState) {
 /** Writes (validated in main: only the gear-dialog settings, never `editor` / `claude.bin`). */
 export const configOps = {
   async update(patch: UserConfigPatch, opts: { ifUnset?: boolean } = {}): Promise<UserConfigState> {
-    const s = await native.config.update(patch, opts);
+    const s = await native.config.update({ patch, ifUnset: opts?.ifUnset });
     apply(s);
     return s;
   },
@@ -119,7 +119,7 @@ let started = false;
 export async function startConfigSync(movedPrefs?: UserConfigPatch): Promise<void> {
   if (started) return;
   started = true;
-  if (movedPrefs) await native.config.update(movedPrefs, { ifUnset: true }).catch((e: unknown) => console.warn('[config] could not move the workspace settings to config.json', e));
+  if (movedPrefs) await native.config.update({ patch: movedPrefs, ifUnset: true }).catch((e: unknown) => console.warn('[config] could not move the workspace settings to config.json', e));
   try {
     apply(await native.config.get());
   } catch (e) {

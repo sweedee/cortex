@@ -177,7 +177,7 @@ export async function removeWorktree(w: Worktree, ctx: KindCtx) {
   let dirtyFiles = 0;
   if (real) {
     try {
-      dirtyFiles = (await native.git.status(w.data.path)).files.filter((f) => f.kind !== 'ignored').length;
+      dirtyFiles = (await native.git.status({ dir: w.data.path })).files.filter((f) => f.kind !== 'ignored').length;
     } catch {
       dirtyFiles = w.data.git?.changedFiles ?? 0;
     }

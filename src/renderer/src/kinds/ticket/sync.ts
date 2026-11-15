@@ -11,7 +11,7 @@ import type { SyncJob } from '../types';
 async function refreshTicket(id: string) {
   const t = currentItem(id, 'ticket');
   if (!t) return;
-  const issue = await native.jira.view(t.data.key);
+  const issue = await native.jira.view({ key: t.data.key });
   queryClient.setQueryData(qk.jira.issue(t.data.key), issue);
   const cur = currentItem(id, 'ticket');
   if (!cur) return;

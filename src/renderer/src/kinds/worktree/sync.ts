@@ -12,9 +12,9 @@ async function refreshWorktree(id: string) {
   const w = currentItem(id, 'worktree');
   if (!w) return;
   const dir = w.data.path;
-  const status = await native.git.status(dir);
+  const status = await native.git.status({ dir });
   queryClient.setQueryData(qk.git.status(dir), status);
-  const count = async (range: string) => (await native.git.log(dir, { range, limit: 500 })).length;
+  const count = async (range: string) => (await native.git.log({ dir, range, limit: 500 })).length;
   let vsBase: { ahead: number; behind: number } | null = null;
   for (const base of [`origin/${w.data.baseBranch}`, w.data.baseBranch]) {
     try {

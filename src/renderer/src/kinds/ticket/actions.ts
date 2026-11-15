@@ -20,7 +20,7 @@ export const ticketUrl = jiraUrl;
 export async function refreshTicket(id: string): Promise<void> {
   const cur = itemById(id);
   if (cur?.kind !== 'ticket') return;
-  const issue = await native.jira.view(cur.data.key);
+  const issue = await native.jira.view({ key: cur.data.key });
   const { patch, title } = ticketPatch(issue);
   patchData<'ticket'>(id, patch, title ? { title } : {});
   queryClient.setQueryData(qk.jira.issue(cur.data.key), issue);

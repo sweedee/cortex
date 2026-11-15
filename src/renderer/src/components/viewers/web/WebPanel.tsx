@@ -89,7 +89,7 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
     const wv = ref.current;
     if (!emulate || !wv) return;
     try {
-      void native.webview.setColorScheme(wv.getWebContentsId(), schemeRef.current).catch(() => {});
+      void native.webview.setColorScheme({ webContentsId: wv.getWebContentsId(), scheme: schemeRef.current }).catch(() => {});
     } catch {
       /* not attached yet: dom-ready calls again */
     }

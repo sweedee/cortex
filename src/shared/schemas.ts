@@ -59,8 +59,9 @@ export const schemas = {
   'proc:start': procStartSchema,
   'proc:stop': z.object({ id: z.string().min(1) }),
   'proc:list': z.undefined(),
-  'dialog:pickDirectory': z.object({ title: z.string().optional(), defaultPath: absPath.optional() }),
-  'dialog:pickFile': z.object({ title: z.string().optional(), defaultPath: absPath.optional(), filters }),
+  // all-optional requests: `pickDirectory()` sends no request at all
+  'dialog:pickDirectory': z.object({ title: z.string().optional(), defaultPath: absPath.optional() }).default({}),
+  'dialog:pickFile': z.object({ title: z.string().optional(), defaultPath: absPath.optional(), filters }).default({}),
   'shell:openExternal': z.object({ url: httpUrl }),
   'shell:openPath': z.object({ path: absPath }),
   'shell:openInEditor': z.object({ path: absPath }),
@@ -84,3 +85,6 @@ export const schemas = {
 type SchemaMatches = { [C in InvokeChannel]: z.infer<(typeof schemas)[C]> extends Req<C> ? true : false };
 const schemasMatchContract: { [C in InvokeChannel]: true } = null as unknown as SchemaMatches;
 void schemasMatchContract;
+/** ...and no schema for a channel the contract doesn't declare (the spreads above escape `satisfies`). */
+const noStraySchemas: [Exclude<keyof typeof schemas, InvokeChannel>] extends [never] ? true : never = true;
+void noStraySchemas;

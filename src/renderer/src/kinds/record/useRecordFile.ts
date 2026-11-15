@@ -25,7 +25,7 @@ export function useRecordFile(path: string | undefined): RecordFile {
     if (!real) return;
     const mine = ++seq.current;
     try {
-      const t = await native.fs.readText(real);
+      const t = await native.fs.readText({ path: real });
       if (mine === seq.current) {
         setText(t);
         setError(undefined);
@@ -51,9 +51,9 @@ export function useRecordFile(path: string | undefined): RecordFile {
       if (e.path === null || normPath(e.path) === target) void read();
     });
     native.fs
-      .watch(dirOf(real))
+      .watch({ dir: dirOf(real) })
       .then((id) => {
-        if (gone) void native.fs.unwatch(id).catch(() => {});
+        if (gone) void native.fs.unwatch({ watchId: id }).catch(() => {});
         else watchId = id;
       })
       .catch(() => {
@@ -62,14 +62,14 @@ export function useRecordFile(path: string | undefined): RecordFile {
     return () => {
       gone = true;
       off();
-      if (watchId) void native.fs.unwatch(watchId).catch(() => {});
+      if (watchId) void native.fs.unwatch({ watchId }).catch(() => {});
     };
   }, [real, read]);
 
   const save = useCallback(
     async (next: string) => {
       if (!real) throw new Error('No file on disk');
-      await native.fs.writeText(real, next);
+      await native.fs.writeText({ path: real, text: next });
       seq.current++;
       setText(next);
       setError(undefined);

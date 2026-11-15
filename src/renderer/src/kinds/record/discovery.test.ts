@@ -10,11 +10,11 @@ vi.mock('../../native', () => ({
   isDesktop: true,
   native: {
     fs: {
-      list: async (_dir: string, opts?: { glob?: string }) =>
-        opts?.glob === 'records'
+      list: async ({ options }: { dir: string; options?: { glob?: string } }) =>
+        options?.glob === 'records'
           ? [{ path: 'C:\\code\\r\\records', name: 'records', isDir: true }]
           : Object.keys(files).map((path) => ({ path, name: path.replace('C:\\code\\r\\records\\', '').replace(/\\/g, '/'), isDir: false })),
-      readText: async (p: string) => files[p],
+      readText: async ({ path }: { path: string }) => files[path],
       watch: async () => 'w1',
       unwatch: async () => {},
       onChanged: () => () => {},

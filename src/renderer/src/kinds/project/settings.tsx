@@ -32,7 +32,7 @@ export async function detectFromBaseDir(dir: string, v: FormValues): Promise<Par
   if (git?.repo && (!str(v, 'repo') || !REPO.test(str(v, 'repo')) || str(v, 'repo').startsWith('unknown/'))) patch.repo = git.repo;
   if (git?.branch && (!str(v, 'defaultBranch') || str(v, 'defaultBranch') === defaultBranch)) patch.defaultBranch = git.branch;
   try {
-    const pkg = JSON.parse(await native.fs.readText(`${dir}${sep(dir)}package.json`)) as { scripts?: Record<string, string> };
+    const pkg = JSON.parse(await native.fs.readText({ path: `${dir}${sep(dir)}package.json` })) as { scripts?: Record<string, string> };
     const scripts = pkg.scripts ?? {};
     if (!str(v, 'startCommand')) patch.startCommand = scripts.dev ? 'npm run dev' : scripts.start ? 'npm start' : '';
     if (!str(v, 'testCommand') && scripts.test) patch.testCommand = 'npm test';

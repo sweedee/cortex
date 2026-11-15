@@ -11,7 +11,7 @@ import { qk } from './queryKeys';
 
 /** Full issue (REST v3 shape: ADF description, comments, links, …). */
 export function useJiraIssue(key: string | undefined) {
-  return useQuery({ queryKey: qk.jira.issue(key ?? ''), queryFn: () => native.jira.view(key!), enabled: ready(key) });
+  return useQuery({ queryKey: qk.jira.issue(key ?? ''), queryFn: () => native.jira.view({ key: key! }), enabled: ready(key) });
 }
 
 /** with the site's custom field ids (config.json `jira.fields`) */
@@ -19,11 +19,11 @@ const summarize = (issue: JiraIssue) => summarizeIssue(issue, userConfig().jira.
 
 /** The same query reduced to `JiraIssueSummary` (status, type, assignee, sprint, points). */
 export function useJiraIssueSummary(key: string | undefined) {
-  return useQuery({ queryKey: qk.jira.issue(key ?? ''), queryFn: () => native.jira.view(key!), enabled: ready(key), select: summarize });
+  return useQuery({ queryKey: qk.jira.issue(key ?? ''), queryFn: () => native.jira.view({ key: key! }), enabled: ready(key), select: summarize });
 }
 
 export function useJiraSearch(jql: string | undefined, limit?: number) {
-  return useQuery({ queryKey: qk.jira.search(jql ?? '', limit), queryFn: () => native.jira.search(jql!, { limit }), enabled: ready(jql) });
+  return useQuery({ queryKey: qk.jira.search(jql ?? '', limit), queryFn: () => native.jira.search({ jql: jql!, limit }), enabled: ready(jql) });
 }
 
 /**
@@ -43,7 +43,7 @@ export function jiraUrl(key: string): string {
  */
 export function loadJiraStatuses(project: string): Promise<JiraStatusOption[]> {
   return queryClient
-    .fetchQuery({ queryKey: qk.jira.statuses(project), queryFn: () => native.jira.statuses(project), staleTime: 10 * 60_000 })
+    .fetchQuery({ queryKey: qk.jira.statuses(project), queryFn: () => native.jira.statuses({ project }), staleTime: 10 * 60_000 })
     .catch((e: unknown) => {
       console.warn('[jira] statuses', project, e);
       return [];
@@ -53,7 +53,7 @@ export function loadJiraStatuses(project: string): Promise<JiraStatusOption[]> {
 /** Writes. Each invalidates the issue and every search. */
 export const jiraOps = {
   async transition(key: string, status: string) {
-    await native.jira.transition(key, status);
+    await native.jira.transition({ key, status });
     await invalidate(qk.jira.issue(key), qk.jira.searches());
   },
   async create(req: JiraCreateIssueRequest) {
@@ -62,7 +62,7 @@ export const jiraOps = {
     return issue;
   },
   async comment(key: string, body: string) {
-    const c = await native.jira.comment(key, body);
+    const c = await native.jira.comment({ key, body });
     await invalidate(qk.jira.issue(key));
     return c;
   },

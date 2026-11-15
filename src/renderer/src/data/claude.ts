@@ -15,12 +15,12 @@ export function useClaudeSessions() {
 
 /** One session with its folded messages (user / assistant / tool rows), status, usage. */
 export function useClaudeSession(localId: string | undefined) {
-  return useQuery({ queryKey: qk.claude.session(localId ?? ''), queryFn: () => native.claude.session(localId!), enabled: ready(localId), staleTime: 5_000 });
+  return useQuery({ queryKey: qk.claude.session(localId ?? ''), queryFn: () => native.claude.session({ localId: localId! }), enabled: ready(localId), staleTime: 5_000 });
 }
 
 /** Raw stream-json events (replay with `replayTranscript` for a custom view). */
 export function useClaudeTranscript(localId: string | undefined) {
-  return useQuery({ queryKey: qk.claude.transcript(localId ?? ''), queryFn: () => native.claude.transcript(localId!), enabled: ready(localId), staleTime: Infinity });
+  return useQuery({ queryKey: qk.claude.transcript(localId ?? ''), queryFn: () => native.claude.transcript({ localId: localId! }), enabled: ready(localId), staleTime: Infinity });
 }
 
 /** Slash commands, skills and models the CLI offers (fetched once; a probe answers before the first session). */
@@ -38,22 +38,22 @@ export const claudeOps = {
     return s;
   },
   async send(localId: string, text: string) {
-    const s = await native.claude.send(localId, text);
+    const s = await native.claude.send({ localId, text });
     await touched(localId);
     return s;
   },
-  answer: (localId: string, toolUseId: string, answers: ClaudeAnswers) => native.claude.answer(localId, toolUseId, answers),
-  permission: (localId: string, requestId: string, decision: ClaudePermissionDecision) => native.claude.permission(localId, requestId, decision),
-  interrupt: (localId: string) => native.claude.interrupt(localId),
+  answer: (localId: string, toolUseId: string, answers: ClaudeAnswers) => native.claude.answer({ localId, toolUseId, answers }),
+  permission: (localId: string, requestId: string, decision: ClaudePermissionDecision) => native.claude.permission({ localId, requestId, decision }),
+  interrupt: (localId: string) => native.claude.interrupt({ localId }),
   /** model / effort / permission mode of a session: live when the process can take it (see the result) */
   async configure(localId: string, c: ClaudeConfigureRequest) {
-    const r = await native.claude.configure(localId, c);
+    const r = await native.claude.configure({ localId, ...c });
     await touched(localId);
     return r;
   },
-  stop: (localId: string) => native.claude.stop(localId),
+  stop: (localId: string) => native.claude.stop({ localId }),
   async remove(localId: string) {
-    const r = await native.claude.remove(localId);
+    const r = await native.claude.remove({ localId });
     await touched(localId);
     return r;
   },

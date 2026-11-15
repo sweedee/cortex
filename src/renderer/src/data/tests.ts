@@ -11,7 +11,7 @@ export function useTestRuns() {
 
 /** Output of a run; `sync/live.ts` appends live `test:output` chunks to this cache. */
 export function useTestLog(id: string | undefined) {
-  return useQuery({ queryKey: qk.tests.log(id ?? ''), queryFn: () => native.tests.log(id!), enabled: ready(id), staleTime: Infinity });
+  return useQuery({ queryKey: qk.tests.log(id ?? ''), queryFn: () => native.tests.log({ id: id! }), enabled: ready(id), staleTime: Infinity });
 }
 
 /** Writes. Use the item id as the runner id (`testrun.data.procId = item.id`). */
@@ -21,5 +21,5 @@ export const testOps = {
     await invalidate(qk.tests.list(), qk.tests.log(req.id));
     return s;
   },
-  stop: (id: string) => native.tests.stop(id),
+  stop: (id: string) => native.tests.stop({ id }),
 };
