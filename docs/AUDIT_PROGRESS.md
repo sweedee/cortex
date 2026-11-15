@@ -20,7 +20,8 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 |---|---|---|---|---|
 | 6 | Agent transcripts: incremental processing, memoized rows, length cap (§6) | opus | ✅ | `3cb9f2a`. Incremental builder (~90× faster per event at 3.4k events), per-frame batching, memoized rows, 150-block display window, cache evicted on remove/archive. Open: main-side `e.events` still unbounded (drop deltas once the final message arrives); transcript refetch after send |
 | 7 | Sync-failure badge per item; Undo for remove (§7) | sonnet | ✅ | `f56ea48`. Ephemeral `sync` map in store, "!" badge + sidebar line, one toast per repo; `removeItems`→snapshot / `restoreRemoved`, 6 s Undo toast. Open: shared `checks:…` jobs have no bubble badge; not checked in the running app |
-| 8 | `~/.cortex/config.json`; move machine prefs out of the workspace; configurable Jira fields, branch template, editor, records folder (§3) | opus | 🔄 | Per-repo `.cortex.json` out of scope for now |
+| 8 | `~/.cortex/config.json`; move machine prefs out of the workspace; configurable Jira fields, branch template, editor, records folder (§3) | opus | ✅ | `46bde88`, `661fc9f`. `src/shared/userConfig.ts` (per-field `.catch`), watched `~/.cortex/config.json` + generated `config.schema.json`, `config:get/update/changed`; renderer may only patch gear-dialog keys (editor, `claude.bin`, jira/git/records are file-only); workspace v4 moves prefs into config once. Configurable: Jira field ids, branch & worktrees templates, editor, records dir, default branch, context window, Renovate, AI review bot. Packaged builds ignore the remaining `CORTEX_*` env vars. Open: per-repo `.cortex.json`; timeouts / refresher speed / GitHub host / `ui.theme` not in config yet (→ item 8b) |
+| 8b | Config follow-ups: `ui.theme` (wire `useThemePref`), exec/rebase timeouts, output cap, refresher fast interval and parallelism | sonnet | 🔄 | GitHub host waits for item 14 (touches `kinds/project`, `kinds/pr`) |
 | 9 | Structured IPC errors; zod-validate `gh` and `acli` JSON (§4) | sonnet | ✅ | `648e5af`. `shared/ipcError.ts` codes (CLI_MISSING/TIMEOUT/EXIT/PARSE/VALIDATION/FORBIDDEN/UNKNOWN) encoded in the IPC error; lenient zod schemas for gh/acli; git runs with `LC_ALL=C`; SIGKILL 3 s after SIGTERM; `truncated` on exec results; one `onShutdown` hook. Open: `truncated` not shown in UI; gh/acli text regexes not centralized; `/unknown app/` and worktree-removal regexes remain |
 | 10 | CI: GitHub Actions typecheck, lint, test (§9) | haiku | ✅ | `b0e0b3d`. Ubuntu + Windows matrix, `engines` added. Not yet run on GitHub (branch not pushed) |
 
@@ -29,7 +30,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 | # | Item | Agent | Status | Commit / notes |
 |---|---|---|---|---|
 | 11 | Packaging: electron-builder, `asarUnpack` jira-mock, icon, signing, updates (§9) | sonnet | ✅ | `f74c1fe`. electron-builder 26.18.1 (nsis / dmg / AppImage), `dist` / `dist:dir` / `icons` scripts, jira-mock + seed unpacked, `unpackedAsar()` path fix, icon (svg/png/ico), v0.1.0, `docs/RELEASING.md`. Renderer deps moved to devDependencies (asar 410 MB → 21 MB). Packaged Windows app starts. Open: macOS/Linux builds and the installer not run; no signing certs; auto-update not implemented; README doesn't mention `dist` yet |
-| 12 | First run: opt-in demo world; explicit "Jira not configured" state (§9) | | ⬜ | |
+| 12 | First run: opt-in demo world; explicit "Jira not configured" state (§9) | sonnet | 🔄 | |
 | 13 | Real-world runs: real Claude session, throwaway PR (§10) | — | ⏸ | Needs the user: real GitHub and Claude accounts |
 
 ## Ongoing: maintainability
@@ -37,7 +38,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 | # | Item | Agent | Status | Commit / notes |
 |---|---|---|---|---|
 | 14 | Kind-specific code into the module: `describe`, `cwdOf`, `sync`, `multiActions`; derive `KINDS`/`ItemSchema`; remove project→deployment import (§2.1) | opus | 🔄 | |
-| 15 | Generate IPC forwarders; derive `CortexApi`; `CodeHost` interface (§2.2) | | ⬜ | |
+| 15 | Generate IPC forwarders; derive `CortexApi`; `CodeHost` interface (§2.2) | opus | 🔄 | |
 | 16 | Canvas rendering: positions via refs; chat draft stops re-rendering canvas (§6) | opus | ✅ | `6685e39`, `1559633`. Positions written from layout ticks via refs (`canvas/positions.ts`), memoized links, ResizeObserver chat rect, stable views, `draftMentions` selector, gentler reheat; backdrop 30 fps with idle pause; float only on selected/running; timers cleaned. Open: offscreen culling; `patchItem` still remaps the array; **needs a hand check in the UI** (see log) |
 | 17 | Accessibility and theming: keyboard/ARIA for bubbles, Strato tokens, z-index scale, light theme, `react-intl` decision (§7) | opus | ✅ | `2ca1de1` (theming), `e155513` (a11y). Tokens with dark/light/system (`R/theme.ts`), `--ink-faint` ≥ 4.5:1, `--z-*` scale, flattened shadows, shared metrics; bubbles get role/aria-label/roving tabindex/arrow-key nav, status glyphs, focus return, `useAutoFocus`, IME-safe Enter, `?` shortcuts overlay from one table. **`react-intl` must stay**: Strato's AppRoot imports it (peer dep). Open: `useThemePref()` returns `'system'` until item 8 adds `ui.theme`; screen-reader list view; hover card on focus; rebindable shortcuts |
 | 18 | Cleanup: dead code, helper de-duplication (`normPath`), `oxlint-disable`, `noUncheckedIndexedAccess`, formatter (§8) | | ⬜ | |
@@ -52,6 +53,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 - 2026-11-15: item 9 done in `648e5af` (381 tests pass). Item 11 dispatched.
 - 2026-11-15: item 16 done in `6685e39`, `1559633`; item 17 dispatched.
 - 2026-11-15: item 11 done in `f74c1fe` (packaged Windows app starts); item 17 done in `2ca1de1`, `e155513` (437 tests pass). Item 14 dispatched.
+- 2026-11-15: item 8 done in `46bde88`, `661fc9f`; items 8b, 12 and 15 dispatched.
 
 ## Check by hand in the UI
 
