@@ -4,7 +4,7 @@
  * helpers in `registry.ts`), never through `switch (item.kind)`.
  */
 import type { ComponentType, ReactElement } from 'react';
-import type { Item, ItemOf, Kind, Link, NewItem, Segment, Tone } from '../domain';
+import type { Item, ItemOf, Kind, Link, LinkLabel, NewItem, Segment, Tone } from '../domain';
 
 export type ActionKind = 'skill' | 'external' | 'direct' | 'view';
 
@@ -72,6 +72,52 @@ export interface Addable {
    * instead of the single input field. `create` still serves paste detection / tests.
    */
   open?: (at: { x: number; y: number }) => void;
+  /**
+   * The label of the link from a new item to the project picked in the add dialog (default
+   * 'belongs to'); `false` = the kind never belongs to a project (no project picker).
+   */
+  linkLabel?: LinkLabel | false;
+  /** add one to a given project (the project sidebar's section button); default: the add dialog */
+  openIn?: (project: ItemOf<'project'>) => void;
+}
+
+/** A section listing a project's items of this kind in the project sidebar (and a count in its facts). */
+export interface ProjectSection<K extends Kind = Kind> {
+  /** plural heading / fact name, e.g. "Deployments" */
+  label: string;
+  /** button label, e.g. "Add deployment" (calls `addable.openIn`) */
+  addLabel?: string;
+  empty?: string;
+  /** chip on a row (default: the kind's badge) */
+  chip?: (item: ItemOf<K>) => Badge | undefined;
+  /** an "open" button on a row */
+  url?: (item: ItemOf<K>) => string | undefined;
+  /** row tooltip */
+  hint?: (item: ItemOf<K>) => string | undefined;
+}
+
+/** One background refresh job (`sync/refresher.ts` runs them with back-off and concurrency limits). */
+export interface SyncJob {
+  /** the item id; jobs shared by several items use another key (e.g. `checks:<repo>#<n>`), the first one wins */
+  id: string;
+  /** shared back-off key (e.g. `gh:<repo>`, `jira`), besides the job itself */
+  group?: string;
+  /** poll at the fast interval (something is running) */
+  fast: boolean;
+  run: () => Promise<void>;
+}
+
+/**
+ * A kind backed by a process / session in main: its push events and the startup reconciliation
+ * (`sync/live.ts` drives them). `L` is what main lists at start (sessions, processes).
+ */
+export interface LiveSync<K extends Kind = Kind, L = unknown> {
+  /** subscribe to main's push events for this kind; returns the unsubscribe */
+  start: () => () => void;
+  /** what main runs now (startup reconciliation) */
+  list(): Promise<L>;
+  /** bring one item in line with `list`'s result (items that never really ran are left alone); method syntax so `L` may be narrower */
+  reconcile(item: ItemOf<K>, running: L): void;
 }
 
 export interface KindModule<K extends Kind = Kind> {
@@ -103,6 +149,28 @@ export interface KindModule<K extends Kind = Kind> {
   primaryAction?: (item: ItemOf<K>, ctx: KindCtx) => string | undefined;
   /** "Mark done": the data patch it applies before archiving. Absent = the kind can only be archived. */
   complete?: (item: ItemOf<K>) => Partial<ItemOf<K>['data']>;
+  /** label of the `complete` action (default "Mark done") */
+  completeLabel?: string;
+  /**
+   * Actions for a multi-selection, given the selected items of this kind (`only`: every selected item
+   * is of this kind). Their `run` gets the whole selection. Shared ones (ask, summary, link, archive) are added.
+   */
+  multiActions?: (items: ItemOf<K>[], only: boolean) => Action[];
+  /**
+   * What the item is, for the chat box's context block (`@handle = <this>`), e.g.
+   * `GitHub pull request o/r#12 "Fix retry" (feat/x → main, open)`.
+   */
+  describe: (item: ItemOf<K>, ctx: KindCtx) => string;
+  /** the item's working folder (agent sessions start there; it is a file root) */
+  cwdOf?: (item: ItemOf<K>) => string | undefined;
+  /** other folders / files the item points at (file roots for main besides `cwdOf`) */
+  paths?: (item: ItemOf<K>) => (string | undefined)[];
+  /** background refresh jobs for a (non-archived) item */
+  sync?: (item: ItemOf<K>) => SyncJob[];
+  /** push events / startup reconciliation for process-backed kinds */
+  live?: LiveSync<K>;
+  /** a section in the project sidebar listing the project's items of this kind */
+  projectSection?: ProjectSection<K>;
   /** details panel body; default = `DefaultSidebar` (status, facts, connections) */
   Sidebar?: ComponentType<SidebarProps<K>>;
   addable?: Addable;

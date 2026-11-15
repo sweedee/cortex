@@ -1,6 +1,6 @@
 import { EditIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { external } from '../common';
+import { external, paren } from '../common';
 import { RocketIcon } from '../icons';
 import type { KindModule } from '../types';
 import { openDeploymentForm } from './form';
@@ -40,6 +40,15 @@ export const deployment: KindModule<'deployment'> = {
     ['Health', `${data.health ?? 'unknown'} (mocked)`],
   ],
 
+  describe: ({ data: d }) => `${d.stageLabel ?? d.stage} deployment at ${d.url}${paren([d.version])}`,
+  projectSection: {
+    label: 'Deployments',
+    addLabel: 'Add deployment',
+    empty: 'No deployments yet.',
+    url: (d) => d.data.url,
+    hint: (d) => d.data.url,
+  },
+
   actions: () => [
     external('open', 'Open', (i) => (i.kind === 'deployment' ? i.data.url : ''), { primary: true }),
     {
@@ -57,6 +66,7 @@ export const deployment: KindModule<'deployment'> = {
     label: 'Add deployment…',
     hint: 'URL, e.g. https://dev.example.com',
     detect: (v) => /^https?:\/\//.test(v) && !/github\.com|\/browse\//.test(v),
+    openIn: (project) => void openDeploymentForm({ project }),
     create: (v, proj) => {
       const stage = guessStage(v);
       const name = proj?.title ?? (v.replace(/^https?:\/\//, '').split(/[/.]/)[0] || 'app');

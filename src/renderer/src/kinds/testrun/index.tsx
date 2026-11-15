@@ -3,10 +3,11 @@ import { testOps } from '../../data/tests';
 import type { ItemOf } from '../../domain';
 import { inspect, patchData } from '../../store';
 import { runTask } from '../../ui/task';
-import { skill, toast } from '../common';
+import { paren, skill, toast } from '../common';
 import { FlaskIcon } from '../icons';
 import type { KindModule } from '../types';
 import { rerunBlocked, runRequest, startPatch, stopBlocked, testrunRing } from './logic';
+import { testrunLive } from './live';
 import { TestRunSidebar } from './Sidebar';
 
 export { testrunRing } from './logic';
@@ -53,6 +54,13 @@ export const testrun: KindModule<'testrun'> = {
       ...(wt ? [['Worktree', wt.handle] as [string, string]] : []),
     ];
   },
+
+  describe: ({ data: d }) => {
+    const s = d.summary;
+    return `test run \`${d.command}\`${paren([d.cwd && `in ${d.cwd}`, d.state, s && `${s.passed} passed, ${s.failed} failed`])}`;
+  },
+  cwdOf: (t) => t.data.cwd,
+  live: testrunLive,
 
   actions: ([t]) => {
     const running = t.data.state === 'running';

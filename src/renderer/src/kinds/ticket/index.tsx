@@ -1,11 +1,12 @@
 import { PlusIcon, StepIcon, SuccessIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { external, skill } from '../common';
+import { external, paren, quoted, skill } from '../common';
 import { openNewWorktree } from '../project/worktreeFlow';
 import type { KindModule } from '../types';
 import { completeTickets, openChangeStatus, ticketUrl } from './actions';
 import { TicketIcon } from './icon';
 import { TicketSidebar } from './Sidebar';
+import { ticketSync } from './sync';
 
 const BLOCKER = /blocker|highest/i;
 
@@ -34,6 +35,13 @@ export const ticket: KindModule<'ticket'> = {
     ['Points', data.points != null ? String(data.points) : '–'],
     ...(data.branch ? [['Branch', data.branch] as [string, string]] : []),
   ],
+
+  describe: (t) => {
+    const d = t.data;
+    return `Jira ticket ${d.key} ${quoted(t.title)}${paren([d.status, d.type, d.branch && `branch ${d.branch}`])}`;
+  },
+  sync: ticketSync,
+  multiActions: () => [skill('plan-multi', 'Plan together', 'plan')],
 
   actions: ([t], ctx) => {
     const todo = t.data.statusCategory === 'new' || ticketRing(t)[0].tone === 'critical';
@@ -76,6 +84,7 @@ export const ticket: KindModule<'ticket'> = {
   addable: {
     label: 'Import Jira ticket…',
     hint: 'CTX-1234 or a Jira URL',
+    linkLabel: 'in project',
     detect: (v) => /^[A-Z][A-Z0-9]+-\d+$/.test(v) || /\/browse\//.test(v),
     create: (v) => {
       const key = v.match(/[A-Z][A-Z0-9]+-\d+/)?.[0] ?? v;

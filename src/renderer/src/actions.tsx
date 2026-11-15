@@ -11,7 +11,7 @@ import { isRealPath, type Item, type ItemOf, type Kind, type NewLink } from './d
 import { camera, place } from './layout';
 import { archive, archiveAction, removeAction, skill, toast, unarchiveAction } from './kinds/common';
 import { actionsForItem, ctxOf, KINDS, getKind } from './kinds/registry';
-import type { Action } from './kinds/types';
+import type { Action, KindModule } from './kinds/types';
 import { isDesktop } from './native';
 import { addItem, addLink, getState, insertSkill, inspect, itemById, newId, notify, openDialog, patchData, select } from './store';
 import { openForm } from './ui/form';
@@ -22,11 +22,13 @@ export { actionsForItem } from './kinds/registry';
 
 /** Actions that act on a whole multi-selection. */
 function multiActions(items: Item[]): Action[] {
-  const kinds = new Set(items.map((i) => i.kind));
   const out: Action[] = [skill('ask', 'Ask about these', '', { icon: <ChatIcon />, primary: true, run: (xs) => insertSkill(null, xs.map((x) => x.id)) })];
-  if (kinds.has('ticket')) out.push(skill('plan-multi', 'Plan together', 'plan'));
-  if (kinds.size === 1 && kinds.has('pr')) out.push(skill('review-multi', 'Review all', 'review-pr'));
-  if (kinds.size === 1 && kinds.has('build')) out.push(skill('fix-multi', 'Fix all builds', 'fix-ci'));
+  // the kinds' own multi-select actions, in kind order
+  for (const k of KINDS) {
+    const mine = items.filter((i) => i.kind === k);
+    const fn = (getKind(k) as unknown as KindModule).multiActions;
+    if (mine.length && fn) out.push(...fn(mine, mine.length === items.length));
+  }
   out.push(skill('summary', 'Status summary', 'status-summary'));
   if (items.every((i) => i.archived)) return [unarchiveAction, out[0]];
   if (items.length === 2) {
@@ -175,6 +177,9 @@ export const KINDS_ADDABLE: { kind: Kind; label: string; hint: string }[] = KIND
   const a = getKind(k).addable;
   return a ? [{ kind: k, label: a.label, hint: a.hint }] : [];
 });
+
+/** The kind the canvas's "Paste a link…" opens the add dialog with: the first one that recognises pasted references (the dialog switches kind as you paste). */
+export const PASTE_KIND: Kind = KINDS.find((k) => getKind(k).addable?.detect && !getKind(k).addable?.open) ?? KINDS[0];
 
 /** Items linked to the given ones (not themselves). */
 export function relatedItems(ids: string[]): Item[] {

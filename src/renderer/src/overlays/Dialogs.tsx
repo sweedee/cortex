@@ -68,10 +68,11 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
   const submit = () => {
     const v = value.trim();
     if (!v) return;
-    const proj = projects.find((p) => p.id === project && kind !== 'project');
+    const linkLabel = meta.linkLabel ?? 'belongs to';
+    const proj = linkLabel ? projects.find((p) => p.id === project) : undefined;
     const item = makeItem({ ...meta.create(v, proj), ...(proj && { projectId: proj.id }) });
     place.seed(item.id, at);
-    addItem(item, proj ? [{ from: item.id, to: proj.id, label: kind === 'ticket' ? 'in project' : 'belongs to' }] : []);
+    addItem(item, proj && linkLabel ? [{ from: item.id, to: proj.id, label: linkLabel }] : []);
     closeDialog();
     select([item.id]);
     showToast({ type: 'success', title: `${kindLabel(kind)} added`, message: item.title, lifespan: 2500 });
@@ -143,7 +144,7 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
             Looks like a {kindLabel(guessed).toLowerCase()}, switched type for you.
           </Text>
         )}
-        {kind !== 'project' && (
+        {meta.linkLabel !== false && (
           <FormField>
             <Label>Link to project</Label>
             <Flex gap={6} flexWrap="wrap">

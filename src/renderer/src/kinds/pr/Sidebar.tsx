@@ -21,7 +21,7 @@ import { DiffViewer, Markdown, WebPanel } from '../../components/viewers';
 import { toast } from '../common';
 import type { KindCtx, SidebarProps } from '../types';
 import { retargetPr } from './actions';
-import { planBuildSync } from './builds';
+import { planBuildSync } from '../../sync/checks';
 import { isAiReviewer, isRealRepo, needsRetarget, prUrl } from './logic';
 import './pr.css';
 

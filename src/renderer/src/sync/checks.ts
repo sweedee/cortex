@@ -3,8 +3,8 @@
  * repo + name + PR number. Existing ones are updated in place; missing ones are only created
  * when the user asks ("Add to canvas" in the PR sidebar). Pure.
  */
-import type { GhCheck } from '../../../../shared/integrations/github';
-import type { BuildData, Item, ItemOf, NewItem } from '../../domain';
+import type { GhCheck } from '../../../shared/integrations/github';
+import type { BuildData, Item, ItemOf, NewItem } from '../domain';
 
 type BuildPatch = Partial<BuildData>;
 

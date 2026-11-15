@@ -3,7 +3,7 @@ import type { ClaudeEvent } from '../../../shared/integrations/claude';
 import { queryClient } from '../data/queryClient';
 import { qk } from '../data/queryKeys';
 import type { Item } from '../domain';
-import { evictTranscripts, flushClaudeEvents, queueClaudeEvent } from './live';
+import { evictTranscripts, flushClaudeEvents, queueClaudeEvent } from '../kinds/agent/live';
 
 const ev = (n: number) => ({ type: 'system', subtype: 'status', n }) as unknown as ClaudeEvent;
 const agent = (localId: string, archived?: boolean) => ({ id: `i-${localId}`, kind: 'agent', title: localId, archived, data: { cwd: '', status: 'idle', localId } }) as unknown as Item;

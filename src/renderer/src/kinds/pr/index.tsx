@@ -1,11 +1,12 @@
 import { AiIcon, CheckmarkIcon, CycleIcon, ArrowDownRightIcon } from '@dynatrace/strato-icons';
 import { userConfig } from '../../data/config';
-import { external, skill } from '../common';
+import { external, paren, quoted, skill } from '../common';
 import { PullRequestIcon } from '../icons';
 import type { Action, KindModule } from '../types';
 import { openMerge, rebasePr, retargetPr, triggerAiReview } from './actions';
 import { ghBlocked, hasConflicts, isMergeable, mergeBlocked, needsRetarget, prRing, prUrl } from './logic';
 import { PrSidebar } from './Sidebar';
+import { prSync } from './sync';
 
 export { isMergeable, prRing } from './logic';
 
@@ -31,6 +32,13 @@ export const pr: KindModule<'pr'> = {
       ...(stacked ? [['Stacked on', stacked.handle] as [string, string]] : []),
     ];
   },
+
+  describe: (p) => {
+    const d = p.data;
+    return `GitHub pull request ${d.repo}#${d.number} ${quoted(p.title)}${paren([d.headBranch && `${d.headBranch} → ${d.baseBranch}`, d.isDraft ? 'draft' : d.state])}`;
+  },
+  sync: prSync,
+  multiActions: (_, only) => (only ? [skill('review-multi', 'Review all', 'review-pr')] : []),
 
   actions: ([p], ctx) => {
     const blocked = ghBlocked(p.data);

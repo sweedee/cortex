@@ -9,68 +9,14 @@
  * - `agentTarget`: exactly one real agent mentioned → the message goes to that session
  */
 import { isRealPath, type Item, type ItemOf } from '../domain';
-import type { KindCtx } from '../kinds/types';
+import type { KindCtx, KindModule } from '../kinds/types';
 
-const q = (s: string) => `"${s.replace(/"/g, "'")}"`;
-const first = (s: string, max = 100) => {
-  const l = s.trim().split(/\r?\n/)[0] ?? '';
-  return l.length > max ? l.slice(0, max - 1) + '…' : l;
-};
-const paren = (parts: (string | undefined | false)[]) => {
-  const p = parts.filter(Boolean);
-  return p.length ? ` (${p.join(', ')})` : '';
-};
+/** The module typed for "some item" (prompt.ts only has the union `Item`). */
+const moduleOf = (item: Item, ctx: KindCtx) => ctx.kind(item.kind) as unknown as KindModule;
 
-/** One context line for an item: `@handle = what it is`. */
+/** One context line for an item: `@handle = what it is` (the kind's `describe`). */
 export function contextLine(item: Item, ctx: KindCtx): string {
-  const at = `@${item.handle}`;
-  switch (item.kind) {
-    case 'project': {
-      const d = item.data;
-      return `${at} = project ${d.repo}${d.baseDir ? ` checked out at ${d.baseDir}` : ''}${paren([`default branch ${d.defaultBranch}`])}`;
-    }
-    case 'ticket': {
-      const d = item.data;
-      return `${at} = Jira ticket ${d.key} ${q(item.title)}${paren([d.status, d.type, d.branch && `branch ${d.branch}`])}`;
-    }
-    case 'worktree': {
-      const d = item.data;
-      return `${at} = git worktree at ${d.path} on branch ${d.branch}${paren([`base ${d.baseBranch}`, d.ticketKey && `ticket ${d.ticketKey}`])}`;
-    }
-    case 'record': {
-      const d = item.data;
-      return `${at} = ${d.recordType} record ${q(item.title)} at ${d.path}${paren([d.status, d.ticketKey && `ticket ${d.ticketKey}`])}`;
-    }
-    case 'pr': {
-      const d = item.data;
-      return `${at} = GitHub pull request ${d.repo}#${d.number} ${q(item.title)}${paren([d.headBranch && `${d.headBranch} → ${d.baseBranch}`, d.isDraft ? 'draft' : d.state])}`;
-    }
-    case 'agent': {
-      const d = item.data;
-      return `${at} = Claude Code session ${q(item.title)}${paren([d.cwd && `in ${d.cwd}`, d.status])}`;
-    }
-    case 'app': {
-      const d = item.data;
-      return `${at} = app started with \`${d.command}\`${paren([d.cwd && `in ${d.cwd}`, d.url, d.state])}`;
-    }
-    case 'build': {
-      const d = item.data;
-      return `${at} = CI build ${q(d.name)} on ${d.branch}${paren([d.conclusion ?? d.state, d.stage && `stage ${d.stage}`, d.url])}`;
-    }
-    case 'deployment': {
-      const d = item.data;
-      return `${at} = ${d.stageLabel ?? d.stage} deployment at ${d.url}${paren([d.version])}`;
-    }
-    case 'todo':
-      return `${at} = todo: ${first(item.data.body || item.title)}`;
-    case 'testrun': {
-      const d = item.data;
-      const s = d.summary;
-      return `${at} = test run \`${d.command}\`${paren([d.cwd && `in ${d.cwd}`, d.state, s && `${s.passed} passed, ${s.failed} failed`])}`;
-    }
-  }
-  // exhaustive above; keeps the linter happy if a kind is added
-  return `${at} = ${(item as Item).title} (in ${ctx.projectOf(item)?.title ?? 'no project'})`;
+  return `@${item.handle} = ${moduleOf(item, ctx).describe(item, ctx)}`;
 }
 
 /** The prompt sent to Claude: the draft unchanged + a context block for the mentioned items. */
@@ -109,8 +55,8 @@ export function resolveCwd(mentioned: Item[], ctx: KindCtx): CwdChoice | null {
       }
       return null;
     }),
-    // 3. a mentioned app / test run / agent directory
-    ...mentioned.filter((m) => m.kind === 'app' || m.kind === 'testrun' || m.kind === 'agent').map((m) => () => pick(m, (m.data as { cwd: string }).cwd)),
+    // 3. a mentioned item's own working folder (app / test run / agent; a worktree's path was tried above)
+    ...mentioned.map((m) => () => pick(m, moduleOf(m, ctx).cwdOf?.(m))),
     // 4. the project's base checkout
     ...mentioned.map((m) => () => {
       const p = projectOf(m);

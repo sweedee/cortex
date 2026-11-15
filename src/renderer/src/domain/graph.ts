@@ -50,3 +50,6 @@ export function rootsOf(items: Item[], links: Link[], kind: Kind, levelOf: Level
 
 /** An absolute path a process can run in (`C:\…`, `C:/…`, `/…`, `\server\…`); demo paths like `~/code/x` are not. */
 export const isRealPath = (p: string | undefined): p is string => !!p && /^([A-Za-z]:[\\/]|\/|\\\\)/.test(p);
+
+/** A GitHub `owner/name` Cortex can reach (demo repos `unknown/…` are not). */
+export const isRealRepo = (r: string | undefined) => !!r && /^[\w.-]+\/[\w.-]+$/.test(r) && !r.startsWith('unknown/');

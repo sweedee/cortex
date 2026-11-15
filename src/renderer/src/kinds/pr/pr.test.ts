@@ -4,7 +4,7 @@ import type { ItemOf, PrData } from '../../domain';
 import { SEED_ITEMS, SEED_LINKS } from '../../testing/fakeWorld';
 import { makeItem } from '../../store';
 import { makeCtx } from '../registry';
-import { buildKey, checkToBuild, planBuildSync, runIdFromUrl } from './builds';
+import { buildKey, checkToBuild, planBuildSync, runIdFromUrl } from '../../sync/checks';
 import { pr as prKind } from './index';
 import { ghBlocked, isAiReviewer, isMergeable, mergeArgs, mergeBlocked, mergeWarnings, needsRetarget, prRing, retargetPlan, stackChildren, worktreeOf } from './logic';
 

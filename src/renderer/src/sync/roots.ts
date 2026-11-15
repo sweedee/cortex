@@ -1,11 +1,13 @@
 /**
  * Tell main which folders Cortex works in (`fs:setRoots`): main refuses `fs:*`, `shell:openPath`,
  * `shell:openInEditor` and the cwd of app / test runs outside them (see ARCHITECTURE.md, Trust model).
- * The roots come from the items: project base checkouts and worktrees folders, worktrees, app / test /
- * agent working folders, record files. Re-sent whenever that set changes.
+ * The roots come from the items: each kind's working folder (`KindModule.cwdOf`: worktrees, app / test /
+ * agent folders) and other paths (`KindModule.paths`: project base checkouts and worktrees folders, record files). Re-sent whenever that set changes.
  */
 import { native } from '../native';
 import type { Item } from '../domain/types';
+import { getKind } from '../kinds/registry';
+import type { KindModule } from '../kinds/types';
 import { getState, subscribe } from '../store';
 
 const isAbs = (p: string | undefined): p is string => !!p && /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(p);
@@ -17,25 +19,9 @@ export function rootsOf(items: readonly Item[]): string[] {
     if (isAbs(p)) out.add(p);
   };
   for (const i of items) {
-    switch (i.kind) {
-      case 'project':
-        add(i.data.baseDir);
-        add(i.data.worktreesDir);
-        break;
-      case 'worktree':
-        add(i.data.path);
-        break;
-      case 'record':
-        add(i.data.path);
-        break;
-      case 'app':
-      case 'testrun':
-      case 'agent':
-        add(i.data.cwd);
-        break;
-      default:
-        break;
-    }
+    const m = getKind(i.kind) as unknown as KindModule;
+    add(m.cwdOf?.(i));
+    for (const p of m.paths?.(i) ?? []) add(p);
   }
   return [...out].sort();
 }

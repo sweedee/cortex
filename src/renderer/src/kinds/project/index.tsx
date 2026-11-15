@@ -1,8 +1,9 @@
 import { PlusIcon, SettingIcon, WorkflowIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { external, openInEditorAction, openPathAction, skill } from '../common';
+import { external, openInEditorAction, openPathAction, paren, skill } from '../common';
 import type { KindModule } from '../types';
 import { ProjectSidebar } from './Sidebar';
+import { projectSync } from './sync';
 import { openProjectSettings } from './settings';
 import { openNewWorktree } from './worktreeFlow';
 import { hasBaseDir, SET_BASE_HINT } from './worktreeModel';
@@ -53,6 +54,10 @@ export const project: KindModule<'project'> = {
 
   subtitle: (p) => p.data.repo,
 
+  describe: ({ data: d }) => `project ${d.repo}${d.baseDir ? ` checked out at ${d.baseDir}` : ''}${paren([`default branch ${d.defaultBranch}`])}`,
+  paths: ({ data }) => [data.baseDir, data.worktreesDir],
+  sync: projectSync,
+
   actions: ([p]) => {
     const renovate = p.data.stats?.renovatePrs ?? 0;
     const base = p.data.baseDir;
@@ -85,6 +90,8 @@ export const project: KindModule<'project'> = {
   addable: {
     label: 'Add project…',
     hint: 'owner/repo',
+    // a project never belongs to a project
+    linkLabel: false,
     open: (at) => void openProjectSettings(undefined, at),
     create: (v) => {
       const name = v.split('/').pop()!.trim() || v;

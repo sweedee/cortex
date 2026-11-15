@@ -1,9 +1,10 @@
 import { CycleIcon, DesktopIcon, PlayIcon, StopIcon, TerminalIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
 import { inspect } from '../../store';
-import { external, openInEditorAction } from '../common';
+import { external, openInEditorAction, paren } from '../common';
 import type { Action, KindModule } from '../types';
 import { cannotStart, isLive, restartApp, startApp, stopApp } from './ops';
+import { appLive } from './live';
 import { AppSidebar, showAppTab } from './Sidebar';
 
 export function appRing({ data }: ItemOf<'app'>): Segment[] {
@@ -91,6 +92,10 @@ export const app: KindModule<'app'> = {
       ...(data.procId ? [['Process', data.procId] as [string, string]] : []),
     ];
   },
+
+  describe: ({ data: d }) => `app started with \`${d.command}\`${paren([d.cwd && `in ${d.cwd}`, d.url, d.state])}`,
+  cwdOf: (a) => a.data.cwd,
+  live: appLive,
 
   actions: ([a]) => appActions(a),
   Sidebar: AppSidebar,

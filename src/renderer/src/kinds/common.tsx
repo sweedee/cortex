@@ -5,8 +5,8 @@
 import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { CodeIcon, DeleteIcon, ExternalLinkIcon, FolderOpenIcon, SuccessIcon, UndoIcon } from '@dynatrace/strato-icons';
-import type { Item } from '../domain';
-import { insertSkill, patchData, removeItems, restoreItems, restoreRemoved, select, setArchived } from '../store';
+import type { Item, ItemOf, Kind } from '../domain';
+import { insertSkill, itemById, patchData, removeItems, restoreItems, restoreRemoved, select, setArchived } from '../store';
 import { openInEditor, openPath, openUrl } from '../ui/task';
 import { ArchiveIcon, skillIcon } from './icons';
 import type { Action, KindModule } from './types';
@@ -16,6 +16,27 @@ export type ToastType = 'info' | 'success' | 'warning' | 'critical';
 export const toast = (title: string, message?: string, type: ToastType = 'success') => showToast({ type, title, message, lifespan: 3000 });
 
 export const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+/** The current item with that id, if it (still) has that kind (async jobs re-read it after awaiting). */
+export function currentItem<K extends Kind>(id: string, kind: K): ItemOf<K> | undefined {
+  const it = itemById(id);
+  return it?.kind === kind ? (it as ItemOf<K>) : undefined;
+}
+
+// ---- `describe` text (chat box context lines) --------------------------------------------
+
+/** `"title"` with inner double quotes made single. */
+export const quoted = (s: string) => `"${s.replace(/"/g, "'")}"`;
+/** The first line, cut at `max` characters. */
+export const oneLine = (s: string, max = 100) => {
+  const l = s.trim().split(/\r?\n/)[0] ?? '';
+  return l.length > max ? l.slice(0, max - 1) + '…' : l;
+};
+/** ` (a, b)` from the parts that are set, or ''. */
+export const paren = (parts: (string | undefined | false)[]) => {
+  const p = parts.filter(Boolean);
+  return p.length ? ` (${p.join(', ')})` : '';
+};
 
 /** "@handle" for one item, "3 items" for several. */
 export const nameOf = (items: Item[]) => (items.length === 1 ? items[0].handle : plural(items.length, 'item'));
@@ -96,7 +117,7 @@ export function archive(items: Item[], verb = 'Archived', before?: (i: Item) => 
 export function completeAction(mod: KindModule): Action {
   return {
     id: 'complete',
-    label: mod.kind === 'agent' ? 'Complete' : 'Mark done',
+    label: mod.completeLabel ?? 'Mark done',
     type: 'direct',
     icon: <SuccessIcon />,
     run: (items) => archive(items, 'Completed', (i) => patchData(i.id, (mod.complete as (x: Item) => object)(i))),

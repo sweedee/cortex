@@ -3,12 +3,12 @@
  * No React, no store, no native calls (unit-tested in `logic.test.ts`).
  */
 import type { GhMergeMethod } from '../../../../shared/integrations/github';
-import type { Item, ItemOf, PrData, Segment } from '../../domain';
+import { isRealRepo, type Item, type ItemOf, type PrData, type Segment } from '../../domain';
 
 type Pr = ItemOf<'pr'>;
 
 /** A GitHub `owner/name` that gh can reach (demo items use `unknown/…`). */
-export const isRealRepo = (r: string | undefined) => !!r && /^[\w.-]+\/[\w.-]+$/.test(r) && !r.startsWith('unknown/');
+export { isRealRepo };
 
 export const prUrl = (d: Pick<PrData, 'repo' | 'number'>) => `https://github.com/${d.repo}/pull/${d.number}`;
 

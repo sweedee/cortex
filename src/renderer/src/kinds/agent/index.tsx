@@ -1,10 +1,11 @@
 import { AgentIcon } from '@dynatrace/strato-icons';
 import type { AgentData } from '../../domain';
 import { focusChat } from '../../store';
-import { toast } from '../common';
+import { paren, quoted, toast } from '../common';
 import type { KindModule } from '../types';
 import { agentActions } from './actions';
 import { agentRing } from './ring';
+import { agentLive } from './live';
 import { AgentSidebar } from './Sidebar';
 import { tokens } from './usage';
 
@@ -42,6 +43,14 @@ export const agent: KindModule<'agent'> = {
     ['Turns', data.usage?.turns != null ? String(data.usage.turns) : '–'],
     ...(data.cwd ? [['Directory', data.cwd] as [string, string]] : []),
   ],
+
+  describe: (a) => {
+    const d = a.data;
+    return `Claude Code session ${quoted(a.title)}${paren([d.cwd && `in ${d.cwd}`, d.status])}`;
+  },
+  cwdOf: (a) => a.data.cwd,
+  live: agentLive,
+  completeLabel: 'Complete',
 
   actions: ([a]) => agentActions(a),
   Sidebar: AgentSidebar,

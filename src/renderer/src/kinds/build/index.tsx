@@ -6,10 +6,11 @@ import type { ItemOf } from '../../domain';
 import { inspect, patchData } from '../../store';
 import { openForm } from '../../ui/form';
 import { openUrl } from '../../ui/task';
-import { skill, toast } from '../common';
+import { paren, quoted, skill, toast } from '../common';
 import type { KindModule } from '../types';
 import { buildFailed, buildRing, ciProvider, duration, externalLabel, rerunBlocked, rerunMode } from './logic';
 import { BuildSidebar } from './Sidebar';
+import { buildSync } from './sync';
 
 export { buildFailed, buildRing } from './logic';
 
@@ -60,6 +61,10 @@ export const build: KindModule<'build'> = {
     ['Stage', data.stage ?? (data.state === 'completed' ? 'done' : '–')],
     ['Workflow', data.name],
   ],
+
+  describe: ({ data: d }) => `CI build ${quoted(d.name)} on ${d.branch}${paren([d.conclusion ?? d.state, d.stage && `stage ${d.stage}`, d.url])}`,
+  sync: buildSync,
+  multiActions: (_, only) => (only ? [skill('fix-multi', 'Fix all builds', 'fix-ci')] : []),
 
   actions: ([b]) => {
     const failed = buildFailed(b);

@@ -6,7 +6,9 @@ import type { JiraIssue } from '../../../shared/integrations/jira';
 import type { AppState, TestState } from '../../../shared/integrations/runners';
 import { DEFAULT_PREFS, type AgentData, type AppData, type Item, type TestRunData } from '../domain';
 import { addItem, getState, itemById, replaceWorld } from '../store';
-import { onClaudeState, onTestState, reconcile } from './live';
+import { onClaudeState } from '../kinds/agent/live';
+import { onTestState } from '../kinds/testrun/live';
+import { reconcile } from './live';
 import { agentStatusOf, changes, mapAppState, mapClaudeState, mapTestState, prPatch, tailOf, ticketPatch, worktreeGitPatch } from './mapping';
 
 const session = (over: Partial<ClaudeSessionSummary> = {}): ClaudeSessionSummary => ({
@@ -183,7 +185,7 @@ describe('live sync → store', () => {
     addItem(mk('known', { status: 'running', localId: 'a1' }));
     addItem(mk('demo', { status: 'running' }));
     addItem({ id: 'app', kind: 'app', handle: 'app', title: 'app', data: { command: 'x', cwd: 'C:/r', state: 'running', procId: 'app' } });
-    await reconcile({ sessions: [session({ status: 'done', running: false })], apps: [], tests: [] });
+    await reconcile({ agent: [session({ status: 'done', running: false })], app: [], testrun: [] });
     const data = (id: string) => (getState().items.find((i) => i.id === id) as Extract<Item, { kind: 'agent' }>).data;
     expect(data('gone')).toMatchObject({ status: 'idle', lastActivity: 'Stopped (app restarted)' });
     expect(data('known').status).toBe('idle');

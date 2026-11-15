@@ -1,12 +1,13 @@
 import { CodeIcon, DeleteIcon, DesktopIcon, UploadIcon } from '@dynatrace/strato-icons';
 import { userConfig } from '../../data/config';
 import type { ItemOf, Segment } from '../../domain';
-import { openInEditorAction, openPathAction, skill } from '../common';
+import { openInEditorAction, openPathAction, paren, skill } from '../common';
 import { FlaskIcon } from '../icons';
 import type { KindModule } from '../types';
 import { createPr, launchApp, removeWorktree, runTests } from './actions';
 import { launchDisabled, pathDisabled, prDisabled, removeDisabled, testsDisabled } from './model';
 import { WorktreeSidebar } from './Sidebar';
+import { worktreeSync } from './sync';
 
 export function worktreeRing({ data }: ItemOf<'worktree'>): Segment[] {
   const g = data.git;
@@ -35,6 +36,10 @@ export const worktree: KindModule<'worktree'> = {
     ['Changed files', data.git ? String(data.git.changedFiles) : '–'],
     ['Base', data.baseBranch],
   ],
+
+  describe: ({ data: d }) => `git worktree at ${d.path} on branch ${d.branch}${paren([`base ${d.baseBranch}`, d.ticketKey && `ticket ${d.ticketKey}`])}`,
+  cwdOf: (w) => w.data.path,
+  sync: worktreeSync,
 
   actions: ([w], ctx) => {
     const project = ctx.projectOf(w);

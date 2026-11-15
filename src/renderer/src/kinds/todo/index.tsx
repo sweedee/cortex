@@ -3,6 +3,7 @@ import type { ItemOf } from '../../domain';
 import { place } from '../../layout';
 import { addItem, getState, inspect, itemById, makeItem, patchData, select } from '../../store';
 import { openForm, str } from '../../ui/form';
+import { oneLine } from '../common';
 import { ChecklistIcon } from '../icons';
 import type { KindModule } from '../types';
 import { checklist, firstLine, handleOf, quickChecklist, shortLabel, toggleChecklistItem, todoFromForm } from './model';
@@ -53,6 +54,8 @@ export const todo: KindModule<'todo'> = {
     const c = checklist(data.body);
     return c.total ? [['Checklist', `${c.done} / ${c.total}`]] : [];
   },
+
+  describe: (t) => `todo: ${oneLine(t.data.body || t.title)}`,
 
   actions: ([x]) => [
     {

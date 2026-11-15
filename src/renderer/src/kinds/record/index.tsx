@@ -2,7 +2,7 @@ import { CheckmarkIcon, DocumentIcon, ViewIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, RecordData, Segment } from '../../domain';
 import { userConfig } from '../../data/config';
 import { inspect, patchData, select } from '../../store';
-import { openInEditorAction, openPathAction, skill, toast } from '../common';
+import { openInEditorAction, openPathAction, paren, quoted, skill, toast } from '../common';
 import type { Action, KindModule } from '../types';
 import { dirOf, isAbsolutePath, recordTypeOf } from './model';
 import { RecordSidebar } from './Sidebar';
@@ -62,6 +62,12 @@ export const record: KindModule<'record'> = {
     ['Author', data.author ?? '–'],
     ['Path', data.path],
   ],
+
+  describe: (r) => {
+    const d = r.data;
+    return `${d.recordType} record ${quoted(r.title)} at ${d.path}${paren([d.status, d.ticketKey && `ticket ${d.ticketKey}`])}`;
+  },
+  paths: (r) => [r.data.path],
 
   actions: ([r]) => {
     const missing = isAbsolutePath(r.data.path) ? undefined : 'No file on disk (demo data)';

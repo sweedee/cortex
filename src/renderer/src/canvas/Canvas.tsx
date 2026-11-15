@@ -24,7 +24,7 @@ import {
   warmUp,
 } from '../layout';
 import { resetToDemo } from '../persist';
-import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, relatedItems, removeSelected } from '../actions';
+import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, PASTE_KIND, relatedItems, removeSelected } from '../actions';
 import { removeWithUndo } from '../kinds/common';
 import { draftMentions, focusChat, getState, insertSkill, inspect, openDialog, select, setHovered, useStore, useVisible, visibleSet } from '../store';
 import { applyMetricVars, METRICS } from '../ui/metrics';
@@ -683,7 +683,7 @@ export function Canvas() {
                     </Menu.Prefix>
                     Auto-arrange
                   </Menu.Item>
-                  <Menu.Item onSelect={() => openDialog({ type: 'add', kind: 'ticket', at: { x: menu.wx, y: menu.wy } })}>
+                  <Menu.Item onSelect={() => openDialog({ type: 'add', kind: PASTE_KIND, at: { x: menu.wx, y: menu.wy } })}>
                     <Menu.Prefix>
                       <LinkIcon />
                     </Menu.Prefix>
