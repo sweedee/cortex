@@ -40,8 +40,8 @@ const TASK_LINE = /^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]\s*(.*)$/;
 export function checklistItems(body: string): ChecklistItem[] {
   const lines = body.split('\n');
   return findTaskLines(body).map((lineNo, index) => {
-    const m = TASK_LINE.exec(lines[lineNo]);
-    return { index, text: (m?.[2] ?? '').trim(), checked: m?.[1].toLowerCase() === 'x' };
+    const m = TASK_LINE.exec(lines[lineNo] ?? '');
+    return { index, text: (m?.[2] ?? '').trim(), checked: m?.[1]?.toLowerCase() === 'x' };
   });
 }
 

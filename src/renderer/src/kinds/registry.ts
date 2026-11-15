@@ -115,7 +115,7 @@ export function sameView(a: ItemView, b: ItemView): boolean {
     a.badge?.label === b.badge?.label &&
     a.badge?.tone === b.badge?.tone &&
     a.ring.length === b.ring.length &&
-    a.ring.every((x, i) => x.tone === b.ring[i].tone && x.label === b.ring[i].label && x.weight === b.ring[i].weight)
+    a.ring.every((x, i) => x.tone === b.ring[i]?.tone && x.label === b.ring[i]?.label && x.weight === b.ring[i]?.weight)
   );
 }
 

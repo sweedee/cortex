@@ -101,8 +101,9 @@ export function ChatBox() {
     const before = text.slice(0, pos);
     const m = before.match(/(^|\s)@([^\s@]*)$/);
     if (m) {
-      const { options, hits } = mentionOptions(index, m[2], visible, selected, 7);
-      setPopup({ type: 'mention', start: pos - m[2].length - 1, query: m[2], options, hits });
+      const query = m[2] ?? '';
+      const { options, hits } = mentionOptions(index, query, visible, selected, 7);
+      setPopup({ type: 'mention', start: pos - query.length - 1, query, options, hits });
       setActive(0);
       return;
     }
@@ -111,14 +112,16 @@ export function ChatBox() {
       const ment = mentionedIds(text, items)
         .map((id) => byId.get(id))
         .filter((i): i is Item => !!i);
-      setPopup({ type: 'action', start: pos - a[2].length - 1, query: a[2], options: actionOptions(ment, a[2]) });
+      const query = a[2] ?? '';
+      setPopup({ type: 'action', start: pos - query.length - 1, query, options: actionOptions(ment, query) });
       setActive(0);
       return;
     }
     const s = before.match(/(^|\s)\/([\w-]*)$/);
     if (s) {
-      const options = slashOptions(s[2], SKILLS, catalog?.commands, 7);
-      setPopup({ type: 'skill', start: pos - s[2].length - 1, query: s[2], options });
+      const query = s[2] ?? '';
+      const options = slashOptions(query, SKILLS, catalog?.commands, 7);
+      setPopup({ type: 'skill', start: pos - query.length - 1, query, options });
       setActive(0);
       return;
     }
@@ -238,8 +241,8 @@ export function ChatBox() {
           <span className="chat-actions-for">
             {sel.items.length === 1 ? (
               <>
-                {kindIcon(sel.items[0].kind, 14)}
-                <span>{sel.items[0].handle}</span>
+                {sel.items[0] && kindIcon(sel.items[0].kind, 14)}
+                <span>{sel.items[0]?.handle}</span>
               </>
             ) : (
               <span>{sel.items.length} selected</span>
@@ -340,7 +343,7 @@ export function ChatBox() {
               ) : popup.type === 'skill' ? (
                 'Insert a skill'
               ) : mentioned.length ? (
-                `Actions for ${mentioned.length === 1 ? '@' + mentioned[0].handle : mentioned.length + ' items'}`
+                `Actions for ${mentioned.length === 1 ? '@' + mentioned[0]?.handle : mentioned.length + ' items'}`
               ) : (
                 'Actions'
               )}

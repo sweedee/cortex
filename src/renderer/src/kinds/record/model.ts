@@ -31,8 +31,8 @@ export function countSteps(md: string): { done: number; total: number } {
   for (const line of md.split('\n')) {
     const f = /^ {0,3}(`{3,}|~{3,})/.exec(line);
     if (f) {
-      if (!fence) fence = f[1][0];
-      else if (f[1][0] === fence) fence = null;
+      if (!fence) fence = f[1]?.charAt(0) ?? null;
+      else if (f[1]?.charAt(0) === fence) fence = null;
       continue;
     }
     if (fence) continue;

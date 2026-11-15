@@ -71,7 +71,7 @@ export const build: KindModule<'build'> = {
     const mode = rerunMode(b.data);
     return [
       ...(failed ? [skill('fix-ci', 'Fix CI', 'fix-ci', { primary: true })] : []),
-      { id: 'details', label: 'View details', type: 'view', icon: <DescriptionIcon />, primary: !failed, run: ([x]) => inspect(x.id) },
+      { id: 'details', label: 'View details', type: 'view', icon: <DescriptionIcon />, primary: !failed, run: ([x]) => x && inspect(x.id) },
       skill('explain', 'Explain failure', 'explain-build', { disabled: failed ? undefined : 'Build did not fail' }),
       {
         id: 'rerun',
@@ -99,7 +99,7 @@ export const build: KindModule<'build'> = {
     hint: 'job/branch, e.g. console-ui/main',
     example: 'console-ui/main',
     create: (v, proj) => {
-      const [name, branch] = v.includes('/') ? [v.split('/')[0], v.split('/').slice(1).join('/')] : [proj?.title ?? v, v];
+      const [name, branch] = v.includes('/') ? [v.split('/')[0] ?? v, v.split('/').slice(1).join('/')] : [proj?.title ?? v, v];
       const n = Math.floor(Math.random() * 900 + 1900);
       return {
         kind: 'build',

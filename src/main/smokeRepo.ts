@@ -111,7 +111,7 @@ export async function runRepoSmoke(win: BrowserWindow, allowRoot: (dir: string) 
       steps.push({ name, ok: true, detail });
       console.log(`[smoke-repo] ✔ ${name}: ${detail}`);
     } catch (e) {
-      const detail = (e as Error).message.replace(/^Error invoking remote method[^:]*: /, '').split('\n')[0];
+      const detail = (e as Error).message.replace(/^Error invoking remote method[^:]*: /, '').split('\n')[0] ?? '';
       steps.push({ name, ok: false, detail });
       console.log(`[smoke-repo] ✘ ${name}: ${detail}`);
       await shot(`failed-${name.replace(/\W+/g, '-').slice(0, 40)}`).catch(() => '');

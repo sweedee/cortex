@@ -72,7 +72,7 @@ describe('AppRunner', () => {
     expect(c.output.length).toBeLessThan(15); // 21 lines arrive in a few batched events
     expect(apps.log('app1')).toContain('line 19');
     expect(await apps.stop('app1')).toBe(true);
-    expect(apps.list()[0].status).toBe('exited');
+    expect(apps.list()[0]?.status).toBe('exited');
     const restarted = await apps.restart('app1');
     expect(restarted.status).toBe('starting');
     await c.until<AppState>((x) => x.status === 'running');

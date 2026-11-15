@@ -146,7 +146,7 @@ export interface KindModule<K extends Kind = Kind> {
   /** needs the user (pulses) */
   waiting?: (item: ItemOf<K>) => boolean;
   /** kind-specific actions for the given items (today always one); shared ones are added by `actionsForItem` */
-  actions: (items: ItemOf<K>[], ctx: KindCtx) => Action[];
+  actions: (items: [ItemOf<K>], ctx: KindCtx) => Action[];
   /** id of the action double-click / Enter runs (default: the first enabled `primary` one) */
   primaryAction?: (item: ItemOf<K>, ctx: KindCtx) => string | undefined;
   /** "Mark done": the data patch it applies before archiving. Absent = the kind can only be archived. */

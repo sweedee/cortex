@@ -45,8 +45,8 @@ describe('parseDiffStats', () => {
       ['new.txt', 'renamed', 0, 0],
       ['img.png', 'modified', 0, 0],
     ]);
-    expect(s.files[3].oldPath).toBe('old.txt');
-    expect(s.files[4].binary).toBe(true);
+    expect(s.files[3]?.oldPath).toBe('old.txt');
+    expect(s.files[4]?.binary).toBe(true);
     expect([s.additions, s.deletions]).toEqual([4, 2]);
   });
 
@@ -84,8 +84,8 @@ describe('splitMermaid', () => {
   it('splits closed mermaid fences and records source lines', () => {
     const s = splitMermaid('a\n```mermaid\ngraph TD\n```\n- [ ] t\n');
     expect(s.map((x) => x.kind)).toEqual(['md', 'mermaid', 'md']);
-    expect(s[2].line).toBe(4);
-    expect(s[1].text).toBe('graph TD');
+    expect(s[2]?.line).toBe(4);
+    expect(s[1]?.text).toBe('graph TD');
   });
   it('leaves an unterminated fence as markdown', () => {
     expect(splitMermaid('x\n```mermaid\ngraph').map((x) => x.kind)).toEqual(['md']);

@@ -37,7 +37,7 @@ export function agentActions(a: Agent): Action[] {
     type: 'view',
     icon: <ViewIcon />,
     primary: !permissions.length || !!pendingQuestion,
-    run: ([x]) => inspect(x.id),
+    run: ([x]) => x && inspect(x.id),
   };
   const followUp: Action = real
     ? {

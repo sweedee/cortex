@@ -23,7 +23,7 @@ export const needsAnswerForm = (a: Agent) => {
 /** Send answers (question text → label(s) or free text). A plain string answers the first question. */
 export async function answerQuestion(a: Agent, answer: string | ClaudeAnswers) {
   const pq = a.data.pendingQuestion;
-  const answers: ClaudeAnswers = typeof answer === 'string' ? (pq ? { [pq.questions[0].question]: answer } : {}) : answer;
+  const answers: ClaudeAnswers = typeof answer === 'string' ? (pq ? { [pq.questions[0]?.question ?? '']: answer } : {}) : answer;
   const shown = Object.values(answers)
     .map((v) => (Array.isArray(v) ? v.join(', ') : v))
     .join(' · ');
@@ -83,8 +83,8 @@ export function openAnswerForm(a: Agent, preset?: string) {
   if (!qs.length) return;
   const values: FormValues = {};
   if (preset) {
-    const oi = qs[0].options.findIndex((o) => o.label === preset);
-    if (qs[0].multiSelect && oi >= 0) values[fieldName(0, oi)] = true;
+    const oi = (qs[0]?.options ?? []).findIndex((o) => o.label === preset);
+    if (qs[0]?.multiSelect && oi >= 0) values[fieldName(0, oi)] = true;
     else values[fieldName(0)] = preset;
   }
   void openForm({

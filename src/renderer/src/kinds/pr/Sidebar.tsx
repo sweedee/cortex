@@ -134,7 +134,7 @@ const STATE_CHIP: Record<string, { label: string; color: 'success' | 'neutral' |
 
 function Header({ pr, view }: { pr: Pr; view?: GhPullRequest }) {
   const d = pr.data;
-  const st = STATE_CHIP[d.state === 'open' && d.isDraft ? 'draft' : d.state];
+  const st = STATE_CHIP[d.state === 'open' && d.isDraft ? 'draft' : d.state] ?? { label: d.state, color: 'neutral' as const };
   const facts: [string, string][] = [
     ['Number', `#${d.number}`],
     ['Author', view?.author?.login ?? d.author ?? '–'],

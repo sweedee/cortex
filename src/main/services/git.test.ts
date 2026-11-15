@@ -25,7 +25,7 @@ beforeAll(async () => {
   root = realpathSync(mkdtempSync(join(tmpdir(), 'cortex-git-')));
   repo = join(root, 'repo');
   await runExec({ cmd: 'git', args: ['init', '-q', '-b', 'main', repo], cwd: root });
-  for (const [k, v] of [
+  for (const [k = '', v = ''] of [
     ['user.name', 'Test'],
     ['user.email', 'test@example.com'],
     ['commit.gpgsign', 'false'],
@@ -85,7 +85,7 @@ describe('GitService (real git, temp repo)', () => {
     const log = await git.log(wtPath, { range: 'main..HEAD' });
     expect(log).toHaveLength(1);
     expect(log[0]).toMatchObject({ subject: 'add b', author: 'Test', email: 'test@example.com' });
-    expect(log[0].sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(log[0]?.sha).toMatch(/^[0-9a-f]{40}$/);
     expect((await git.diffStat(wtPath, { base: 'main' })).files).toEqual([{ path: 'b.txt', additions: 1, deletions: 0 }]);
 
     await git.worktreeRemove(repo, wtPath);

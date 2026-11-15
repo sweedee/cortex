@@ -26,7 +26,7 @@ export function failingTests(output: string | undefined, max = 50): string[] {
     for (const re of PATTERNS) {
       const m = re.exec(raw);
       if (!m) continue;
-      const name = m[1].replace(/\s+/g, ' ').trim();
+      const name = (m[1] ?? '').replace(/\s+/g, ' ').trim();
       if (name && !seen.has(name)) {
         seen.add(name);
         out.push(name);

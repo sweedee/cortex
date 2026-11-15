@@ -520,7 +520,7 @@ function Composer({ agent, real, session }: { agent: Agent; real: boolean; sessi
 
   const refreshSlash = (value: string, pos: number) => {
     const m = value.slice(0, pos).match(/(^|\s)\/([\w:-]*)$/);
-    setSlash(m ? { start: pos - m[2].length - 1, query: m[2] } : null);
+    setSlash(m ? { start: pos - (m[2] ?? '').length - 1, query: m[2] ?? '' } : null);
     setActive(0);
   };
   const accept = (i: number) => {
@@ -665,7 +665,7 @@ function Composer({ agent, real, session }: { agent: Agent; real: boolean; sessi
 
 /** A terminal-like status bar: state │ model · effort · mode │ context meter │ tokens │ cache │ cost │ turns · time │ subagents. */
 function StatusLine({ agent, session, subagents }: { agent: Agent; session: ClaudeSession | undefined; subagents: SubagentInfo[] }) {
-  const ring = agentRing(agent)[0];
+  const ring = agentRing(agent)[0] ?? { tone: 'neutral' as const };
   const d = agent.data;
   const model = session?.model ?? d.model ?? (d.localId ? 'default model' : undefined);
   const effort = session?.effort ?? d.effort;

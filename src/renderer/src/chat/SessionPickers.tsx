@@ -12,7 +12,7 @@ import { effortChoices, modelChoiceOf, modelChoices, PERMISSION_CHOICES, permiss
 import './sessionPickers.css';
 
 function Picker({ title, icon, value, choices, onChange, disabled, tone, pending }: { title: string; icon: ReactNode; value: string; choices: Choice[]; onChange: (v: string) => void; disabled?: boolean; tone?: string; pending?: boolean }) {
-  const cur = choices.find((c) => c.value === value) ?? choices[0];
+  const cur = choices.find((c) => c.value === value) ?? choices[0] ?? { value: '', label: '', short: '' };
   return (
     <Menu>
       <Menu.Trigger>

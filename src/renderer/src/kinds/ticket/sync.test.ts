@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Item, ItemOf } from '../../domain';
 import { demoWorld } from '../../seed';
 import { isDemoTicket } from './sync';
+import { must } from '../../testing/must';
 
 describe('ticket sync', () => {
   const demo = demoWorld();
@@ -14,7 +15,7 @@ describe('ticket sync', () => {
   });
 
   it('still syncs tickets of real (or migrated unknown/…) projects', () => {
-    const t = tickets[0];
+    const t = must(tickets[0]);
     for (const repo of ['acme/app', 'unknown/ingest']) expect(isDemoTicket(t, { ...project, data: { ...project.data, repo } } as Item)).toBe(false);
     expect(isDemoTicket(t, undefined)).toBe(false);
   });

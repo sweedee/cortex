@@ -73,7 +73,8 @@ export function resolveCwd(mentioned: Item[], ctx: KindCtx): CwdChoice | null {
 /** The one real agent session the draft is addressed to (exactly one agent with a session mentioned). */
 export function agentTarget(mentioned: Item[]): ItemOf<'agent'> | null {
   const agents = mentioned.filter((m): m is ItemOf<'agent'> => m.kind === 'agent');
-  return agents.length === 1 && agents[0].data.localId ? agents[0] : null;
+  const only = agents.length === 1 ? agents[0] : undefined;
+  return only?.data.localId ? only : null;
 }
 
 /** "Plan CTX-4821", "Chat wt/retry", from the skill and the first mention. */

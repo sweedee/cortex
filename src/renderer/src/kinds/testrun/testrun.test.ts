@@ -74,7 +74,7 @@ describe('test run actions', () => {
     expect(m.notice?.tone).toBe('critical');
   });
   it('a failed run without failing tests still looks failed', () => {
-    expect(testrunRing(withData({ summary: { passed: 4, failed: 0, skipped: 0 } }))[0].tone).toBe('critical');
+    expect(testrunRing(withData({ summary: { passed: 4, failed: 0, skipped: 0 } }))[0]?.tone).toBe('critical');
   });
   it('duration', () => {
     expect(durationText({ state: 'passed', startedAt: 0, endedAt: 75_000 })).toBe('1m 15s');

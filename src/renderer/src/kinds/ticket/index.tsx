@@ -44,7 +44,7 @@ export const ticket: KindModule<'ticket'> = {
   multiActions: () => [skill('plan-multi', 'Plan together', 'plan')],
 
   actions: ([t], ctx) => {
-    const todo = t.data.statusCategory === 'new' || ticketRing(t)[0].tone === 'critical';
+    const todo = t.data.statusCategory === 'new' || ticketRing(t)[0]?.tone === 'critical';
     const project = ctx.projectOf(t);
     return [
       skill('plan', 'Plan', 'plan', { primary: todo }),
@@ -63,7 +63,7 @@ export const ticket: KindModule<'ticket'> = {
         icon: <PlusIcon />,
         disabled: project ? undefined : 'This ticket is not in a project',
         run: ([x]) => {
-          const p = ctx.projectOf(x);
+          const p = x && ctx.projectOf(x);
           if (p) void openNewWorktree(p, { ticket: x as ItemOf<'ticket'> });
         },
       },

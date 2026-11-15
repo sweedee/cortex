@@ -250,7 +250,7 @@ export type UpdateType = 'major' | 'minor' | 'patch' | 'digest' | 'unknown';
 export function updateTypeOf(pr: Pick<GhPrListItem, 'title' | 'headRefName' | 'labels'>): UpdateType {
   for (const l of pr.labels ?? []) {
     const hit = /\b(major|minor|patch|digest)\b/i.exec(l.name);
-    if (hit) return hit[1].toLowerCase() as UpdateType;
+    if (hit) return (hit[1] ?? '').toLowerCase() as UpdateType;
   }
   const branch = /^renovate\/(major|minor|patch|digest)-/.exec(pr.headRefName);
   if (branch) return branch[1] as UpdateType;
@@ -268,7 +268,7 @@ export const isRenovatePr = (pr: Pick<GhPrListItem, 'author' | 'labels' | 'headR
 /** PR number from a URL like https://github.com/o/r/pull/123 (what `gh pr create` prints). */
 export function prNumberFromUrl(text: string): { number: number; url: string } | null {
   const m = /(https?:\/\/\S+\/pull\/(\d+))/.exec(text);
-  return m ? { url: m[1], number: Number(m[2]) } : null;
+  return m ? { url: m[1] ?? '', number: Number(m[2]) } : null;
 }
 
 /** Does a `gh pr update-branch` failure message mean merge conflicts (vs. auth, network, …)? */

@@ -32,7 +32,7 @@ const humanize = (branch: string) =>
 export function defaultPrTitle(w: Worktree, ticket?: ItemOf<'ticket'>): string {
   if (ticket) return `${ticket.data.key}: ${ticket.title}`;
   const h = humanize(w.data.branch);
-  const text = h ? h[0].toUpperCase() + h.slice(1) : w.data.branch;
+  const text = h ? h.charAt(0).toUpperCase() + h.slice(1) : w.data.branch;
   return w.data.ticketKey ? `${w.data.ticketKey}: ${text}` : text;
 }
 

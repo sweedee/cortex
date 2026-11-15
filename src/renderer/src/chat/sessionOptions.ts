@@ -55,8 +55,11 @@ export function effortChoices(catalog?: Pick<ClaudeCatalog, 'models'>, model?: s
 
 export type PermissionValue = 'default' | 'manual' | 'acceptEdits' | 'plan' | 'auto' | 'dontAsk' | 'bypassPermissions';
 
-export const PERMISSION_CHOICES: (Choice<PermissionValue> & { value: PermissionValue; tone?: 'warning' | 'critical' })[] = [
-  { value: 'default', label: 'CLI default', short: 'mode', hint: 'No flag: the CLI’s configured permission mode' },
+type PermissionChoice = Choice<PermissionValue> & { value: PermissionValue; tone?: 'warning' | 'critical' };
+const DEFAULT_PERMISSION: PermissionChoice = { value: 'default', label: 'CLI default', short: 'mode', hint: 'No flag: the CLI’s configured permission mode' };
+
+export const PERMISSION_CHOICES: PermissionChoice[] = [
+  DEFAULT_PERMISSION,
   { value: 'manual', label: 'manual', short: 'manual', hint: 'Ask before every tool' },
   { value: 'acceptEdits', label: 'acceptEdits', short: 'accept edits', hint: 'Edits run, other tools ask' },
   { value: 'plan', label: 'plan', short: 'plan', hint: 'Read-only planning, no changes' },
@@ -65,7 +68,7 @@ export const PERMISSION_CHOICES: (Choice<PermissionValue> & { value: PermissionV
   { value: 'bypassPermissions', label: 'bypassPermissions', short: 'bypass', hint: 'Run everything without asking (careful)', tone: 'critical' },
 ];
 
-export const permissionChoice = (mode: string | undefined) => PERMISSION_CHOICES.find((c) => c.value === (mode || 'default')) ?? PERMISSION_CHOICES[0];
+export const permissionChoice = (mode: string | undefined) => PERMISSION_CHOICES.find((c) => c.value === (mode || 'default')) ?? DEFAULT_PERMISSION;
 
 const SETTING_LABEL: Record<keyof ClaudeConfigureResult, string> = { model: 'Model', effort: 'Effort', permissionMode: 'Permission mode' };
 
@@ -105,6 +108,6 @@ export function slashOptions(query: string, skills: { name: string; desc: string
 }
 
 function firstSentence(s: string, max = 90) {
-  const one = s.split(/(?<=\.)\s|\n/)[0].trim();
+  const one = (s.split(/(?<=\.)\s|\n/)[0] ?? '').trim();
   return one.length > max ? one.slice(0, max - 1) + '…' : one;
 }

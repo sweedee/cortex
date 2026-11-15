@@ -88,7 +88,7 @@ export function parseTestSummary(raw: string): TestSummary | undefined {
   // vitest: "      Tests  12 passed | 1 failed | 2 skipped (15)"
   const vt = [...out.matchAll(/^\s*Tests\s+(.+?)\s*\((\d+)\)\s*$/gm)].pop();
   if (vt) {
-    const part = vt[1];
+    const part = vt[1] ?? '';
     const passed = num(/(\d+) passed/.exec(part));
     const failed = num(/(\d+) failed/.exec(part));
     const skipped = num(/(\d+) skipped/.exec(part)) + num(/(\d+) todo/.exec(part));
@@ -98,7 +98,7 @@ export function parseTestSummary(raw: string): TestSummary | undefined {
   // jest: "Tests:       1 failed, 2 skipped, 10 passed, 13 total"
   const jt = [...out.matchAll(/^Tests:\s+(.+?(\d+) total)\s*$/gm)].pop();
   if (jt) {
-    const part = jt[1];
+    const part = jt[1] ?? '';
     return {
       framework: 'jest',
       passed: num(/(\d+) passed/.exec(part)),
@@ -111,7 +111,7 @@ export function parseTestSummary(raw: string): TestSummary | undefined {
   // pytest: "==== 3 failed, 10 passed, 1 skipped in 0.12s ====" (also "5 passed in 0.1s")
   const pt = [...out.matchAll(/^=+ (.*?\d+ (?:passed|failed|error|errors|skipped).*?) in [\d.]+s(?: \([^)]*\))? =+\s*$/gm)].pop();
   if (pt) {
-    const part = pt[1];
+    const part = pt[1] ?? '';
     const passed = num(/(\d+) passed/.exec(part));
     const failed = num(/(\d+) failed/.exec(part)) + num(/(\d+) errors?/.exec(part));
     const skipped = num(/(\d+) skipped/.exec(part)) + num(/(\d+) xfailed/.exec(part));

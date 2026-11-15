@@ -45,7 +45,7 @@ describe('JiraService with real acli output', () => {
     const found = await jira.search('project = CTX', { limit: 5 });
     expect(calls[0]).toEqual(['acli', 'jira', 'workitem', 'search', '--jql', 'project = CTX', '--json', '--limit', '5']);
     expect(found.map((i) => i.key).sort()).toEqual(['CTX-10', 'CTX-4', 'CTX-6']);
-    const s = summarizeIssue(found[0]);
+    const s = summarizeIssue(found[0]!);
     expect(s.updated).toBe('');
     expect(s.status).toBeTruthy();
   });

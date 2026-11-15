@@ -44,7 +44,7 @@ export const accentOf = (colors: Map<string, string[]>, id: string) => colors.ge
 
 /** Hard-edged slices of the given colours along a line (for borders and strips), no blending. */
 export function stripes(colors: string[], angle = 90): string {
-  if (colors.length === 1) return colors[0];
+  if (colors.length === 1) return colors[0] ?? '';
   const step = 100 / colors.length;
   return `linear-gradient(${angle}deg, ${colors.map((c, i) => `${c} ${i * step}% ${(i + 1) * step}%`).join(', ')})`;
 }
@@ -53,7 +53,7 @@ export function stripes(colors: string[], angle = 90): string {
 export function groupFill(colors: string[] | undefined): string | undefined {
   if (!colors?.length) return undefined;
   const tint = (c: string) => `color-mix(in srgb, ${c} 30%, var(--surface-raised))`;
-  if (colors.length === 1) return tint(colors[0]);
+  if (colors.length === 1) return tint(colors[0] ?? '');
   const step = 360 / colors.length;
   const stops = colors.map((c, i) => `${tint(c)} ${i * step}deg ${(i + 1) * step}deg`).join(', ');
   return `conic-gradient(${stops})`;

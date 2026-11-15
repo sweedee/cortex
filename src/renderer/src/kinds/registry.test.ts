@@ -51,7 +51,7 @@ describe('kind registry', () => {
 
   it('archived items only offer unarchive plus viewing', () => {
     const a = actionsForItem({ ...seed('b-1838', 'build'), archived: true }, ctx);
-    expect(a[0].id).toBe('unarchive');
+    expect(a[0]?.id).toBe('unarchive');
     expect(a.every((x) => x.id === 'unarchive' || x.type === 'view' || x.type === 'external')).toBe(true);
   });
 
@@ -105,11 +105,11 @@ describe('ring derivation', () => {
       ['success', 2],
       ['warning', 1],
     ]);
-    expect(worktreeRing({ ...seed('w-4821', 'worktree'), data: { ...seed('w-4821', 'worktree').data, git: undefined } })[0].tone).toBe('neutral');
+    expect(worktreeRing({ ...seed('w-4821', 'worktree'), data: { ...seed('w-4821', 'worktree').data, git: undefined } })[0]?.tone).toBe('neutral');
   });
 
   it('agent, record, testrun, deployment, ticket', () => {
-    expect(agentRing(seed('a-plan-4833', 'agent'))[0].tone).toBe('warning');
+    expect(agentRing(seed('a-plan-4833', 'agent'))[0]?.tone).toBe('warning');
     expect(viewOf(seed('a-plan-4833', 'agent'), ctx).waiting).toBe(true);
     expect(viewOf(seed('a-impl-4821', 'agent'), ctx).running).toBe(true);
     expect(recordRing(seed('plan-4821', 'record')).map((s) => [s.tone, s.weight])).toEqual([

@@ -30,7 +30,7 @@ describe('toIpcError / ipcError', () => {
     expect(err).toBeInstanceOf(InvalidRequestError);
     const p = toIpcError(err);
     expect(p.code).toBe('VALIDATION');
-    expect(p.issues?.[0].path).toBe('id');
+    expect(p.issues?.[0]?.path).toBe('id');
   });
   it('maps path policy refusals to FORBIDDEN', () => {
     expect(toIpcError(new PathNotAllowedError('cwd not allowed: /x'))).toMatchObject({ code: 'FORBIDDEN' });

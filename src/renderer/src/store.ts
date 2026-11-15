@@ -482,7 +482,7 @@ export function insertSkill(skill: string | null, ids: string[]) {
 /** Ids of items that the current draft mentions with @handle, in the order they appear. */
 export function mentionedIds(draft: string, items: Item[]): string[] {
   if (!draft.includes('@')) return [];
-  const handles = [...new Set([...draft.matchAll(/@([^\s@]+)/g)].map((m) => m[1].toLowerCase()))];
+  const handles = [...new Set([...draft.matchAll(/@([^\s@]+)/g)].map((m) => (m[1] ?? '').toLowerCase()))];
   const byHandle = handleIndex(items);
   return handles.map((h) => byHandle.get(h)).filter((id): id is string => !!id);
 }

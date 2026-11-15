@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { contrastRatio, parseHex } from './contrast';
 import { metricVars } from './metrics';
+import { must } from '../testing/must';
 
 const css = readFileSync(join(__dirname, '..', 'index.css'), 'utf8').replace(/\r\n/g, '\n');
 
@@ -34,12 +35,12 @@ describe('theme tokens in index.css', () => {
   ];
 
   it.each(themes)('%s: faint text reads at 4.5:1 or more on every surface', (_, t) => {
-    for (const s of surfaces) expect(contrastRatio(t['--ink-faint'], t[s]), `--ink-faint on ${s}`).toBeGreaterThanOrEqual(4.5);
+    for (const s of surfaces) expect(contrastRatio(must(t['--ink-faint']), must(t[s])), `--ink-faint on ${s}`).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each(themes)('%s: status tones stand out from the canvas (3:1, for graphics)', (_, t) => {
     for (const tone of ['--tone-success', '--tone-critical', '--tone-running', '--tone-primary', '--tone-pending'])
-      expect(contrastRatio(t[tone], t['--canvas-bg']), tone).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(must(t[tone]), must(t['--canvas-bg'])), tone).toBeGreaterThanOrEqual(3);
   });
 
   it('component rules use tokens: raw colours only in the token blocks', () => {
@@ -51,13 +52,13 @@ describe('theme tokens in index.css', () => {
 
   it('every layout size the stylesheet uses is published from ui/metrics.ts', () => {
     const published = new Set(Object.keys(metricVars()));
-    const used = [...css.matchAll(/var\((--(?:chat-space|top-space|hover-card-[\w-]+|actions-[\w-]+))\)/g)].map((m) => m[1]);
+    const used = [...css.matchAll(/var\((--(?:chat-space|top-space|hover-card-[\w-]+|actions-[\w-]+))\)/g)].map((m) => m[1] ?? '');
     expect(used.length).toBeGreaterThan(0);
     for (const v of used) expect(published.has(v), v).toBe(true);
   });
 
   it('z-index values come from the --z-* scale (small local ones aside)', () => {
-    const z = [...css.matchAll(/z-index:\s*([^;]+);/g)].map((m) => m[1].trim());
+    const z = [...css.matchAll(/z-index:\s*([^;]+);/g)].map((m) => m[1]?.trim() ?? '');
     for (const v of z) expect(v.startsWith('var(--z-') || Number(v) <= 2, v).toBe(true);
   });
 });

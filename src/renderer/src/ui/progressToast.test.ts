@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { startProgressToast } from './progressToast';
+import { must } from '../testing/must';
 
 function fakeApi() {
   const timers: (() => void)[] = [];
@@ -27,7 +28,7 @@ describe('progress toast', () => {
   it('shows after the delay and dismisses when done', () => {
     const api = fakeApi();
     const p = startProgressToast(api);
-    api.timers[0]();
+    must(api.timers[0])();
     expect(api.show).toHaveBeenCalledWith(p.id);
     p.mounted();
     expect(api.dismiss).not.toHaveBeenCalled();
@@ -38,7 +39,7 @@ describe('progress toast', () => {
   it('dismisses itself when it only appears (queued) after the work finished', () => {
     const api = fakeApi();
     const p = startProgressToast(api);
-    api.timers[0](); // shown, but queued behind 5 open toasts: dismiss() is a no-op then
+    must(api.timers[0])(); // shown, but queued behind 5 open toasts: dismiss() is a no-op then
     p.finish();
     api.dismiss.mockClear();
     p.mounted(); // the queue moves on and the spinner finally renders

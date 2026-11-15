@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SEED_ITEMS } from './testing/fakeWorld';
 import { draftMentions, mentionedIds, mentionRe } from './store';
+import { must } from './testing/must';
 
-const [a, b] = SEED_ITEMS;
+const a = must(SEED_ITEMS[0]);
+const b = must(SEED_ITEMS[1]);
 
 describe('mentionRe', () => {
   it('matches the handle as a whole token, case-insensitively', () => {

@@ -53,7 +53,7 @@ function dueAt(job: Job, intervalMs: number): number {
 
 /** Keys (repo or item) that already got a "sync failing" toast; cleared on the next success. */
 const toasted = new Set<string>();
-const errorLine = (e: unknown) => ipcErrorMessage(e).split('\n')[0];
+const errorLine = (e: unknown) => ipcErrorMessage(e).split('\n')[0] ?? '';
 
 async function runJob(job: Job) {
   const t = track.get(job.id) ?? { last: 0, fails: 0 };

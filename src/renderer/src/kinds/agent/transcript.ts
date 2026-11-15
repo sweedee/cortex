@@ -110,12 +110,15 @@ export function transcriptBuilder(localId = 'session'): TranscriptBuilder {
     const rows: Row[] = [];
     let t = 0;
     s.messages.forEach((m, i) => {
-      while (t < thinking.length && thinking[t].before <= i) rows.push(thinking[t++].row);
+      for (let th = thinking[t]; th && th.before <= i; th = thinking[t]) {
+        rows.push(th.row);
+        t++;
+      }
       if (m.parent) return; // drawn inside its subagent
       const r = toRow(m);
       if (r) rows.push(r);
     });
-    while (t < thinking.length) rows.push(thinking[t++].row);
+    for (const th of thinking.slice(t)) rows.push(th.row);
     if (sameRows(rows, out.rows) && s.subagents === out.subagents) return out;
     return { rows: sameRows(rows, out.rows) ? out.rows : rows, subagents: s.subagents };
   };
@@ -127,7 +130,7 @@ export function transcriptBuilder(localId = 'session'): TranscriptBuilder {
       const appended = count === 0 || (events.length >= count && events[0] === first && events[count - 1] === last);
       if (!appended) reset();
       if (events.length === count) return out;
-      for (let i = count; i < events.length; i++) consume(events[i]);
+      for (const ev of events.slice(count)) consume(ev);
       first = events[0];
       last = events[events.length - 1];
       count = events.length;

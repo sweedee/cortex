@@ -56,7 +56,7 @@ export function parseDiffStats(diff: string): DiffStats {
     }
     if (line.startsWith('diff --git ')) {
       const m = /^diff --git a\/(.*) b\/(.*)$/.exec(line);
-      cur = newFile(m ? m[2] : line.slice(11));
+      cur = newFile((m ? m[2] : undefined) ?? line.slice(11));
       files.push(cur);
       sawHunk = false;
     } else if (line.startsWith('--- ')) {

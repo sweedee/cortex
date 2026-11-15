@@ -373,7 +373,7 @@ export class ClaudeSessions {
     const localId = req.localId ?? `cs-${Date.now().toString(36)}-${(++seq).toString(36)}`;
     const existing = this.entries.get(localId);
     if (existing?.child) throw new Error(`Claude session "${localId}" is already running`);
-    const title = req.title ?? (req.prompt ? req.prompt.split('\n')[0].slice(0, 80) : 'Claude session');
+    const title = req.title ?? (req.prompt ? (req.prompt.split('\n')[0] ?? '').slice(0, 80) : 'Claude session');
     const session = newSession({ localId, cwd: req.cwd, title, sessionId: req.resume ?? existing?.session.sessionId, model: req.model, effort: req.effort, permissionMode: req.permissionMode ?? this.opts.defaultPermissionMode });
     const e: Entry = existing ?? { session, req, events: [], asks: new Map(), controls: new Map(), stderr: new LogTail(16 * 1024), interrupting: false, stopping: false };
     if (existing) {

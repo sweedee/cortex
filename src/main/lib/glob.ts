@@ -21,7 +21,7 @@ export function globToRegExp(glob: string, caseInsensitive = process.platform ==
     else if (c === '{') re += '(?:';
     else if (c === '}') re += ')';
     else if (c === ',') re += '|';
-    else re += c.replace(/[.+^$()|[\]\\]/g, '\\$&');
+    else re += (c ?? '').replace(/[.+^$()|[\]\\]/g, '\\$&');
   }
   return new RegExp(`^${re}$`, caseInsensitive ? 'i' : '');
 }

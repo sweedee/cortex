@@ -58,7 +58,7 @@ export const paren = (parts: (string | undefined | false)[]) => {
 };
 
 /** "@handle" for one item, "3 items" for several. */
-export const nameOf = (items: Item[]) => (items.length === 1 ? items[0].handle : plural(items.length, 'item'));
+export const nameOf = (items: Item[]) => (items.length === 1 && items[0] ? items[0].handle : plural(items.length, 'item'));
 
 /** An AI action: inserts `/name @item…` into the chat box (the skill need not exist yet). */
 export function skill(id: string, label: string, name: string, extra: Partial<Action> = {}): Action {
@@ -84,19 +84,19 @@ export function external(id: string, label: string, url: (i: Item) => string, ex
     label,
     type: 'external',
     icon: <ExternalLinkIcon />,
-    run: (items) => void openUrl(url(items[0])),
+    run: ([i]) => i && void openUrl(url(i)),
     ...extra,
   };
 }
 
 /** Shows a folder / file in the OS file manager. */
 export function openPathAction(id: string, label: string, path: (i: Item) => string | undefined, extra: Partial<Action> = {}): Action {
-  return { id, label, type: 'external', icon: <FolderOpenIcon />, run: (items) => void openPath(path(items[0]) ?? ''), ...extra };
+  return { id, label, type: 'external', icon: <FolderOpenIcon />, run: ([i]) => i && void openPath(path(i) ?? ''), ...extra };
 }
 
 /** Opens a folder / file in the editor (`code <path>`, falls back to the OS). */
 export function openInEditorAction(id: string, label: string, path: (i: Item) => string | undefined, extra: Partial<Action> = {}): Action {
-  return { id, label, type: 'external', icon: <CodeIcon />, run: (items) => void openInEditor(path(items[0]) ?? ''), ...extra };
+  return { id, label, type: 'external', icon: <CodeIcon />, run: ([i]) => i && void openInEditor(path(i) ?? ''), ...extra };
 }
 
 // ---- complete / archive -----------------------------------------------------------------

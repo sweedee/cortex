@@ -314,7 +314,7 @@ const unquote = (s: string) => s.replace(/\\"/g, '"');
 /** The AskUserQuestion tool_result reads `… "<question>"="<answer>", … .` */
 export function parseAnswers(text: string): Record<string, string> | undefined {
   const out: Record<string, string> = {};
-  for (const m of text.matchAll(/"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"/g)) out[unquote(m[1])] = unquote(m[2]);
+  for (const m of text.matchAll(/"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"/g)) out[unquote(m[1] ?? '')] = unquote(m[2] ?? '');
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
@@ -396,6 +396,7 @@ function patchSub(list: SubagentInfo[], match: (s: SubagentInfo) => boolean, pat
   const i = list.findIndex(match);
   if (i < 0) return list;
   const prev = list[i];
+  if (!prev) return list;
   // a finished subagent stays finished (late progress events)
   const next = prev.status !== 'running' && patch.status === 'running' ? { ...prev, ...patch, status: prev.status } : { ...prev, ...patch };
   return [...list.slice(0, i), next, ...list.slice(i + 1)];
@@ -441,7 +442,7 @@ function applyTaskEvent(subs: SubagentInfo[], e: Record<string, unknown>, at: st
 /** `<local-command-stdout>Set model to …</local-command-stdout>` → the text inside (undefined = not such a message) */
 export function localCommandOutput(text: string): string | undefined {
   const m = text.match(/^\s*<local-command-(?:stdout|stderr)>([\s\S]*?)<\/local-command-(?:stdout|stderr)>\s*$/);
-  return m ? m[1].replace(/`/g, '').trim() : undefined;
+  return m ? (m[1] ?? '').replace(/`/g, '').trim() : undefined;
 }
 
 const QUESTION_ACTIVITY = 'Has a question for you';
@@ -449,7 +450,7 @@ const QUESTION_ACTIVITY = 'Has a question for you';
 function openQuestion(messages: SessionMessage[]): { toolUseId: string; questions: AskQuestion[] } | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.role === 'tool' && m.tool === ASK_TOOL && m.status === 'running') return { toolUseId: m.id, questions: m.questions ?? [] };
+    if (m && m.role === 'tool' && m.tool === ASK_TOOL && m.status === 'running') return { toolUseId: m.id, questions: m.questions ?? [] };
   }
   return undefined;
 }
@@ -458,7 +459,7 @@ function openQuestion(messages: SessionMessage[]): { toolUseId: string; question
 const settle = (s: ClaudeSession): ClaudeSession => {
   const q = openQuestion(s.messages);
   if (q || s.pendingPermissions.length > 0) {
-    return { ...s, pendingQuestion: q, status: 'waiting', activity: q ? QUESTION_ACTIVITY : `Wants to use ${s.pendingPermissions[0].toolName}` };
+    return { ...s, pendingQuestion: q, status: 'waiting', activity: q ? QUESTION_ACTIVITY : `Wants to use ${s.pendingPermissions[0]?.toolName ?? 'a tool'}` };
   }
   return { ...s, pendingQuestion: undefined, status: s.status === 'waiting' ? 'running' : s.status };
 };

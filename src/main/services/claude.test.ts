@@ -93,7 +93,7 @@ describe('ClaudeSessions (fake claude process)', () => {
     const s = m.start({ cwd: dir, prompt: 'bash please' });
     const w = await until((x) => x.pendingPermissions.length > 0);
     expect(w.pendingPermissions[0]).toMatchObject({ toolName: 'Bash', input: { command: 'echo hi' } });
-    m.permission(s.localId, w.pendingPermissions[0].requestId, { behavior: 'deny', message: 'no' });
+    m.permission(s.localId, w.pendingPermissions[0]?.requestId ?? '', { behavior: 'deny', message: 'no' });
     expect((await until((x) => x.status === 'idle')).lastText).toBe('denied');
 
     m.send(s.localId, 'slow job');
@@ -169,7 +169,7 @@ describe('ClaudeSessions (fake claude process)', () => {
     const inits = events.filter((e) => e.event.type === 'system' && (e.event as { subtype?: string }).subtype === 'init').map((e) => (e.event as unknown as { argv: string[] }).argv);
     const last = inits.at(-1)!;
     expect(last).toEqual(expect.arrayContaining(['--resume', idle.sessionId, '--effort', 'max', '--model', 'sonnet', '--permission-mode', 'plan']));
-    expect(m.list()[0].restartPending).toBeUndefined();
+    expect(m.list()[0]?.restartPending).toBeUndefined();
     await m.stop(s.localId);
     // no process: applies on resume
     expect(m.configure(s.localId, { model: null })).toEqual({ model: 'next' });

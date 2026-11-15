@@ -4,6 +4,7 @@ import type { ItemOf } from '../../domain';
 import { makeItem } from '../../store';
 import { agentActions } from './actions';
 import { answersOf, buildRows, buildTranscript, contextTone, emptyChoice, groupRows, inputText, isAnswered, toggleChoice, toggleOther, tokens, transcriptBuilder, usd } from './transcript';
+import { must } from '../../testing/must';
 
 const S = 'sess-1';
 const ev = (e: object, at = '2026-11-14T10:00:00.000Z') => ({ timestamp: at, session_id: S, ...e }) as ClaudeEvent;
@@ -25,7 +26,7 @@ describe('agent transcript rows', () => {
     expect(rows.map((r) => r.kind)).toEqual(['user', 'thinking', 'assistant', 'tool', 'tool', 'question']);
     const read = rows[3];
     expect(read).toMatchObject({ kind: 'tool', tool: 'Read', summary: '/a.ts', status: 'ok', result: 'line 1\nline 2' });
-    const edit = rows[4];
+    const edit = must(rows[4]);
     expect(edit).toMatchObject({ kind: 'tool', tool: 'Edit', status: 'running' });
     expect(edit.kind === 'tool' && inputText(edit.tool, edit.input)).toBe('- a\n+ b');
     expect(rows[5]).toMatchObject({ kind: 'question', id: 'ask1', status: 'running', questions: [{ question: 'Which?', multiSelect: true }] });

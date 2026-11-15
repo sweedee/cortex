@@ -64,6 +64,7 @@ export const todo = defineKind({
       icon: <EditIcon />,
       primary: true,
       run: ([x]) => {
+        if (!x) return;
         inspect(x.id);
         select([x.id]);
       },
@@ -75,6 +76,7 @@ export const todo = defineKind({
       type: 'direct' as const,
       icon: c.checked ? <CheckmarkIcon /> : <SquareIcon />,
       run: ([t]: { id: string }[]) => {
+        if (!t) return;
         const cur = itemById(t.id);
         if (cur?.kind === 'todo') patchData<'todo'>(t.id, { body: toggleChecklistItem(cur.data.body, c.index) });
       },

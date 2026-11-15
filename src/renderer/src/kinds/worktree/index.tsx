@@ -16,7 +16,8 @@ export function worktreeRing({ data }: ItemOf<'worktree'>): Segment[] {
   if (g.behind > 0) out.push({ tone: 'warning', label: `${g.behind} commit${g.behind === 1 ? '' : 's'} behind ${data.baseBranch}`, weight: 2 });
   else out.push({ tone: 'success', label: g.changedFiles ? `up to date with ${data.baseBranch}` : 'clean, up to date', weight: 2 });
   if (g.changedFiles > 0) out.push({ tone: 'warning', label: `${g.changedFiles} uncommitted file${g.changedFiles === 1 ? '' : 's'}`, weight: 1 });
-  return out.length === 1 ? [{ ...out[0], weight: undefined }] : out;
+  const [only] = out;
+  return only && out.length === 1 ? [{ ...only, weight: undefined }] : out;
 }
 
 const lastSegment = (branch: string) => branch.split('/').pop() ?? branch;

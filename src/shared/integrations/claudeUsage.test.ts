@@ -88,7 +88,7 @@ describe('subagents', () => {
     const fin = applyClaudeEvent(launched, { type: 'system', subtype: 'task_notification', session_id: S, tool_use_id: 'toolu_bg', status: 'failed', usage: { total_tokens: 50, tool_uses: 1 } });
     expect(fin.subagents[0]).toMatchObject({ status: 'failed', tokens: 50 });
     const killed = applyClaudeEvent(started, { type: 'result', subtype: 'error_during_execution', is_error: true, session_id: S });
-    expect(killed.subagents[0].status).toBe('stopped');
+    expect(killed.subagents[0]?.status).toBe('stopped');
     // summaries carry them
     expect(toSummary(killed).subagents).toHaveLength(1);
   });

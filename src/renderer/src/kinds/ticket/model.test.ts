@@ -75,7 +75,7 @@ describe('ticket model', () => {
       ],
     });
     expect(rows.map((r) => `${r.relation} ${r.key}`)).toEqual(['blocks CTX-2', 'is blocked by CTX-3']);
-    expect(rows[0].status).toBe('To Do');
+    expect(rows[0]?.status).toBe('To Do');
     expect(linkRows({})).toEqual([]);
   });
 

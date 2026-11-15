@@ -27,7 +27,7 @@ export function stepsToDone(status: string, statuses: JiraStatusOption[] = MOCK_
   const done = doneStatus(statuses);
   const doneAt = flow.findIndex((s) => s.name === done);
   const at = flow.findIndex((s) => s.name.toLowerCase() === status.toLowerCase());
-  if (at >= 0 && flow[at].category === 'done') return [];
+  if (at >= 0 && flow[at]?.category === 'done') return [];
   if (at < 0) return /block/i.test(status) ? flow.slice(1, doneAt + 1).map((s) => s.name) : [done];
   return flow.slice(at + 1, doneAt + 1).map((s) => s.name);
 }

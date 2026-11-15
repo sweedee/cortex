@@ -10,10 +10,10 @@ const byId = (a: ItemOf<'app'>) => Object.fromEntries(appActions(a).map((x) => [
 
 describe('app ring', () => {
   it('maps the states to tones', () => {
-    expect(appRing(app({ state: 'starting' }))[0].tone).toBe('running');
+    expect(appRing(app({ state: 'starting' }))[0]?.tone).toBe('running');
     expect(appRing(app({ state: 'running', url: 'http://localhost:3000' }))[0]).toEqual({ tone: 'success', label: 'Running on http://localhost:3000' });
-    expect(appRing(app({ state: 'crashed' }))[0].tone).toBe('critical');
-    expect(appRing(app({ state: 'stopped' }))[0].tone).toBe('neutral');
+    expect(appRing(app({ state: 'crashed' }))[0]?.tone).toBe('critical');
+    expect(appRing(app({ state: 'stopped' }))[0]?.tone).toBe('neutral');
   });
 });
 
@@ -21,7 +21,7 @@ describe('app actions', () => {
   it('stopped: start is primary, open disabled', () => {
     const a = byId(app({}));
     expect(a.start).toMatchObject({ label: 'Start', primary: true, disabled: undefined });
-    expect(a.open.disabled).toBe('Not running');
+    expect(a.open?.disabled).toBe('Not running');
     expect(a.stop).toBeUndefined();
     expect(a.restart).toBeUndefined();
   });
@@ -33,17 +33,17 @@ describe('app actions', () => {
     expect(a.start).toBeUndefined();
   });
   it('starting without a URL: open disabled until one is detected', () => {
-    expect(byId(app({ state: 'starting' })).open.disabled).toBe('No URL detected yet');
+    expect(byId(app({ state: 'starting' })).open?.disabled).toBe('No URL detected yet');
   });
   it('crashed: "Restart" starts again, show log is primary', () => {
     const a = byId(app({ state: 'crashed' }));
-    expect(a.start.label).toBe('Restart');
-    expect(a.log.primary).toBe(true);
+    expect(a.start?.label).toBe('Restart');
+    expect(a.log?.primary).toBe(true);
   });
   it('demo item with a fake path cannot start', () => {
     const demo = app({ cwd: '~/wt/x' });
     expect(cannotStart(demo)).toBe(NO_DIR_HINT);
-    expect(byId(demo).start.disabled).toBe(NO_DIR_HINT);
+    expect(byId(demo).start?.disabled).toBe(NO_DIR_HINT);
     expect(byId(demo).editor).toBeUndefined();
     expect(cannotStart(app({ command: ' ' }))).toBe('No start command');
   });

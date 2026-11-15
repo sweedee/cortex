@@ -42,7 +42,7 @@ describe('GhService (fake runner)', () => {
     const prs = await gh.prList('sweedee/cortex', { author: '@me', search: 'is:draft', state: 'all', limit: 5 });
     expect(prs).toEqual([LIST_ITEM]);
     expect(calls[0]).toEqual(['pr', 'list', '--repo', 'sweedee/cortex', '--state', 'all', '--limit', '5', '--json', GH_PR_LIST_FIELDS, '--author', '@me', '--search', 'is:draft']);
-    expect(summarizePr(prs[0])).toMatchObject({ number: 2, state: 'merged', author: 'sweedee', head: 'claude/pr-management-ui-features-vgnprp', checks: 'none' });
+    expect(summarizePr(prs[0]!)).toMatchObject({ number: 2, state: 'merged', author: 'sweedee', head: 'claude/pr-management-ui-features-vgnprp', checks: 'none' });
   });
 
   it('views a PR with merge state', async () => {
@@ -124,8 +124,8 @@ describe.runIf(process.env['CORTEX_LIVE_GH'] === '1' && !!process.env['CORTEX_LI
     // the repo needs at least one PR (any state)
     const prs = await gh.prList(repo, { state: 'all', limit: 3 });
     expect(prs.length).toBeGreaterThan(0);
-    const pr = await gh.prView(repo, prs[0].number);
-    expect(pr.number).toBe(prs[0].number);
+    const pr = await gh.prView(repo, prs[0]?.number ?? 0);
+    expect(pr.number).toBe(prs[0]?.number);
     expect(typeof pr.mergeStateStatus).toBe('string');
     expect(Array.isArray(pr.files)).toBe(true);
     expect(Array.isArray(await gh.prChecks(repo, pr.number))).toBe(true);

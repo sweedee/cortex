@@ -48,7 +48,7 @@ describe('jira-mock + JiraService', () => {
     expect(i.fields.issuelinks?.[0]).toMatchObject({ type: { name: 'Blocks', outward: 'blocks' }, outwardIssue: { key: 'CTX-4833' } });
     expect(i.fields.description).toMatchObject({ type: 'doc', version: 1 });
     expect(adfToMarkdown(i.fields.description)).toContain('- gives up after 8 attempts');
-    expect(i.fields.comment?.comments[0].author.displayName).toBe('Mara Lindqvist');
+    expect(i.fields.comment?.comments[0]?.author.displayName).toBe('Mara Lindqvist');
     expect(summarizeIssue(i)).toMatchObject({ key: 'CTX-4821', statusCategory: 'indeterminate', storyPoints: 5, sprint: 'CTX 26.23', epic: { key: 'CTX-4700' } });
     const few = await jira.view('CTX-4821', { fields: ['summary', 'status'] });
     expect(Object.keys(few.fields)).toEqual(['summary', 'status']);

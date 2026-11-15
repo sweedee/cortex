@@ -103,7 +103,7 @@ export interface JiraFieldIds {
  */
 export function browseUrl(issue: Pick<JiraIssue, 'key' | 'self'>): string {
   const m = /^(https?:\/\/([^/]+))\//.exec(issue.self ?? '');
-  if (!m || /\.atl-paas\.net$/i.test(m[2])) return '';
+  if (!m || /\.atl-paas\.net$/i.test(m[2] ?? '')) return '';
   return `${m[1]}/browse/${issue.key}`;
 }
 
@@ -121,7 +121,8 @@ export function jiraBrowseUrl(key: string, opts: { issue?: Pick<JiraIssue, 'key'
 export function parseAcliSite(text: string): string | null {
   const m = /^\s*Site:\s*(\S+)\s*$/im.exec(text);
   if (!m) return null;
-  return /^https?:\/\//i.test(m[1]) ? m[1].replace(/\/+$/, '') : `https://${m[1].replace(/\/+$/, '')}`;
+  const site = (m[1] ?? '').replace(/\/+$/, '');
+  return /^https?:\/\//i.test(site) ? site : `https://${site}`;
 }
 
 /**

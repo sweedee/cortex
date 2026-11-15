@@ -43,7 +43,7 @@ const int = (s: string | undefined) => {
 };
 const pairOf = (s: string | undefined) => {
   const m = s?.match(/(\d+)\s*\/\s*(\d+)/);
-  return m ? [Number(m[1]), Number(m[2])] : undefined;
+  return m ? ([Number(m[1]), Number(m[2])] as [number, number]) : undefined;
 };
 const durationSec = (s: string | undefined) => {
   const m = s?.match(/(?:(\d+)m)?\s*(?:(\d+)s)?/);

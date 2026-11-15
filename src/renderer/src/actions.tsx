@@ -30,7 +30,7 @@ function multiActions(items: Item[]): Action[] {
     if (mine.length && fn) out.push(...fn(mine, mine.length === items.length));
   }
   out.push(skill('summary', 'Status summary', 'status-summary'));
-  if (items.every((i) => i.archived)) return [unarchiveAction, out[0]];
+  if (items.every((i) => i.archived)) return [unarchiveAction, ...out.slice(0, 1)];
   if (items.length === 2) {
     out.push({
       id: 'link',
@@ -38,6 +38,7 @@ function multiActions(items: Item[]): Action[] {
       type: 'direct',
       icon: <LinkIcon />,
       run: ([a, b]) => {
+        if (!a || !b) return;
         addLink(a.id, b.id, 'related to');
         toast('Linked', `${a.handle} ↔ ${b.handle}`);
       },
@@ -50,7 +51,8 @@ function multiActions(items: Item[]): Action[] {
 export function actionsForSelection(ids: string[]): { items: Item[]; actions: Action[] } {
   const items = ids.map(itemById).filter((i): i is Item => !!i);
   if (items.length === 0) return { items, actions: [] };
-  if (items.length === 1) return { items, actions: actionsForItem(items[0], ctxOf()) };
+  const [only] = items;
+  if (items.length === 1 && only) return { items, actions: actionsForItem(only, ctxOf()) };
   return { items, actions: multiActions(items) };
 }
 
@@ -66,7 +68,7 @@ async function askCwd(): Promise<{ cwd: string; project?: ItemOf<'project'> } | 
     submitLabel: 'Start agent',
     fields: [
       ...(projects.length
-        ? [{ name: 'project', label: 'Project', type: 'radio' as const, options: [...projects.map((p) => ({ value: p.id, label: p.title, hint: p.data.baseDir })), { value: '', label: 'Another folder' }], default: projects[0].id }]
+        ? [{ name: 'project', label: 'Project', type: 'radio' as const, options: [...projects.map((p) => ({ value: p.id, label: p.title, hint: p.data.baseDir })), { value: '', label: 'Another folder' }], default: projects[0]?.id ?? '' }]
         : []),
       { name: 'dir', label: 'Folder', type: 'directory', when: (v) => !projects.length || !v.project, required: true, validate: (v) => (isRealPath(String(v)) ? undefined : 'Use an absolute path') },
     ],

@@ -55,6 +55,7 @@ export class LogTail {
     while (this.size > this.max) {
       const over = this.size - this.max;
       const first = this.parts[0];
+      if (!first) break;
       if (first.length <= over) {
         this.parts.shift();
         this.size -= first.length;

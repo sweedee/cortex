@@ -32,7 +32,8 @@ export const project: KindModule<'project'> = {
             : { tone: 'neutral', label: 'no CI status yet' },
     ];
     if (renovate > 0) {
-      out[0] = { ...out[0], weight: 3 };
+      const head = out[0];
+      if (head) out[0] = { ...head, weight: 3 };
       out.push({ tone: 'warning', label: `${renovate} Renovate PR${renovate === 1 ? '' : 's'} waiting`, weight: 1 });
     }
     return out;
@@ -86,7 +87,7 @@ export const project: KindModule<'project'> = {
         label: 'Settings…',
         type: 'direct',
         icon: <SettingIcon />,
-        run: ([x]) => void openProjectSettings(x.kind === 'project' ? x : undefined),
+        run: ([x]) => void openProjectSettings(x?.kind === 'project' ? x : undefined),
       },
     ];
   },

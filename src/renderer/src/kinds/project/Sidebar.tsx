@@ -121,7 +121,7 @@ function PullRequests({ item }: { item: Project }) {
             <button key={pr.number} className="sidebar-row" onClick={() => void openUrl(pr.url)} title={`${pr.title} · ${pr.author}`}>
               <span style={{ flex: 'none', ...mono }}>#{pr.number}</span>
               <span className="sidebar-row-main">{pr.title}</span>
-              <ToneChip tone={CHECK_TONE[pr.checks]}>{pr.checks === 'none' ? 'no checks' : pr.checks}</ToneChip>
+              <ToneChip tone={CHECK_TONE[pr.checks] ?? 'neutral'}>{pr.checks === 'none' ? 'no checks' : pr.checks}</ToneChip>
               <ToneChip tone={PR_TONE[pr.state] ?? 'neutral'}>{pr.state}</ToneChip>
               <span className="sidebar-row-rel">{agoShort(Date.parse(pr.updatedAt))}</span>
             </button>

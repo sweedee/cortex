@@ -3,6 +3,7 @@ import type { Item, ItemOf } from '../../domain';
 import { nextSteps } from './index';
 import { branchFolder, countSteps, planDiscovery, recordTypeOf, sameBranch } from './model';
 import { normPath } from '../../../../shared/paths';
+import { must } from '../../testing/must';
 
 const base = { createdAt: 0, updatedAt: 0 };
 const project: ItemOf<'project'> = { ...base, id: 'p', kind: 'project', handle: 'p', title: 'p', data: { repo: 'o/r', defaultBranch: 'main', baseDir: 'C:\\code\\r' } };
@@ -50,7 +51,7 @@ describe('record model', () => {
     ];
     const plan = planDiscovery([project, ticket, worktree], project, files);
     expect(plan.add).toHaveLength(1);
-    const { item, links } = plan.add[0];
+    const { item, links } = must(plan.add[0]);
     expect(item).toMatchObject({ kind: 'record', handle: 'plan.md', projectId: 'p', data: { recordType: 'plan', ticketBranch: 'feat/CTX-1-x', ticketKey: 'CTX-1', status: 'draft', steps: { done: 1, total: 2 } } });
     expect(links.map((l) => l.to).sort()).toEqual(['t', 'w']);
   });

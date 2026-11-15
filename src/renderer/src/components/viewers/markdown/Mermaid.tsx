@@ -52,7 +52,7 @@ function renderDiagram(source: string, theme: 'dark' | 'default'): Promise<Resul
     } catch (e) {
       document.getElementById(id)?.remove();
       document.getElementById(`d${id}`)?.remove();
-      return { error: (e instanceof Error ? e.message : String(e)).split('\n')[0] };
+      return { error: (e instanceof Error ? e.message : String(e)).split('\n')[0] ?? '' };
     }
   };
   const p = queue.then(run, run);

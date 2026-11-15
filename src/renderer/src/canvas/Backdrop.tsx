@@ -56,7 +56,7 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
         vx: (Math.random() - 0.5) * 0.12,
         vy: -0.03 - Math.random() * 0.1,
         r: 1 + Math.floor(Math.random() * Math.random() * 3), // 1-3 grid cells, mostly 1
-        c: COLORS[Math.floor(Math.random() * COLORS.length)],
+        c: COLORS[Math.floor(Math.random() * COLORS.length)] ?? '#888',
         depth: 0.05 + Math.random() * 0.25,
         phase: Math.random() * Math.PI * 2,
       }));

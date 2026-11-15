@@ -80,6 +80,7 @@ export const record: KindModule<'record'> = {
         icon: <ViewIcon />,
         primary: true,
         run: ([x]) => {
+          if (!x) return;
           inspect(x.id);
           select([x.id]);
         },

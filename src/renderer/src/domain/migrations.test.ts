@@ -6,6 +6,7 @@ import v3 from './fixtures/workspace-v3.json';
 import { DEFAULT_PREFS, migrate, movedPrefsPatch, parseWorkspace } from './migrations';
 import { KindSchema, WORKSPACE_VERSION, WorkspaceSchema } from './schemas';
 import type { Item, ItemOf, Kind } from './types';
+import { must } from '../testing/must';
 
 describe('migration v0 → v1 (phase-0a seed)', () => {
   const r = parseWorkspace(v0);
@@ -37,7 +38,7 @@ describe('migration v0 → v1 (phase-0a seed)', () => {
       git: { ahead: 3, behind: 12, changedFiles: 0, dirty: false },
     });
     expect(get('a-plan-4833', 'agent').data).toMatchObject({ status: 'waiting', model: 'claude-opus-5-5', usage: { contextPct: 34, costUsd: 0.62, turns: 9 } });
-    expect(get('a-plan-4833', 'agent').data.pendingQuestion?.questions[0].question).toMatch(/Dedup window/);
+    expect(get('a-plan-4833', 'agent').data.pendingQuestion?.questions[0]?.question).toMatch(/Dedup window/);
     expect(get('a-impl-4821', 'agent').data).toMatchObject({ status: 'running', lastActivity: 'editing src/dispatcher/retry.ts' });
     expect(get('pr-477', 'pr').data).toMatchObject({
       repo: 'ctx-observability/console-ui',
@@ -100,7 +101,7 @@ describe('migration v1 → v2 (phase-2b settings)', () => {
   it('keeps items and links as they are', () => {
     expect(r.warnings.filter((w) => w.startsWith('dropped'))).toEqual([]);
     expect(r.workspace.items.map((i) => i.id)).toEqual(['p-ingest', 'a-impl-4821']);
-    const a = r.workspace.items[1];
+    const a = must(r.workspace.items[1]);
     expect(a.kind === 'agent' && a.data).toMatchObject({ status: 'running', skill: 'implement' });
     expect(a.kind === 'agent' && a.data.localId).toBeUndefined();
     expect(r.workspace.links).toHaveLength(1);

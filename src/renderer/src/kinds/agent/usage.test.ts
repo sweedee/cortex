@@ -5,6 +5,7 @@ import { NO_USAGE, parseStreamLine, type ClaudeEvent, type SubagentInfo } from '
 import { mapClaudeState } from '../../sync/mapping';
 import { buildTranscript, groupRows } from './transcript';
 import { duration, subagentTally, tokens, usageView } from './usage';
+import { must } from '../../testing/must';
 
 describe('status bar numbers', () => {
   it('context meter, cache hit rates, window guess', () => {
@@ -36,7 +37,7 @@ describe('transcript with a subagent (real Claude Code session)', () => {
     const { rows, subagents } = buildTranscript(events, 'x');
     expect(subagents).toHaveLength(1);
     expect(rows.map((r) => r.kind)).toEqual(['subagent', 'assistant', 'note', 'assistant']);
-    const sub = rows[0];
+    const sub = must(rows[0]);
     if (sub.kind !== 'subagent') throw new Error('expected a subagent row');
     expect(sub).toMatchObject({ tool: 'Agent', status: 'ok', sub: { description: 'List files', status: 'done' } });
     expect(sub.prompt).toMatch(/Glob tool/);

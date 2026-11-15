@@ -7,6 +7,7 @@ import { KINDS, getKind, makeCtx } from '../registry';
 import { buildKey, checkToBuild, planBuildSync, runIdFromUrl } from '../../sync/checks';
 import { pr as prKind } from './index';
 import { ghBlocked, isAiReviewer, isMergeable, mergeArgs, mergeBlocked, mergeWarnings, needsRetarget, prRing, retargetPlan, stackChildren, worktreeOf } from './logic';
+import { must } from '../../testing/must';
 
 const seed = (id: string) => SEED_ITEMS.find((i) => i.id === id) as ItemOf<'pr'>;
 const withData = (p: ItemOf<'pr'>, d: Partial<PrData>): ItemOf<'pr'> => ({ ...p, data: { ...p.data, ...d } });
@@ -96,9 +97,9 @@ describe('stacked PRs', () => {
     const kids = stackChildren(SEED_ITEMS, parent.id);
     expect(kids.map((k) => k.id)).toEqual(['pr-3124']);
     expect(retargetPlan(parent.data, kids, true)).toEqual([{ child: kids[0], newBase: 'main', automatic: true }]);
-    expect(retargetPlan(parent.data, kids, false)[0].automatic).toBe(false);
+    expect(retargetPlan(parent.data, kids, false)[0]?.automatic).toBe(false);
     // a child already retargeted elsewhere is left alone
-    expect(retargetPlan(parent.data, [withData(kids[0], { baseBranch: 'develop' })], true)).toEqual([]);
+    expect(retargetPlan(parent.data, [withData(must(kids[0]), { baseBranch: 'develop' })], true)).toEqual([]);
   });
   it('needsRetarget once the parent merged', () => {
     const parent = seed('pr-482').data;
@@ -147,9 +148,9 @@ describe('builds from checks', () => {
     const other = makeItem({ kind: 'build', handle: 'c', title: 'c', data: { repo: 'o/r', name: 'test', url: '', state: 'completed', prNumber: 8, branch: 'x' } });
     const plan = planBuildSync([pr, existing, other], pr, [check({ name: 'lint', bucket: 'fail', state: 'FAILURE' }), check({ name: 'test' }), check({ name: 'test' }), check({ name: 'triage', bucket: 'skipping', state: 'SKIPPED' })]);
     expect(plan.updates).toHaveLength(1);
-    expect(plan.updates[0].id).toBe(existing.id);
-    expect(plan.updates[0].patch).toMatchObject({ state: 'completed', conclusion: 'failure' });
-    expect(plan.updates[0].patch.stage).toBeUndefined();
+    expect(plan.updates[0]?.id).toBe(existing.id);
+    expect(plan.updates[0]?.patch).toMatchObject({ state: 'completed', conclusion: 'failure' });
+    expect(plan.updates[0]?.patch.stage).toBeUndefined();
     expect(plan.creates).toHaveLength(1);
     expect(plan.creates[0]).toMatchObject({ kind: 'build', projectId: 'p-ingest', data: { name: 'test', prNumber: 9 } });
     expect(buildKey('o/r', 'test', 9)).not.toBe(buildKey('o/r', 'test', 8));

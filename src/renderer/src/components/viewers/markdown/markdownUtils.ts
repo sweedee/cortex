@@ -6,7 +6,7 @@ const OPEN = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)[^`]*$/;
 
 function closesFence(line: string, fence: string): boolean {
   const t = line.trim();
-  return t.length >= fence.length && t.split(fence[0]).join('') === '';
+  return t.length >= fence.length && t.split(fence.charAt(0)).join('') === '';
 }
 
 /**
@@ -23,15 +23,16 @@ export function splitMermaid(src: string): Segment[] {
     buf = [];
   };
   for (let i = 0; i < lines.length; i++) {
-    const m = OPEN.exec(lines[i]);
+    const line = lines[i] ?? '';
+    const m = OPEN.exec(line);
     if (!m) {
       if (!buf.length) bufStart = i;
-      buf.push(lines[i]);
+      buf.push(line);
       continue;
     }
     let end = -1;
     for (let j = i + 1; j < lines.length; j++) {
-      if (closesFence(lines[j], m[1])) {
+      if (closesFence(lines[j] ?? '', m[1] ?? '')) {
         end = j;
         break;
       }
@@ -41,7 +42,7 @@ export function splitMermaid(src: string): Segment[] {
       buf.push(...lines.slice(i));
       break;
     }
-    if (m[2].toLowerCase() === 'mermaid') {
+    if ((m[2] ?? '').toLowerCase() === 'mermaid') {
       flush();
       out.push({ kind: 'mermaid', text: lines.slice(i + 1, end).join('\n'), line: i });
     } else {
@@ -63,15 +64,15 @@ export function findTaskLines(src: string): number[] {
   let fence: string | null = null;
   for (let i = 0; i < lines.length; i++) {
     if (fence) {
-      if (closesFence(lines[i], fence)) fence = null;
+      if (closesFence(lines[i] ?? '', fence)) fence = null;
       continue;
     }
-    const open = OPEN.exec(lines[i]);
+    const open = OPEN.exec(lines[i] ?? '');
     if (open) {
-      fence = open[1];
+      fence = open[1] ?? null;
       continue;
     }
-    if (TASK.test(lines[i])) found.push(i);
+    if (TASK.test(lines[i] ?? '')) found.push(i);
   }
   return found;
 }
@@ -81,7 +82,7 @@ export function toggleTask(src: string, index: number, checked: boolean): string
   const lineNo = findTaskLines(src)[index];
   if (lineNo === undefined) return src;
   const lines = src.split('\n');
-  lines[lineNo] = lines[lineNo].replace(TASK, `$1${checked ? 'x' : ' '}$3`);
+  lines[lineNo] = (lines[lineNo] ?? '').replace(TASK, `$1${checked ? 'x' : ' '}$3`);
   return lines.join('\n');
 }
 

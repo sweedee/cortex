@@ -119,15 +119,15 @@ export function parseStatusV2(out: string): GitStatus {
     if (type === '1') {
       // 1 XY sub mH mI mW hH hI path
       const f = p.split(' ');
-      s.files.push({ path: f.slice(8).join(' '), index: f[1][0], worktree: f[1][1], kind: 'changed' });
+      s.files.push({ path: f.slice(8).join(' '), index: f[1]?.[0] ?? ' ', worktree: f[1]?.[1] ?? ' ', kind: 'changed' });
     } else if (type === '2') {
       // 2 XY sub mH mI mW hH hI Xscore path \0 origPath
       const f = p.split(' ');
-      s.files.push({ path: f.slice(9).join(' '), origPath: parts[++i], index: f[1][0], worktree: f[1][1], kind: 'renamed' });
+      s.files.push({ path: f.slice(9).join(' '), origPath: parts[++i], index: f[1]?.[0] ?? ' ', worktree: f[1]?.[1] ?? ' ', kind: 'renamed' });
     } else if (type === 'u') {
       // u XY sub m1 m2 m3 mW h1 h2 h3 path
       const f = p.split(' ');
-      s.files.push({ path: f.slice(10).join(' '), index: f[1][0], worktree: f[1][1], kind: 'unmerged' });
+      s.files.push({ path: f.slice(10).join(' '), index: f[1]?.[0] ?? ' ', worktree: f[1]?.[1] ?? ' ', kind: 'unmerged' });
     } else if (type === '?') {
       s.files.push({ path: p.slice(2), index: '?', worktree: '?', kind: 'untracked' });
     } else if (type === '!') {
@@ -143,11 +143,11 @@ export function parseNumstat(out: string): GitDiffStat {
   const files: GitDiffStatFile[] = [];
   const parts = out.split('\0');
   for (let i = 0; i < parts.length; i++) {
-    const p = parts[i].replace(/^\n/, '');
+    const p = (parts[i] ?? '').replace(/^\n/, '');
     if (!p) continue;
     const m = /^(-|\d+)\t(-|\d+)\t(.*)$/s.exec(p);
     if (!m) continue;
-    let path = m[3];
+    let path = m[3] ?? '';
     // renames with -z: "a\td\t" then old path, new path as separate entries
     if (path === '') {
       i += 2;
@@ -172,7 +172,7 @@ export function parseLog(out: string): GitLogEntry[] {
     .filter(Boolean)
     .map((r) => {
       const [sha, short, author, email, date, subject] = r.split('\x1f');
-      return { sha, short, author, email, date, subject: subject ?? '' };
+      return { sha: sha ?? '', short: short ?? '', author: author ?? '', email: email ?? '', date: date ?? '', subject: subject ?? '' };
     });
 }
 
@@ -186,6 +186,6 @@ export function parseRemoteRepo(url: string, host?: string): string | null {
     /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u) ?? /^(?:[^@]+@)?([^:/]+):([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u);
   if (!m) return null;
   // `host` (config github.host): a remote on another host is not a repo of this GitHub
-  if (host && m[1].toLowerCase() !== host.split(':')[0].toLowerCase()) return null;
+  if (host && (m[1] ?? '').toLowerCase() !== (host.split(':')[0] ?? '').toLowerCase()) return null;
   return `${m[2]}/${m[3]}`;
 }

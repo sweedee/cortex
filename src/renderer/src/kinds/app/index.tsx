@@ -32,7 +32,7 @@ export function appActions(a: ItemOf<'app'>): Action[] {
     primary: a.data.state === 'crashed',
     run: ([x]) => {
       showAppTab('log');
-      inspect(x.id);
+      if (x) inspect(x.id);
     },
   };
   return [
@@ -47,7 +47,7 @@ export function appActions(a: ItemOf<'app'>): Action[] {
       icon: <DesktopIcon />,
       run: ([x]) => {
         showAppTab('preview');
-        inspect(x.id);
+        if (x) inspect(x.id);
       },
     },
     ...(live

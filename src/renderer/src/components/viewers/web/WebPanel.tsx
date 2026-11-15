@@ -186,7 +186,7 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
           {viewportSwitcher &&
             (['desktop', 'tablet', 'mobile'] as const).map((v) => (
               <Button key={v} size="condensed" variant={viewport === v ? 'emphasized' : 'default'} onClick={() => setViewport(v)}>
-                {v[0].toUpperCase() + v.slice(1)}
+                {v.charAt(0).toUpperCase() + v.slice(1)}
               </Button>
             ))}
           {emulate && (
