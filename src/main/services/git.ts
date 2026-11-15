@@ -17,7 +17,15 @@ import {
 import { CliError, defaultRunner, runOk, type Runner } from './cli';
 
 /** never wait for an editor or a credential prompt */
-const NON_INTERACTIVE = { GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true', GIT_TERMINAL_PROMPT: '0', GIT_MERGE_AUTOEDIT: 'no' };
+const NON_INTERACTIVE = {
+  GIT_EDITOR: 'true',
+  GIT_SEQUENCE_EDITOR: 'true',
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_MERGE_AUTOEDIT: 'no',
+  // messages in English whatever the user's locale: we match on them (/conflict/i, "already exists", …)
+  LC_ALL: 'C',
+  LANG: 'C',
+};
 
 export interface DiffOptions {
   /** diff against the merge base with this ref (`git diff --merge-base <base>`), working tree included */

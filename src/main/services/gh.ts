@@ -15,6 +15,7 @@ import {
   type GhUpdateBranchResult,
 } from '../../shared/integrations/github';
 import type { GhPrEditRequest } from '../../shared/ipc';
+import { ghChecksSchema, ghPrListSchema, ghPullRequestSchema, ghRunSchema } from './schemas';
 import { CliError, defaultRunner, parseJson, runOk, type Runner } from './cli';
 
 export interface PrListFilter {
@@ -68,11 +69,11 @@ export class GhService {
     if (f.label) args.push('--label', f.label);
     if (f.head) args.push('--head', f.head);
     if (f.base) args.push('--base', f.base);
-    return parseJson<GhPrListItem[]>(await this.gh(args), 'gh pr list');
+    return parseJson<GhPrListItem[]>(await this.gh(args), 'gh pr list', ghPrListSchema);
   }
 
   async prView(repo: string, number: number): Promise<GhPullRequest> {
-    return parseJson<GhPullRequest>(await this.gh(['pr', 'view', String(number), '--repo', repo, '--json', GH_PR_FIELDS]), 'gh pr view');
+    return parseJson<GhPullRequest>(await this.gh(['pr', 'view', String(number), '--repo', repo, '--json', GH_PR_FIELDS]), 'gh pr view', ghPullRequestSchema);
   }
 
   /** runs in `dir` (the worktree); the head branch must already be pushed */
@@ -125,14 +126,14 @@ export class GhService {
     const args = ['pr', 'checks', String(number), '--repo', repo, '--json', GH_CHECK_FIELDS];
     const r = await this.run('gh', args, { cwd: this.cwd, env: ENV });
     const out = r.stdout.trim();
-    if (out.startsWith('[')) return parseJson<GhCheck[]>(out, 'gh pr checks');
+    if (out.startsWith('[')) return parseJson<GhCheck[]>(out, 'gh pr checks', ghChecksSchema);
     // "no checks reported on the '<branch>' branch"
     if (/no checks reported/i.test(r.stderr + r.stdout)) return [];
     throw new CliError('gh', args, r);
   }
 
   async runView(repo: string, runId: number): Promise<GhRun> {
-    return parseJson<GhRun>(await this.gh(['run', 'view', String(runId), '--repo', repo, '--json', GH_RUN_FIELDS]), 'gh run view');
+    return parseJson<GhRun>(await this.gh(['run', 'view', String(runId), '--repo', repo, '--json', GH_RUN_FIELDS]), 'gh run view', ghRunSchema);
   }
 
   async runRerun(repo: string, runId: number, opts: { failedOnly?: boolean } = {}): Promise<void> {

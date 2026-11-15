@@ -557,7 +557,7 @@ export class ClaudeSessions {
     if (!child) return Promise.resolve(false);
     e.stopping = true;
     return new Promise((resolve) => {
-      const timer = setTimeout(() => killTree(child.pid), 2000);
+      const timer = setTimeout(() => killTree(child.pid), 2000) // killTree itself escalates to SIGKILL on POSIX;
       child.once('close', () => {
         clearTimeout(timer);
         resolve(true);

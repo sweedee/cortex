@@ -1,6 +1,8 @@
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import type { EventChannel, EventChannels, InvokeChannel, Req, Res } from '../../shared/ipc';
 import { parseRequest } from '../lib/validate';
+import { PathNotAllowedError } from '../lib/pathPolicy';
+import { ipcError } from './errors';
 
 /** Shared state the handler modules need. */
 export interface IpcContext {
@@ -24,7 +26,11 @@ export function handle<C extends InvokeChannel>(
     const frame = e.senderFrame;
     const main = win?.webContents.mainFrame;
     const isMain = !!frame && !!main && frame.processId === main.processId && frame.routingId === main.routingId;
-    if (!win || e.sender !== win.webContents || !isMain) throw new Error(`${channel}: caller not allowed`);
-    return fn(parseRequest(channel, raw), e);
+    if (!win || e.sender !== win.webContents || !isMain) throw ipcError(new PathNotAllowedError(`${channel}: caller not allowed`));
+    try {
+      return await fn(parseRequest(channel, raw), e);
+    } catch (err) {
+      throw ipcError(err);
+    }
   });
 }

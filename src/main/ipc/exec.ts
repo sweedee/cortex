@@ -4,6 +4,7 @@ import { OutputBatcher } from '../lib/batcher';
 import type { Roots } from '../lib/pathPolicy';
 import { runExec, type ExecSpawn } from '../lib/exec';
 import { ProcManager } from '../lib/procManager';
+import { onShutdown } from '../lib/shutdown';
 import { handle, type IpcContext } from './handle';
 
 /** `exec:*` (one-shot, allowlisted, no shell) and `proc:*` (long-running, streamed). */
@@ -35,6 +36,5 @@ export function registerExec(ctx: IpcContext, opts: { roots: Roots; resolve?: (r
   handle(ctx, 'proc:list', () => procs.list());
 
   // no orphaned dev servers: kill every child tree when the app goes away
-  app.on('will-quit', () => procs.stopAll());
-  process.on('exit', () => procs.stopAll());
+  onShutdown(() => procs.stopAll());
 }

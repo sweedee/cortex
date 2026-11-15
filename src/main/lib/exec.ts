@@ -13,8 +13,43 @@ import type { ExecRequest, ExecResult } from '../../shared/ipc';
 import { killTree, treeSpawnOptions } from './killTree';
 
 const DEFAULT_TIMEOUT = 120_000;
-/** keep at most this many chars per stream */
-const MAX_OUTPUT = 20 * 1024 * 1024;
+/** keep at most this many chars per stream; the result says `truncated` when more came */
+export const MAX_OUTPUT = 20 * 1024 * 1024;
+
+/** The command could not be started (not installed / not on PATH). */
+export class CliMissingError extends Error {
+  readonly cmd: string;
+  constructor(cmd: string, reason: string) {
+    super(`Could not run ${cmd}: ${reason}`);
+    this.name = 'CliMissingError';
+    this.cmd = cmd;
+  }
+}
+
+/** Collects a stream's chunks up to `MAX_OUTPUT` chars (no repeated string concatenation / re-slicing). */
+class Collector {
+  private chunks: string[] = [];
+  private size = 0;
+  truncated = false;
+  push(chunk: string): void {
+    if (this.size >= MAX_OUTPUT) {
+      this.truncated = true;
+      return;
+    }
+    const room = MAX_OUTPUT - this.size;
+    if (chunk.length > room) {
+      this.chunks.push(chunk.slice(0, room));
+      this.size = MAX_OUTPUT;
+      this.truncated = true;
+    } else {
+      this.chunks.push(chunk);
+      this.size += chunk.length;
+    }
+  }
+  text(): string {
+    return this.chunks.join('');
+  }
+}
 
 /** What `runExec` takes: an `exec:run` request, or (main-internal) any resolved command. */
 export type ExecSpawn = Omit<ExecRequest, 'cmd'> & { cmd: string };
@@ -28,12 +63,11 @@ export function runExec(req: ExecSpawn): Promise<ExecResult> {
       stdio: ['pipe', 'pipe', 'pipe'],
       ...treeSpawnOptions,
     });
-    let stdout = '';
-    let stderr = '';
+    const stdout = new Collector();
+    const stderr = new Collector();
     let timedOut = false;
-    const cap = (cur: string, chunk: string) => (cur.length >= MAX_OUTPUT ? cur : (cur + chunk).slice(0, MAX_OUTPUT));
-    child.stdout?.setEncoding('utf8').on('data', (c: string) => (stdout = cap(stdout, c)));
-    child.stderr?.setEncoding('utf8').on('data', (c: string) => (stderr = cap(stderr, c)));
+    child.stdout?.setEncoding('utf8').on('data', (c: string) => stdout.push(c));
+    child.stderr?.setEncoding('utf8').on('data', (c: string) => stderr.push(c));
 
     const timer = setTimeout(() => {
       timedOut = true;
@@ -42,11 +76,11 @@ export function runExec(req: ExecSpawn): Promise<ExecResult> {
 
     child.on('error', (err) => {
       clearTimeout(timer);
-      reject(new Error(`Could not run ${req.cmd}: ${err.message}`));
+      reject(new CliMissingError(req.cmd, err.message));
     });
     child.on('close', (code) => {
       clearTimeout(timer);
-      resolve({ code: timedOut ? null : code, stdout, stderr, timedOut });
+      resolve({ code: timedOut ? null : code, stdout: stdout.text(), stderr: stderr.text(), timedOut, truncated: stdout.truncated || stderr.truncated });
     });
 
     child.stdin?.on('error', () => {}); // EPIPE when the child exits before reading

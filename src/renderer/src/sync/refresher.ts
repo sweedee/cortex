@@ -13,6 +13,7 @@
  * the item (and, for gh, its whole repo) backs off exponentially (up to 30 intervals). Paths
  * that are not absolute (demo data like `~/wt/…`) are skipped without calling git.
  */
+import { ipcErrorMessage } from '../../../shared/ipcError';
 import { queryClient } from '../data/queryClient';
 import { qk } from '../data/queryKeys';
 import { isRealPath, type Item, type ItemOf } from '../domain';
@@ -174,11 +175,7 @@ function dueAt(job: Job, intervalMs: number): number {
 
 /** Keys (repo or item) that already got a "sync failing" toast; cleared on the next success. */
 const toasted = new Set<string>();
-const errorLine = (e: unknown) =>
-  ((e as Error)?.message ?? String(e))
-    .split('\n')[0]
-    .replace(/^Error invoking remote method '[^']+': /, '')
-    .replace(/^(?:(?:[A-Z]\w*)?Error: )+/, '');
+const errorLine = (e: unknown) => ipcErrorMessage(e).split('\n')[0];
 
 async function runJob(job: Job) {
   const t = track.get(job.id) ?? { last: 0, fails: 0 };
@@ -207,7 +204,7 @@ async function runJob(job: Job) {
     }
     if (!t.logged) {
       t.logged = true;
-      console.info(`[refresh] ${itemById(job.id)?.handle ?? job.id}: ${(e as Error).message?.split('\n')[0]} (backing off)`);
+      console.info(`[refresh] ${itemById(job.id)?.handle ?? job.id}: ${errorLine(e)} (backing off)`);
     }
   }
 }

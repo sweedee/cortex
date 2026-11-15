@@ -14,6 +14,7 @@
  */
 import { bulkFailures, isAcliBulkResult, parseAcliSite, workflowStatuses, type JiraComment, type JiraIssue, type JiraStatusOption } from '../../shared/integrations/jira';
 import { defaultRunner, parseJson, runOk, type Runner } from './cli';
+import { jiraIssueSchema, jiraSearchSchema } from './schemas';
 import type { JiraCliSpec } from './config';
 
 export interface JiraCreateRequest {
@@ -108,12 +109,12 @@ export class JiraService {
     if (opts.fields) args.push('--fields', opts.fields.join(','));
     const out = await this.acli(args);
     if (!out.trim().startsWith('[') && !out.trim().startsWith('{')) return []; // "No work items found."
-    const v = parseJson<JiraIssue[] | { issues: JiraIssue[] }>(out, 'jira search');
+    const v = parseJson<JiraIssue[] | { issues: JiraIssue[] }>(out, 'jira search', jiraSearchSchema);
     return Array.isArray(v) ? v : (v.issues ?? []);
   }
 
   async view(key: string, opts: { fields?: string[] } = {}): Promise<JiraIssue> {
-    return parseJson<JiraIssue>(await this.acli(['view', key, '--json', '--fields', (opts.fields ?? ['*all']).join(',')]), 'jira view');
+    return parseJson<JiraIssue>(await this.acli(['view', key, '--json', '--fields', (opts.fields ?? ['*all']).join(',')]), 'jira view', jiraIssueSchema);
   }
 
   /** The statuses of a project's workflow as far as its issues show them (see the file comment). */
@@ -131,7 +132,7 @@ export class JiraService {
     if (req.description) args.push('--description', req.description);
     if (req.assignee) args.push('--assignee', req.assignee);
     if (req.parent) args.push('--parent', req.parent);
-    return parseJson<JiraIssue>(await this.acli(args), 'jira create');
+    return parseJson<JiraIssue>(await this.acli(args), 'jira create', jiraIssueSchema);
   }
 
   /** acli prints only a bulk result (no comment object): null then; the mock prints the comment. */

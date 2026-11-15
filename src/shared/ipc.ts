@@ -32,6 +32,8 @@ export interface ExecResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  /** stdout or stderr hit the output cap and the rest was dropped */
+  truncated?: boolean;
 }
 
 // ---- long-running processes ---------------------------------------------------------------

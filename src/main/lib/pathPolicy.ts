@@ -130,7 +130,7 @@ export class Roots {
   /** throw unless `p` is reachable */
   check(p: string, what = 'path'): void {
     const why = this.refusal(p);
-    if (why) throw new Error(`${what} not allowed: ${p} (${why})`);
+    if (why) throw new PathNotAllowedError(`${what} not allowed: ${p} (${why})`);
   }
 }
 
@@ -151,4 +151,12 @@ export function isExecutablePath(p: string): boolean {
   if (base.includes(':')) return true;
   const dot = base.lastIndexOf('.');
   return dot > 0 && execExt.has(base.slice(dot + 1).toLowerCase());
+}
+
+/** A path outside the folders Cortex works in (maps to the IPC error code FORBIDDEN). */
+export class PathNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PathNotAllowedError';
+  }
 }

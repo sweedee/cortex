@@ -1,4 +1,5 @@
 /** Pure helpers of the ticket kind: workflow, "mark done" fallback, related items. */
+import { ipcErrorMessage } from '../../../../shared/ipcError';
 import { MOCK_STATUS_OPTIONS, type JiraIssue, type JiraStatusOption } from '../../../../shared/integrations/jira';
 
 /** Project key of an issue key (`CTX-12` → `CTX`). */
@@ -38,7 +39,7 @@ export type DoneResult = { ok: true; via: 'direct' | 'steps' } | { ok: false; er
  * `transition` is `jiraOps.transition` (injected for tests); `statuses` the project's workflow.
  */
 export async function transitionToDone(key: string, status: string, transition: (key: string, status: string) => Promise<void>, statuses: JiraStatusOption[] = MOCK_STATUS_OPTIONS): Promise<DoneResult> {
-  const text = (e: unknown) => (e instanceof Error ? e.message : String(e));
+  const text = ipcErrorMessage;
   const done = doneStatus(statuses);
   try {
     await transition(key, done);

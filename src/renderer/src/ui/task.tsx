@@ -6,12 +6,12 @@
 import { ProgressCircle } from '@dynatrace/strato-components/content';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { useEffect } from 'react';
+import { ipcErrorMessage } from '../../../shared/ipcError';
 import { native } from '../native';
 import { startProgressToast } from './progressToast';
 
 /** A readable message of a failed native call (strips Electron's "Error invoking remote method …"). */
-export const errorText = (e: unknown) =>
-  (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']+': /, '').replace(/^(?:(?:[A-Z]\w*)?Error: )+/, '');
+export const errorText = ipcErrorMessage;
 
 export interface TaskOptions<T> {
   /** success toast title (default: the label + " done"); a function gets the result */

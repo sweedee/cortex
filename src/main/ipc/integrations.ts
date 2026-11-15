@@ -1,6 +1,7 @@
-import { app, dialog } from 'electron';
+import { dialog } from 'electron';
 import { ModeGate } from '../lib/modeGate';
 import type { Roots } from '../lib/pathPolicy';
+import { onShutdown } from '../lib/shutdown';
 import type { Services } from '../services';
 import { handle, type IpcContext } from './handle';
 
@@ -96,6 +97,5 @@ export function registerIntegrations(ctx: IpcContext, s: Services, roots: Roots)
   handle(ctx, 'tests:log', ({ id }) => tests.log(id));
 
   // no orphaned agents / dev servers / test runs
-  app.on('will-quit', () => s.stopAll());
-  process.on('exit', () => s.stopAll());
+  onShutdown(() => s.stopAll());
 }

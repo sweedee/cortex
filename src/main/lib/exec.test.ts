@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runExec } from './exec';
+import { CliMissingError, MAX_OUTPUT, runExec } from './exec';
 import { globToRegExp } from './glob';
 
 const cwd = process.cwd();
@@ -7,7 +7,7 @@ const cwd = process.cwd();
 describe('runExec (real child processes, no shell)', () => {
   it('captures stdout, stderr and the exit code', async () => {
     const r = await runExec({ cmd: 'node', args: ['-e', 'process.stdout.write("out"); process.stderr.write("err"); process.exit(3)'], cwd });
-    expect(r).toEqual({ code: 3, stdout: 'out', stderr: 'err', timedOut: false });
+    expect(r).toEqual({ code: 3, stdout: 'out', stderr: 'err', timedOut: false, truncated: false });
   });
 
   it('passes arguments verbatim (no shell interpretation)', async () => {
@@ -19,6 +19,17 @@ describe('runExec (real child processes, no shell)', () => {
   it('feeds stdin and merges env', async () => {
     const r = await runExec({ cmd: 'node', args: ['-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(s+process.env.CORTEX_T))'], cwd, stdin: 'hi-', env: { CORTEX_T: 'there' } });
     expect(r.stdout.trim()).toBe('hi-there');
+  });
+
+  it('stops collecting at the cap and says so', async () => {
+    const r = await runExec({ cmd: 'node', args: ['-e', `process.stdout.write("x".repeat(${MAX_OUTPUT} + 5000))`], cwd });
+    expect(r.stdout.length).toBe(MAX_OUTPUT);
+    expect(r.truncated).toBe(true);
+    expect(r.code).toBe(0);
+  }, 30_000);
+
+  it('reports a missing command as CliMissingError', async () => {
+    await expect(runExec({ cmd: 'definitely-not-a-cortex-command', args: [], cwd })).rejects.toBeInstanceOf(CliMissingError);
   });
 
   it('kills on timeout', async () => {
