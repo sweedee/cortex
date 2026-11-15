@@ -47,6 +47,11 @@ Shared files that many features touch. Keep changes there small and additive, id
   happen: actions that need one are disabled with a reason;
   sidebars show a hint ("Set the project's base checkout in Settings…") or an inline error. Never crash and
   never leave a spinner running.
+- Colours, shadows and z-index come from the tokens at the top of `index.css` (dark in `:root`, light under
+  `[data-theme='light']`, the `--z-*` scale); component rules never use raw hex/rgba (`ui/contrast.test.ts`
+  checks this and the text contrast). Sizes shared by TS and CSS live in `ui/metrics.ts`. Keyboard shortcuts
+  live in one table, `ui/shortcuts.ts` (the canvas handler and the `?` overlay both read it). New
+  focusable things need a label and a visible `:focus-visible` style.
 - UI style: flat, dark-first, small radii, no glass or gradients, colours from Strato tokens. Check Strato
   props in `node_modules/@dynatrace/strato-components/**/*.d.ts`. Reuse the `sidebar/` sections
   (`SidebarSection` with `actions`, `SidebarTabs` with `wide: true` for webviews and diffs) and
