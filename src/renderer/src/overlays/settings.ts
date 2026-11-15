@@ -7,6 +7,7 @@
  * config.json itself.
  */
 import { loadIntegrationConfig } from '../data/app';
+import type { ThemePref } from '../theme';
 import { configOps, userConfig } from '../data/config';
 import { toggleDesktop } from '../desktop';
 import { native } from '../native';
@@ -27,6 +28,12 @@ export const modelOptions = (catalog: ClaudeCatalog | undefined, current?: strin
   modelChoices(catalog, current).map((c) => ({ value: c.value || DEFAULT, label: c.value ? `${c.label}${c.hint ? ` — ${c.hint}` : ''}` : 'CLI default (no flag)' }));
 const EFFORT_OPTIONS = effortChoices().map((c) => ({ value: c.value || DEFAULT, label: c.value ? `${c.label}: ${c.hint}` : 'CLI default (no flag)' }));
 
+export const THEME_OPTIONS: { value: ThemePref; label: string }[] = [
+  { value: 'system', label: 'System (follow the OS)' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+];
+
 export const COLOR_BY: { value: ColorBy; label: string }[] = [
   { value: 'project', label: 'Project (one colour per project and everything linked to it)' },
   { value: 'ticket', label: 'Ticket (one colour per ticket)' },
@@ -45,7 +52,7 @@ export function settingsPatch(v: FormValues): UserConfigPatch {
     claude: { model: model && model !== DEFAULT ? model : null, effort: effort ?? null, permissionMode: mode },
     github: { aiReviewComment: str(v, 'aiReviewComment').trim() || null },
     refresh: { intervalSec: Math.round(Number(str(v, 'refreshSec'))) },
-    ui: { sound: v.soundOn === true },
+    ui: { sound: v.soundOn === true, theme: THEME_OPTIONS.find((t) => t.value === str(v, 'theme'))?.value ?? 'system', animations: v.animations !== false },
   };
 }
 
@@ -86,6 +93,8 @@ export async function openSettings() {
       refreshSec: String(cfg.refresh.intervalSec),
       desktopNotify: s.desktopNotify,
       soundOn: cfg.ui.sound,
+      theme: cfg.ui.theme,
+      animations: cfg.ui.animations,
       configPath: configFileInfo(configState),
       workspacePath,
       userData: info?.userData || '–',
@@ -101,6 +110,8 @@ export async function openSettings() {
       { name: 'refreshSec', label: 'Background refresh (seconds)', type: 'text', required: true, validate: validRefresh, hint: 'How often git / GitHub / Jira caches on the bubbles refresh (15 s while checks or builds run).' },
       { name: 'desktopNotify', label: 'Desktop notifications when Cortex is in the background', type: 'checkbox' },
       { name: 'soundOn', label: 'Sound for new notices', type: 'checkbox' },
+      { name: 'theme', label: 'Theme', type: 'select', options: THEME_OPTIONS },
+      { name: 'animations', label: 'Animations (backdrop particles, floating bubbles)', type: 'checkbox', hint: 'The OS setting “reduce motion” always turns them off.' },
       {
         name: 'configPath',
         label: 'Config file',

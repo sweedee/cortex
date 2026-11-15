@@ -9,7 +9,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { showToast } from '@dynatrace/strato-components/notifications';
 import { shallow } from 'zustand/shallow';
-import { DEFAULT_USER_CONFIG, type UserConfig, type UserConfigPatch, type UserConfigState } from '../../../shared/userConfig';
+import { DEFAULT_USER_CONFIG, repoUrl, type UserConfig, type UserConfigPatch, type UserConfigState } from '../../../shared/userConfig';
 import { native, notifyPermitted } from '../native';
 import { appStore, setState, type State } from '../store';
 import { queryClient } from './queryClient';
@@ -22,6 +22,9 @@ export function useUserConfig() {
 
 /** The effective config outside React (defaults until it is loaded). */
 export const userConfig = (): UserConfig => queryClient.getQueryData<UserConfigState>(qk.app.userConfig())?.config ?? DEFAULT_USER_CONFIG;
+
+/** Web URL of a repo (or a path in it) on the configured GitHub host: the one place that builds them. */
+export const repoWebUrl = (repo: string, path = ''): string => repoUrl(userConfig().github.host, repo, path);
 
 /** The config values the store mirrors. */
 export interface MirroredPrefs {

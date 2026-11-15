@@ -3,6 +3,7 @@
  * No React, no store, no native calls (unit-tested in `logic.test.ts`).
  */
 import type { GhMergeMethod } from '../../../../shared/integrations/github';
+import { repoWebUrl } from '../../data/config';
 import { isRealRepo, type Item, type ItemOf, type PrData, type Segment } from '../../domain';
 
 type Pr = ItemOf<'pr'>;
@@ -10,7 +11,7 @@ type Pr = ItemOf<'pr'>;
 /** A GitHub `owner/name` that gh can reach (demo items use `unknown/…`). */
 export { isRealRepo };
 
-export const prUrl = (d: Pick<PrData, 'repo' | 'number'>) => `https://github.com/${d.repo}/pull/${d.number}`;
+export const prUrl = (d: Pick<PrData, 'repo' | 'number'>) => repoWebUrl(d.repo, `/pull/${d.number}`);
 
 /** Checks are fine for merging: green, or there are none. */
 const checksOk = (d: PrData) => !d.checks || d.checks.state === 'success' || d.checks.state === 'none';

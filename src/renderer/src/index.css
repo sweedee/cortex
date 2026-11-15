@@ -220,6 +220,12 @@ body {
   animation-duration: 6.2s;
   animation-delay: -4s;
 }
+html.no-animations .backdrop-particles {
+  display: none;
+}
+html.no-animations .bubble .bubble-float {
+  animation: none !important;
+}
 @keyframes float {
   50% {
     transform: translateY(-3px);
@@ -1777,4 +1783,53 @@ body .Toastify__toast-container.Toastify__toast-container--bottom-left {
   color: var(--ink);
   font: 12px var(--dt-typography-code-base-default-family, ui-monospace), monospace;
   text-align: center;
+}
+
+/* first-run panel and the Jira-not-configured banner (overlays/Welcome.tsx) */
+.welcome {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-hud);
+  width: min(460px, calc(100vw - 32px));
+  padding: 20px 24px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+}
+.welcome h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.welcome p {
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+.welcome-actions {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+.welcome-hint {
+  color: var(--ink-subdued);
+  font-size: 12px;
+}
+.jira-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: var(--z-hud);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 8px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--tone-warning, var(--line));
+  border-radius: 4px;
+  color: var(--ink);
+  font-size: 13px;
 }

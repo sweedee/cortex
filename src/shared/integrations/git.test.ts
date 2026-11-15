@@ -80,3 +80,11 @@ describe('git parsers', () => {
     ['', null],
   ])('remote %s → %s', (url, repo) => expect(parseRemoteRepo(url)).toBe(repo));
 });
+
+describe('parseRemoteRepo host', () => {
+  it('accepts any host, or only the given one', () => {
+    expect(parseRemoteRepo('git@ghe.example.com:o/r.git')).toBe('o/r');
+    expect(parseRemoteRepo('git@ghe.example.com:o/r.git', 'ghe.example.com')).toBe('o/r');
+    expect(parseRemoteRepo('https://gitlab.com/o/r', 'github.com')).toBeNull();
+  });
+});

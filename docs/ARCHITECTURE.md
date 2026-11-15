@@ -850,6 +850,7 @@ start).
 | `claude.contextWindow` | `200000` | context % until a session reports its window (`usageView`, `mapClaudeState`) |
 | `github.aiReviewComment` | `@claude review` | *Request AI review*, `gh:prComment` without a body |
 | `github.aiReviewBot` | `claude[bot]` | tags its comments "AI review" in the PR sidebar (`isAiReviewer`) |
+| `github.host` | `github.com` | repo links (`repoWebUrl`, `repoUrl`); file-only. `parseRemoteRepo` accepts any host (GitHub Enterprise remotes work) |
 | `github.renovate.app`, `.label` | `renovate`, `renovate` | `gh:renovatePrs` |
 | `jira.cli`, `jira.site` | `acli`, `""` | Jira CLI (restart); site for links (`""` = `acli jira auth status`) |
 | `jira.fields.storyPoints`, `.sprint` | `customfield_10016`, `customfield_10020` | `summarizeIssue` |
@@ -858,7 +859,10 @@ start).
 | `git.worktreesDir` | `../wt/{repo}` | default worktrees folder of a project (relative to the base checkout or absolute; `worktreesDirFor`) |
 | `records.dir` | `records` | record discovery and new records (relative to the base checkout, no `..`) |
 | `refresh.intervalSec` | `60` | background refresher |
+| `refresh.fastSec`, `.parallel` | `15`, `3` | refresher: interval while checks / builds run, jobs at a time (file-only) |
+| `limits.execTimeoutSec`, `.rebaseTimeoutSec`, `.outputCapMb` | `120`, `300`, `20` | `lib/exec.ts` default timeout and per-stream output cap, `git rebase` timeout (`lib/limits.ts`; file-only, apply at once) |
 | `ui.notifications`, `ui.sound` | `false`, `true` | notices |
+| `ui.theme`, `ui.animations` | `system`, `true` | `useThemePref()`; `animations: false` adds `no-animations` to `<html>` (no backdrop particles, no bubble float) |
 
 Resolution (main, `services/config.ts` `resolveConfig`): `DEFAULT_CONFIG` ← config.json ← env. The env overrides
 are dev / test only (a packaged build strips them, `lib/devEnv.ts`): `CORTEX_JIRA_CLI=acli|mock` (smoke runs
@@ -869,8 +873,7 @@ While running, GitHub settings and a set `jira.site` apply at once (`services.se
 `integrations:config` returns main's effective values once `initJira` is done (Settings shows the Jira CLI, site
 and `note`).
 
-Not yet configurable: exec / rebase / probe timeouts and output caps, refresher fast interval and parallelism,
-the GitHub host. Deferred: a per-repo `.cortex.json` for team settings (AUDIT §3.3 point 3).
+Not yet configurable: probe timeouts. Deferred: a per-repo `.cortex.json` for team settings (AUDIT §3.3 point 3).
 
 ## Smoke runs
 
@@ -889,7 +892,7 @@ smoke's temp folder) is added to the allowed roots.
 | `CORTEX_SMOKE_GH_REPO=owner/name` | a read-only `gh pr list` |
 | `CORTEX_SMOKE_E2E=1` | a project on this repo + forced refresh; with `CORTEX_CLAUDE_BIN=<fake-claude.mjs>` chat → agent → question → answer and the agent harness via the DOM; an app with a tiny HTTP server (URL, preview, restart, stop, crash). `CORTEX_SMOKE_FINAL=app \| agent \| <item id>` picks the final view |
 | `CORTEX_SMOKE_GALLERY=1` | the viewer gallery: mermaid, CodeMirror, diff rendering and CSP violations |
-| `CORTEX_SMOKE_WORLD=1` | loads the first-run world (`resetToDemo`), one forced refresh with the real gh / git / Jira (read-only), then prints what each bubble shows and every warning logged meanwhile. Add `CORTEX_JIRA_CLI=acli` for the real Jira |
+| `CORTEX_SMOKE_WORLD=1` | loads the demo world (`loadDemoWorld`), one forced refresh, then prints what each bubble shows and every warning logged meanwhile. |
 | `CORTEX_SMOKE_REPO=1` | the real-repo click-through (`smokeRepo.ts`): a temp repo with a local bare `origin`, then project via Add, new worktree, launch app, run tests, commit → diff, record file → record bubble, todo add / edit, create PR up to the push, Jira status change, agent question (fake CLI), settings, worktree removal. Checklist on stdout, screenshots in `CORTEX_SMOKE_OUT` (default `<tmp>/cortex-smoke-*`). Start it with `GH_HOST=smoke.invalid` so gh never contacts GitHub |
 
 ## Where things live

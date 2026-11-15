@@ -14,6 +14,7 @@ import {
   type GitStatus,
   type GitWorktree,
 } from '../../shared/integrations/git';
+import { rebaseTimeoutMs } from '../lib/limits';
 import { CliError, defaultRunner, runOk, type Runner } from './cli';
 
 /** never wait for an editor or a credential prompt */
@@ -127,7 +128,7 @@ export class GitService {
 
   /** `git rebase <onto>`; stops (not aborts) on conflicts so they can be resolved or aborted */
   async rebase(dir: string, onto: string): Promise<GitRebaseResult> {
-    const r = await this.run('git', ['rebase', onto], { cwd: dir, env: NON_INTERACTIVE, timeoutMs: 300_000 });
+    const r = await this.run('git', ['rebase', onto], { cwd: dir, env: NON_INTERACTIVE, timeoutMs: rebaseTimeoutMs() });
     if (r.code === 0) return { ok: true };
     const conflicts = await this.conflicts(dir).catch(() => []);
     if (conflicts.length > 0) return { ok: false, conflicts };

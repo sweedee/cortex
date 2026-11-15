@@ -178,11 +178,14 @@ export function parseLog(out: string): GitLogEntry[] {
 
 /**
  * `owner/name` from a GitHub remote URL (https, ssh, scp-like); null for anything else.
- * Works for GitHub Enterprise hosts too (host is ignored).
+ * Any host is accepted (GitHub Enterprise too) unless `host` is given: then the remote must be on it.
  */
-export function parseRemoteRepo(url: string): string | null {
+export function parseRemoteRepo(url: string, host?: string): string | null {
   const u = url.trim();
   const m =
-    /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?[^/]+(?::\d+)?\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u) ?? /^(?:[^@]+@)?[^:/]+:([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u);
-  return m ? `${m[1]}/${m[2]}` : null;
+    /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u) ?? /^(?:[^@]+@)?([^:/]+):([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u);
+  if (!m) return null;
+  // `host` (config github.host): a remote on another host is not a repo of this GitHub
+  if (host && m[1].toLowerCase() !== host.split(':')[0].toLowerCase()) return null;
+  return `${m[2]}/${m[3]}`;
 }

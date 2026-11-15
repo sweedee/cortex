@@ -11,13 +11,12 @@ import { ipcErrorMessage } from '../../../shared/ipcError';
 import type { Item } from '../domain';
 import { getKind } from '../kinds/registry';
 import type { KindModule, SyncJob } from '../kinds/types';
+import { userConfig } from '../data/config';
 import { isDesktop } from '../native';
 import { getState, itemById, setSynced, setSyncError } from '../store';
 import { showToast } from '@dynatrace/strato-components/notifications';
 
 const TICK_MS = 5_000;
-const FAST_MS = 15_000;
-const PARALLEL = 3;
 
 type Job = SyncJob;
 
@@ -48,7 +47,7 @@ function dueAt(job: Job, intervalMs: number): number {
   const own = track.get(job.id);
   const grp = job.group ? track.get(job.group) : undefined;
   const fails = Math.max(own?.fails ?? 0, grp?.fails ?? 0);
-  const base = job.fast ? Math.min(FAST_MS, intervalMs) : intervalMs;
+  const base = job.fast ? Math.min(userConfig().refresh.fastSec * 1000, intervalMs) : intervalMs;
   return (own?.last ?? 0) + base * Math.min(2 ** fails, 30);
 }
 
@@ -102,7 +101,8 @@ export async function refreshDue(force = false): Promise<void> {
     const intervalMs = getState().settings.refreshSec * 1000;
     const now = Date.now();
     const due = jobsFor(getState().items).filter((j) => force || dueAt(j, intervalMs) <= now);
-    for (let i = 0; i < due.length; i += PARALLEL) await Promise.all(due.slice(i, i + PARALLEL).map(runJob));
+    const parallel = userConfig().refresh.parallel;
+    for (let i = 0; i < due.length; i += parallel) await Promise.all(due.slice(i, i + parallel).map(runJob));
   })();
   running = pass.finally(() => {
     if (running === guarded) running = null;

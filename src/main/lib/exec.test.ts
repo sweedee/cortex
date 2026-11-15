@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CliMissingError, MAX_OUTPUT, runExec } from './exec';
+import { CliMissingError, runExec } from './exec';
 import { globToRegExp } from './glob';
+import { setLimits } from './limits';
+import { DEFAULT_USER_CONFIG } from '../../shared/userConfig';
 
 const cwd = process.cwd();
 
@@ -22,10 +24,16 @@ describe('runExec (real child processes, no shell)', () => {
   });
 
   it('stops collecting at the cap and says so', async () => {
-    const r = await runExec({ cmd: 'node', args: ['-e', `process.stdout.write("x".repeat(${MAX_OUTPUT} + 5000))`], cwd });
-    expect(r.stdout.length).toBe(MAX_OUTPUT);
-    expect(r.truncated).toBe(true);
-    expect(r.code).toBe(0);
+    const MAX_OUTPUT = 1024 * 1024;
+    setLimits({ ...DEFAULT_USER_CONFIG.limits, outputCapMb: 1 });
+    try {
+      const r = await runExec({ cmd: 'node', args: ['-e', `process.stdout.write("x".repeat(${MAX_OUTPUT} + 5000))`], cwd });
+      expect(r.stdout.length).toBe(MAX_OUTPUT);
+      expect(r.truncated).toBe(true);
+      expect(r.code).toBe(0);
+    } finally {
+      setLimits(DEFAULT_USER_CONFIG.limits);
+    }
   }, 30_000);
 
   it('reports a missing command as CliMissingError', async () => {

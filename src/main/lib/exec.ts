@@ -11,10 +11,7 @@
 import spawn from 'cross-spawn';
 import type { ExecRequest, ExecResult } from '../../shared/ipc';
 import { killTree, treeSpawnOptions } from './killTree';
-
-const DEFAULT_TIMEOUT = 120_000;
-/** keep at most this many chars per stream; the result says `truncated` when more came */
-export const MAX_OUTPUT = 20 * 1024 * 1024;
+import { execTimeoutMs, outputCap } from './limits';
 
 /** The command could not be started (not installed / not on PATH). */
 export class CliMissingError extends Error {
@@ -26,20 +23,21 @@ export class CliMissingError extends Error {
   }
 }
 
-/** Collects a stream's chunks up to `MAX_OUTPUT` chars (no repeated string concatenation / re-slicing). */
+/** Collects a stream's chunks up to `outputCap()` chars (config `limits.outputCapMb`; the result says `truncated` when more came) (no repeated string concatenation / re-slicing). */
 class Collector {
   private chunks: string[] = [];
   private size = 0;
   truncated = false;
   push(chunk: string): void {
-    if (this.size >= MAX_OUTPUT) {
+    const cap = outputCap();
+    if (this.size >= cap) {
       this.truncated = true;
       return;
     }
-    const room = MAX_OUTPUT - this.size;
+    const room = cap - this.size;
     if (chunk.length > room) {
       this.chunks.push(chunk.slice(0, room));
-      this.size = MAX_OUTPUT;
+      this.size = cap;
       this.truncated = true;
     } else {
       this.chunks.push(chunk);
@@ -72,7 +70,7 @@ export function runExec(req: ExecSpawn): Promise<ExecResult> {
     const timer = setTimeout(() => {
       timedOut = true;
       killTree(child.pid);
-    }, req.timeoutMs ?? DEFAULT_TIMEOUT);
+    }, req.timeoutMs ?? execTimeoutMs());
 
     child.on('error', (err) => {
       clearTimeout(timer);

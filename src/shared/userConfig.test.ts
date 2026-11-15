@@ -6,7 +6,7 @@ import {
   editorArgs,
   mergePatch,
   parseUserConfig,
-  RendererConfigPatchSchema,
+  RendererConfigPatchSchema, repoUrl,
   renderBranchTemplate,
   userConfigJsonSchema,
   UserConfigSchema,
@@ -24,12 +24,13 @@ describe('user config schema', () => {
     expect(DEFAULT_USER_CONFIG).toMatchObject({
       editor: { command: 'code', args: ['{path}'] },
       claude: { bin: 'claude', model: null, effort: null, permissionMode: 'default', contextWindow: 200_000 },
-      github: { aiReviewComment: '@claude review', aiReviewBot: 'claude[bot]', renovate: { app: 'renovate', label: 'renovate' } },
+      github: { host: 'github.com', aiReviewComment: '@claude review', aiReviewBot: 'claude[bot]', renovate: { app: 'renovate', label: 'renovate' } },
       jira: { cli: 'acli', site: '', fields: { storyPoints: 'customfield_10016', sprint: 'customfield_10020' } },
       git: { branchTemplate: '{key}-{slug}', defaultBranch: 'main', worktreesDir: '../wt/{repo}' },
       records: { dir: 'records' },
-      refresh: { intervalSec: 60 },
-      ui: { notifications: false, sound: true },
+      refresh: { intervalSec: 60, fastSec: 15, parallel: 3 },
+      limits: { execTimeoutSec: 120, rebaseTimeoutSec: 300, outputCapMb: 20 },
+      ui: { notifications: false, sound: true, theme: 'system', animations: true },
     });
     expect(parseUserConfig(null)).toEqual(DEFAULT_USER_CONFIG);
     expect(parseUserConfig([1, 2])).toEqual(DEFAULT_USER_CONFIG);
@@ -39,10 +40,11 @@ describe('user config schema', () => {
     const paths = leaves(DEFAULT_USER_CONFIG);
     expect(paths.length).toBeGreaterThan(20);
     for (const path of paths) {
-      const raw = { ...withValue(path, { not: 'valid' }), refresh: { intervalSec: path.join('.') === 'refresh.intervalSec' ? { not: 'valid' } : 120 } };
+      const raw: Record<string, unknown> = { ...withValue(path, { not: 'valid' }) };
+      if (path[0] !== 'refresh') raw.refresh = { intervalSec: 120 };
       const c = UserConfigSchema.parse(raw);
       expect(get(c, path), path.join('.')).toEqual(get(DEFAULT_USER_CONFIG, path));
-      expect(c.refresh.intervalSec).toBe(path.join('.') === 'refresh.intervalSec' ? 60 : 120);
+      expect(c.refresh.intervalSec).toBe(path[0] === 'refresh' ? 60 : 120);
       expect(configProblems(raw)).toContain(path.join('.'));
     }
   });
@@ -113,5 +115,17 @@ describe('templates', () => {
     expect(editorArgs(['--goto', '{path}:1'], '/x/y')).toEqual(['--goto', '/x/y:1']);
     expect(editorArgs(['-n'], '/x/y')).toEqual(['-n', '/x/y']);
     expect(editorArgs([], '/x/y')).toEqual(['/x/y']);
+  });
+
+  it('new fields: bad values fall back, valid ones stick, only theme / animations are renderer-patchable', () => {
+    const c = parseUserConfig({ ui: { theme: 'sepia', animations: 'no' }, limits: { execTimeoutSec: -1, rebaseTimeoutSec: 600, outputCapMb: 5 }, refresh: { fastSec: 'x', parallel: 8 }, github: { host: 'https://evil/x' } });
+    expect(c.ui).toMatchObject({ theme: 'system', animations: true });
+    expect(c.limits).toEqual({ execTimeoutSec: 120, rebaseTimeoutSec: 600, outputCapMb: 5 });
+    expect(c.refresh).toMatchObject({ fastSec: 15, parallel: 8 });
+    expect(c.github.host).toBe('github.com');
+    expect(parseUserConfig({ github: { host: 'ghe.example.com' } }).github.host).toBe('ghe.example.com');
+    expect(RendererConfigPatchSchema.parse({ ui: { theme: 'dark', animations: false } })).toEqual({ ui: { theme: 'dark', animations: false } });
+    for (const bad of [{ limits: { execTimeoutSec: 5 } }, { refresh: { parallel: 2 } }, { github: { host: 'x.com' } }]) expect(RendererConfigPatchSchema.safeParse(bad).success).toBe(false);
+    expect(repoUrl('ghe.example.com', 'o/r', '/pull/3')).toBe('https://ghe.example.com/o/r/pull/3');
   });
 });

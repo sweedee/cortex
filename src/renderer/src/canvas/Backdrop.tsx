@@ -1,6 +1,7 @@
 /** Floating pixel particles in brand colours and the faint logo mark, with a little parallax. */
 import { useEffect, useRef } from 'react';
 import { asset } from '../native';
+import { useAnimationsPref } from '../theme';
 
 /** particle grid size in css px */
 const PX = 2;
@@ -28,11 +29,12 @@ interface P {
 export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: number; k: number }> }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const logo = useRef<HTMLImageElement>(null);
+  const animations = useAnimationsPref();
 
   useEffect(() => {
     const canvas = ref.current!;
     const ctx = canvas.getContext('2d')!;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches || !animations;
     let w = 0,
       h = 0,
       raf = 0,
@@ -112,7 +114,7 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
       inputs.forEach((e) => window.removeEventListener(e, wake));
       document.removeEventListener('visibilitychange', wake);
     };
-  }, [cam]);
+  }, [cam, animations]);
 
   return (
     <div className="backdrop" aria-hidden>

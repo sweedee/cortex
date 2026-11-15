@@ -8,6 +8,7 @@
  * again, so later changes (an OS switch with "system", or a new preference) are applied here.
  */
 import { useLayoutEffect, useSyncExternalStore } from 'react';
+import { useUserConfig } from './data/config';
 
 export type ThemePref = 'dark' | 'light' | 'system';
 export type Theme = 'dark' | 'light';
@@ -31,6 +32,11 @@ function subscribeSystem(cb: () => void) {
   return () => mq?.removeEventListener('change', cb);
 }
 
+/** `no-animations` on <html> stops the floating bubbles; the backdrop reads it too. */
+export function applyAnimations(on: boolean, doc: Document = document) {
+  doc.documentElement.classList.toggle('no-animations', !on);
+}
+
 /** Set the theme on the document (and on Strato's AppRoot element, which carries its own copy). */
 export function applyTheme(theme: Theme, doc: Document = document) {
   const root = doc.documentElement;
@@ -39,12 +45,14 @@ export function applyTheme(theme: Theme, doc: Document = document) {
   doc.querySelectorAll('[data-dt-component="AppRoot"]').forEach((el) => el.setAttribute('data-theme', theme));
 }
 
-/**
- * The user's theme preference: the one place to switch to the `ui.theme` config value once it
- * exists. Until then the app follows the OS.
- */
+/** The user's theme preference (config.json `ui.theme`; "system" until the config is loaded). */
 export function useThemePref(): ThemePref {
-  return 'system';
+  return parseThemePref(useUserConfig().data?.config.ui.theme);
+}
+
+/** Animations on (config.json `ui.animations`); a class on <html> lets CSS switch them off. */
+export function useAnimationsPref(): boolean {
+  return useUserConfig().data?.config.ui.animations ?? true;
 }
 
 /** Theme before React runs (Strato's AppRoot asks for it once at mount). */
@@ -56,6 +64,8 @@ export function useTheme(): Theme {
   const systemDark = useSyncExternalStore(subscribeSystem, systemPrefersDark, () => true);
   const theme = resolveTheme(pref, systemDark);
   useLayoutEffect(() => applyTheme(theme), [theme]);
+  const animations = useAnimationsPref();
+  useLayoutEffect(() => applyAnimations(animations), [animations]);
   return theme;
 }
 

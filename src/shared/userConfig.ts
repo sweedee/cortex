@@ -18,6 +18,8 @@ const text = (max = 1000) => z.string().min(1).max(max).refine((s) => !s.include
 const program = text(4096).refine((s) => !s.startsWith('-'), 'must not start with "-"');
 /** a folder relative to a base checkout: no absolute path, no `..` */
 const relDir = text(500).refine((s) => !/^(?:[a-zA-Z]:|[\\/])/.test(s) && !s.split(/[\\/]/).includes('..'), 'must be a relative folder inside the checkout (no "..")');
+/** a bare host name, optionally with a port: no scheme, path or credentials */
+const hostName = z.string().regex(/^[A-Za-z0-9.-]+(?::\d{1,5})?$/, 'expected a host name like github.com');
 const customField = z.string().regex(/^customfield_\d+$/, 'expected customfield_<number>');
 const int = (min: number, max: number) => z.number().int().min(min).max(max);
 
@@ -54,6 +56,7 @@ export const UserConfigSchema = z.object({
   ),
   github: section(
     {
+      host: hostName.catch('github.com').describe('GitHub host for repo links (GitHub Enterprise: github.example.com). File-only.'),
       aiReviewComment: text(65_536).catch('@claude review').describe('PR comment posted by "Request AI review"'),
       aiReviewBot: text(200).catch('claude[bot]').describe('Login of the bot that answers it'),
       renovate: section(
@@ -89,11 +92,28 @@ export const UserConfigSchema = z.object({
     'git',
   ),
   records: section({ dir: relDir.catch('records').describe('Records folder inside each base checkout (e.g. .cortex/records, docs/plans)') }, 'Records (markdown plans)'),
-  refresh: section({ intervalSec: int(10, 3600).catch(60).describe('Background refresh of git / GitHub / Jira caches, seconds') }, 'Background refresh'),
+  refresh: section(
+    {
+      intervalSec: int(10, 3600).catch(60).describe('Background refresh of git / GitHub / Jira caches, seconds'),
+      fastSec: int(5, 3600).catch(15).describe('Refresh interval while PR checks or builds run, seconds (never slower than intervalSec). File-only.'),
+      parallel: int(1, 16).catch(3).describe('Refresh jobs run at the same time. File-only.'),
+    },
+    'Background refresh',
+  ),
+  limits: section(
+    {
+      execTimeoutSec: int(1, 86_400).catch(120).describe('Default time limit of a git / gh / claude command, seconds. File-only; applies at once.'),
+      rebaseTimeoutSec: int(1, 86_400).catch(300).describe('Time limit of "git rebase", seconds. File-only; applies at once.'),
+      outputCapMb: int(1, 1024).catch(20).describe('Output kept per stream of a command, megabytes (more is cut off). File-only; applies at once.'),
+    },
+    'Limits',
+  ),
   ui: section(
     {
       notifications: z.boolean().catch(false).describe('Desktop notifications when Cortex is in the background'),
       sound: z.boolean().catch(true).describe('Chime for new notices'),
+      theme: z.enum(['dark', 'light', 'system']).catch('system').describe('Colour theme; "system" follows the OS'),
+      animations: z.boolean().catch(true).describe('Backdrop particles and floating bubbles (off = still; the OS "reduce motion" setting always wins)'),
     },
     'UI',
   ),
@@ -122,7 +142,7 @@ export const RendererConfigPatchSchema = z.strictObject({
     .optional(),
   github: z.strictObject({ aiReviewComment: text(65_536).nullable() }).partial().optional(),
   refresh: z.strictObject({ intervalSec: int(10, 3600) }).partial().optional(),
-  ui: z.strictObject({ notifications: z.boolean(), sound: z.boolean() }).partial().optional(),
+  ui: z.strictObject({ notifications: z.boolean(), sound: z.boolean(), theme: z.enum(['dark', 'light', 'system']), animations: z.boolean() }).partial().optional(),
 });
 
 export type UserConfigPatch = z.infer<typeof RendererConfigPatchSchema>;
@@ -215,3 +235,6 @@ export const configSchemas = {
   'config:get': z.undefined(),
   'config:update': z.strictObject({ patch: RendererConfigPatchSchema, ifUnset: z.boolean().optional() }),
 };
+
+/** Web URL of a repo (or a path in it) on the configured GitHub host. */
+export const repoUrl = (host: string, repo: string, path = '') => `https://${host}/${repo}${path}`;

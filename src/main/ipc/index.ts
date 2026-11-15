@@ -1,5 +1,6 @@
 import { app } from 'electron';
 import { Roots } from '../lib/pathPolicy';
+import { setLimits } from '../lib/limits';
 import { UserConfigStore } from '../lib/userConfig';
 import { createServices } from '../services';
 import type { IpcContext } from './handle';
@@ -18,8 +19,12 @@ export function registerIpc(ctx: IpcContext) {
   userConfig.ensureFiles();
   userConfig.watch();
   app.on('will-quit', () => userConfig.close());
-  const services = createServices({ appRoot: app.getAppPath(), userData: app.getPath('userData'), isElectron: true }, (channel, payload) => ctx.send(channel, payload), process.env, userConfig.config);
-  userConfig.onChange((s) => services.setUserConfig(s.config));
+  const services = createServices({ appRoot: app.getAppPath(), userData: app.getPath('userData'), isElectron: true, isPackaged: app.isPackaged }, (channel, payload) => ctx.send(channel, payload), process.env, userConfig.config);
+  setLimits(userConfig.config.limits);
+  userConfig.onChange((s) => {
+    services.setUserConfig(s.config);
+    setLimits(s.config.limits);
+  });
   // the folders fs / shell / proc calls may touch (lib/pathPolicy.ts)
   const roots = new Roots({ platform: process.platform, home: app.getPath('home'), userData: app.getPath('userData'), programData: process.env['ProgramData'] });
   registerExec(ctx, { roots, resolve: services.resolveExec });

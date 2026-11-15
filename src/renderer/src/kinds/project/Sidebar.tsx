@@ -1,6 +1,7 @@
 import { Button } from '@dynatrace/strato-components/buttons';
 import { CodeIcon, ExternalLinkIcon, FolderOpenIcon, PlusIcon, SettingIcon } from '@dynatrace/strato-icons';
 import { useMemo } from 'react';
+import { repoWebUrl } from '../../data/config';
 import { useRenovatePrs, usePrList } from '../../data/gh';
 import { useWorktrees } from '../../data/git';
 import { KINDS, type Item, type ItemOf, type Tone } from '../../domain';
@@ -37,9 +38,9 @@ function Setup({ item }: { item: Project }) {
         </Button>
       }
     >
-      <ValueRow label="Repo" actions={real && <IconBtn label="Open on GitHub" onClick={() => void openUrl(`https://github.com/${d.repo}`)}><ExternalLinkIcon /></IconBtn>}>
+      <ValueRow label="Repo" actions={real && <IconBtn label="Open on GitHub" onClick={() => void openUrl(repoWebUrl(d.repo))}><ExternalLinkIcon /></IconBtn>}>
         {real ? (
-          <a href={`https://github.com/${d.repo}`} onClick={(e) => (e.preventDefault(), void openUrl(`https://github.com/${d.repo}`))} style={{ color: 'var(--tone-primary)' }}>
+          <a href={repoWebUrl(d.repo)} onClick={(e) => (e.preventDefault(), void openUrl(repoWebUrl(d.repo)))} style={{ color: 'var(--tone-primary)' }}>
             {d.repo}
           </a>
         ) : (
