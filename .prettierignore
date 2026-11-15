@@ -1,0 +1,13 @@
+node_modules
+out
+dist
+release
+build
+public
+package-lock.json
+*.md
+src/renderer/src/**/*.css
+.claude
+**/fixtures
+**/__fixtures__
+scripts/*.cjs
