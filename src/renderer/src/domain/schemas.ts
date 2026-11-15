@@ -32,9 +32,6 @@ export const NoticeSchema = z.object({
 
 export const PointSchema = z.object({ x: z.number(), y: z.number() });
 
-export const KINDS = ['project', 'ticket', 'worktree', 'record', 'pr', 'agent', 'app', 'build', 'deployment', 'todo', 'testrun'] as const;
-export const KindSchema = z.enum(KINDS);
-
 /** Fields every item has, whatever its kind. */
 const common = {
   id: z.string().min(1),
@@ -242,35 +239,40 @@ export const TestRunDataSchema = z.object({
 
 // ---- items ---------------------------------------------------------------------------------
 
-const item = <K extends (typeof KINDS)[number], D extends z.ZodType>(kind: K, data: D) => z.object({ ...common, kind: z.literal(kind), data });
-
-export const ItemSchemas = {
-  project: item('project', ProjectDataSchema),
-  ticket: item('ticket', TicketDataSchema),
-  worktree: item('worktree', WorktreeDataSchema),
-  record: item('record', RecordDataSchema),
-  pr: item('pr', PrDataSchema),
-  agent: item('agent', AgentDataSchema),
-  app: item('app', AppDataSchema),
-  build: item('build', BuildDataSchema),
-  deployment: item('deployment', DeploymentDataSchema),
-  todo: item('todo', TodoDataSchema),
-  testrun: item('testrun', TestRunDataSchema),
+/**
+ * The one list of kinds: kind name → data schema, in display order (legend, filter, add menu).
+ * `KINDS`, `KindSchema`, `ItemSchemas` and the `ItemSchema` union are all derived from it, so a
+ * new kind is added here once (plus its module in `kinds/registry.ts`). The data schemas stay in
+ * `domain` (not in `kinds/<kind>/`) because `domain` must not import from `kinds`.
+ */
+const DATA_SCHEMAS = {
+  project: ProjectDataSchema,
+  ticket: TicketDataSchema,
+  worktree: WorktreeDataSchema,
+  record: RecordDataSchema,
+  pr: PrDataSchema,
+  agent: AgentDataSchema,
+  app: AppDataSchema,
+  build: BuildDataSchema,
+  deployment: DeploymentDataSchema,
+  todo: TodoDataSchema,
+  testrun: TestRunDataSchema,
 } as const;
+type DataSchemas = typeof DATA_SCHEMAS;
+type KindName = keyof DataSchemas;
 
-export const ItemSchema = z.discriminatedUnion('kind', [
-  ItemSchemas.project,
-  ItemSchemas.ticket,
-  ItemSchemas.worktree,
-  ItemSchemas.record,
-  ItemSchemas.pr,
-  ItemSchemas.agent,
-  ItemSchemas.app,
-  ItemSchemas.build,
-  ItemSchemas.deployment,
-  ItemSchemas.todo,
-  ItemSchemas.testrun,
-]);
+/** Every kind, in display order. */
+export const KINDS = Object.keys(DATA_SCHEMAS) as unknown as readonly [KindName, ...KindName[]];
+export const KindSchema = z.enum(KINDS);
+
+const item = <K extends KindName, D extends z.ZodType>(kind: K, data: D) => z.object({ ...common, kind: z.literal(kind), data });
+type ItemSchemaOf<K extends KindName> = z.ZodObject<typeof common & { kind: z.ZodLiteral<K>; data: DataSchemas[K] }>;
+
+/** The item schema of each kind, e.g. `ItemSchemas.pr`. */
+export const ItemSchemas = Object.fromEntries(KINDS.map((k) => [k, item(k, DATA_SCHEMAS[k])])) as { [K in KindName]: ItemSchemaOf<K> };
+
+type AnyItemSchema = (typeof ItemSchemas)[KindName];
+export const ItemSchema = z.discriminatedUnion('kind', KINDS.map((k) => ItemSchemas[k]) as unknown as readonly [AnyItemSchema, ...AnyItemSchema[]]);
 
 export const LinkSchema = z.object({ id: z.string(), from: z.string(), to: z.string(), label: z.string() });
 
