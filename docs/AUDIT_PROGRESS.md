@@ -30,7 +30,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 | # | Item | Agent | Status | Commit / notes |
 |---|---|---|---|---|
 | 11 | Packaging: electron-builder, `asarUnpack` jira-mock, icon, signing, updates (§9) | sonnet | ✅ | `f74c1fe`. electron-builder 26.18.1 (nsis / dmg / AppImage), `dist` / `dist:dir` / `icons` scripts, jira-mock + seed unpacked, `unpackedAsar()` path fix, icon (svg/png/ico), v0.1.0, `docs/RELEASING.md`. Renderer deps moved to devDependencies (asar 410 MB → 21 MB). Packaged Windows app starts. Open: macOS/Linux builds and the installer not run; no signing certs; auto-update not implemented; README doesn't mention `dist` yet |
-| 12 | First run: opt-in demo world; explicit "Jira not configured" state (§9) | sonnet | 🔄 | |
+| 12 | First run: opt-in demo world; explicit "Jira not configured" state (§9) | sonnet | ✅ | `d60dd92`. Empty first-run world + Welcome panel (Add a project / Load demo world); neutral static `demoWorld` (`unknown/demo`, DEMO-1..3); smoke repo from git remote or `CORTEX_SMOKE_GH_REPO`; dead demo pins and `isOldFakeDemo` removed; Gallery uses `location.origin`; packaged builds never auto-fall back to the Jira mock, `jira.unavailable` + dismissable banner. Open: not seen in a real installer; banner not in the add-ticket dialog |
 | 13 | Real-world runs: real Claude session, throwaway PR (§10) | — | ⏸ | Needs the user: real GitHub and Claude accounts |
 
 ## Ongoing: maintainability
@@ -57,6 +57,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 - 2026-11-15 14:40: agents for 8b, 12, 14 and 15 stopped on the 5-hour usage limit (resets 18:10 Vienna) before saving any edits. Resuming item 14 first to test whether the limit has cleared.
 - 2026-11-15: item 14 done (443 tests pass); 8b, 12 and 15 resumed.
 - 2026-11-15: item 8b done in `802e413` (main/shared tests pass; renderer tests to re-run once 12 lands).
+- 2026-11-15: item 12 done in `d60dd92` (448/449 pass; the failure is `settings.test.ts` not yet updated for 8b's new keys). Follow-up agent fixes that and skips demo items in the refresher.
 
 ## Check by hand in the UI
 
@@ -65,4 +66,6 @@ Agents can't drive the GUI, so these changes have passed typecheck and tests but
 - **Item 7:** the "!" sync badge and tooltip; the Undo toast after Remove / Delete.
 - **Item 16:** bubbles and links follow the layout after boot, add/remove, filter, drag, Auto-arrange and Reset (no flash at 0,0); the hover card and inline actions follow their bubble and flip at the right edge; chat threads start at the chat box after a sidebar resize; popup rows are still clickable. Expected visible changes: idle bubbles no longer float, particles freeze after 60 s idle, the world layer isn't permanently promoted (check pan/zoom smoothness and text sharpness).
 - **Item 17:** Tab into the canvas, arrow keys, Enter / Space / Esc, focus back on the bubble after the sidebar closes; the `?` overlay; the light theme (OS light mode) incl. Strato menus, diff, CodeMirror, mermaid, log ANSI colours; whether a ✓ on every green bubble is too busy; backdrop logo opacity in light mode.
+- **Item 12:** with no `workspace.json` the welcome panel shows; Add a project opens the folder form; Load demo world shows 1 project, 3 tickets, 2 PRs, 1 todo with no sync-error noise; Gallery webview loads the dev server.
+- **Item 8b:** Theme select and Animations checkbox in the gear dialog.
 - **Items 2–4:** a one-time confirm dialog when an agent starts in `bypassPermissions` / `dontAsk`; embedded GitHub/Jira/app pages still load.
