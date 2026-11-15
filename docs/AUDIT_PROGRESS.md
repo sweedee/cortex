@@ -36,10 +36,10 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 
 | # | Item | Agent | Status | Commit / notes |
 |---|---|---|---|---|
-| 14 | Kind-specific code into the module: `describe`, `cwdOf`, `sync`, `multiActions`; derive `KINDS`/`ItemSchema`; remove project→deployment import (§2.1) | | ⬜ | |
+| 14 | Kind-specific code into the module: `describe`, `cwdOf`, `sync`, `multiActions`; derive `KINDS`/`ItemSchema`; remove project→deployment import (§2.1) | opus | 🔄 | |
 | 15 | Generate IPC forwarders; derive `CortexApi`; `CodeHost` interface (§2.2) | | ⬜ | |
 | 16 | Canvas rendering: positions via refs; chat draft stops re-rendering canvas (§6) | opus | ✅ | `6685e39`, `1559633`. Positions written from layout ticks via refs (`canvas/positions.ts`), memoized links, ResizeObserver chat rect, stable views, `draftMentions` selector, gentler reheat; backdrop 30 fps with idle pause; float only on selected/running; timers cleaned. Open: offscreen culling; `patchItem` still remaps the array; **needs a hand check in the UI** (see log) |
-| 17 | Accessibility and theming: keyboard/ARIA for bubbles, Strato tokens, z-index scale, light theme, `react-intl` decision (§7) | opus | 🔄 | `react-intl`: recommend dropping (removal goes with item 18) |
+| 17 | Accessibility and theming: keyboard/ARIA for bubbles, Strato tokens, z-index scale, light theme, `react-intl` decision (§7) | opus | ✅ | `2ca1de1` (theming), `e155513` (a11y). Tokens with dark/light/system (`R/theme.ts`), `--ink-faint` ≥ 4.5:1, `--z-*` scale, flattened shadows, shared metrics; bubbles get role/aria-label/roving tabindex/arrow-key nav, status glyphs, focus return, `useAutoFocus`, IME-safe Enter, `?` shortcuts overlay from one table. **`react-intl` must stay**: Strato's AppRoot imports it (peer dep). Open: `useThemePref()` returns `'system'` until item 8 adds `ui.theme`; screen-reader list view; hover card on focus; rebindable shortcuts |
 | 18 | Cleanup: dead code, helper de-duplication (`normPath`), `oxlint-disable`, `noUncheckedIndexedAccess`, formatter (§8) | | ⬜ | |
 
 ## Log
@@ -51,6 +51,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 - 2026-11-15: item 6 done in `3cb9f2a`; items 2–4 done in `4a75ab7` (343 tests pass; dev smoke runs pass). Items 8 and 9 dispatched.
 - 2026-11-15: item 9 done in `648e5af` (381 tests pass). Item 11 dispatched.
 - 2026-11-15: item 16 done in `6685e39`, `1559633`; item 17 dispatched.
+- 2026-11-15: item 11 done in `f74c1fe` (packaged Windows app starts); item 17 done in `2ca1de1`, `e155513` (437 tests pass). Item 14 dispatched.
 
 ## Check by hand in the UI
 
@@ -58,4 +59,5 @@ Agents can't drive the GUI, so these changes have passed typecheck and tests but
 
 - **Item 7:** the "!" sync badge and tooltip; the Undo toast after Remove / Delete.
 - **Item 16:** bubbles and links follow the layout after boot, add/remove, filter, drag, Auto-arrange and Reset (no flash at 0,0); the hover card and inline actions follow their bubble and flip at the right edge; chat threads start at the chat box after a sidebar resize; popup rows are still clickable. Expected visible changes: idle bubbles no longer float, particles freeze after 60 s idle, the world layer isn't permanently promoted (check pan/zoom smoothness and text sharpness).
+- **Item 17:** Tab into the canvas, arrow keys, Enter / Space / Esc, focus back on the bubble after the sidebar closes; the `?` overlay; the light theme (OS light mode) incl. Strato menus, diff, CodeMirror, mermaid, log ANSI colours; whether a ✓ on every green bubble is too busy; backdrop logo opacity in light mode.
 - **Items 2–4:** a one-time confirm dialog when an agent starts in `bypassPermissions` / `dontAsk`; embedded GitHub/Jira/app pages still load.
