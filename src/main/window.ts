@@ -76,7 +76,7 @@ export function createMainWindow(): BrowserWindow {
       writeFileSync(tmp, JSON.stringify(state));
       renameSync(tmp, stateFile());
     } catch (err) {
-      console.warn('[window] could not save bounds:', (err as Error).message);
+      log.warn('[window] could not save bounds:', (err as Error).message);
     }
   };
   const later = () => {
@@ -124,10 +124,10 @@ export function createMainWindow(): BrowserWindow {
       .then(({ response }) => (response === 0 && !win.isDestroyed() ? win.reload() : app.quit()));
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => log.error(`[renderer] failed to load ${url}: ${desc} (${code})`));
-  win.webContents.on('did-finish-load', () => console.log(`[renderer] loaded ${win.webContents.getURL()}`));
+  win.webContents.on('did-finish-load', () => log.info(`[renderer] loaded ${win.webContents.getURL()}`));
   if (!app.isPackaged) {
     win.webContents.on('console-message', (e) => {
-      if (e.level === 'warning' || e.level === 'error') console.log(`[renderer:${e.level}] ${e.message} (${e.sourceId}:${e.lineNumber})`);
+      if (e.level === 'warning' || e.level === 'error') (e.level === 'error' ? log.error : log.warn)(`[renderer:${e.level}] ${e.message} (${e.sourceId}:${e.lineNumber})`);
     });
   }
 

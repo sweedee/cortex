@@ -8,6 +8,7 @@
  */
 import { watch, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
+import { log } from './log';
 import type { FsChangedEvent } from '../../shared/ipc';
 
 const COALESCE_MS = 60;
@@ -40,7 +41,7 @@ export class Watchers {
       });
     });
     w.on('error', (err) => {
-      console.warn(`[fs:watch] ${dir}: ${err.message}`);
+      log.warn(`[fs:watch] ${dir}: ${err.message}`);
       this.unwatch(watchId);
     });
     this.watchers.set(watchId, w);

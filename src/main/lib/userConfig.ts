@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, watch, writeFileSync, type FSWatch
 import { basename, dirname, join, resolve } from 'node:path';
 import { configProblems, mergePatch, parseUserConfig, userConfigJsonSchema, type ConfigUpdateRequest, type UserConfig, type UserConfigState } from '../../shared/userConfig';
 import { atomicWrite } from './atomicWrite';
+import { log } from './log';
 
 export const CONFIG_FILE = 'config.json';
 export const CONFIG_SCHEMA_FILE = 'config.schema.json';
@@ -98,7 +99,7 @@ export class UserConfigStore {
       writeFileSync(join(dir, CONFIG_SCHEMA_FILE), `${JSON.stringify(userConfigJsonSchema(), null, 2)}\n`);
       if (!existsSync(this.path)) writeFileSync(this.path, STARTER_CONFIG, { flag: 'wx' });
     } catch (e) {
-      console.warn(`[config] could not write ${dir}: ${(e as Error).message}`);
+      log.warn(`[config] could not write ${dir}: ${(e as Error).message}`);
     }
   }
 
@@ -112,11 +113,11 @@ export class UserConfigStore {
         this.timer = setTimeout(() => this.reload(), 100);
       });
       this.watcher.on('error', (e) => {
-        console.warn(`[config] watch failed: ${e.message}`);
+        log.warn(`[config] watch failed: ${e.message}`);
         this.close();
       });
     } catch (e) {
-      console.warn(`[config] cannot watch ${this.path}: ${(e as Error).message}`);
+      log.warn(`[config] cannot watch ${this.path}: ${(e as Error).message}`);
     }
   }
 
@@ -133,7 +134,7 @@ export class UserConfigStore {
     const source = error ? {} : this.raw;
     const problems = error ? [error] : configProblems(source).map((k) => `invalid value for "${k}", using the default`);
     const text = JSON.stringify(source);
-    if (problems.length && text !== this.lastText) console.warn(`[config] ${this.path}: ${problems.join('; ')}`);
+    if (problems.length && text !== this.lastText) log.warn(`[config] ${this.path}: ${problems.join('; ')}`);
     this.lastText = text;
     return { config: parseUserConfig(source), path: this.path, problems };
   }
