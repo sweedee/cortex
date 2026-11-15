@@ -1,8 +1,8 @@
 /** Background refresh of an open PR (`KindModule.sync`): `gh pr view` (state, review decision, mergeable, checks rollup). */
+import { codeHost } from '../../data/codehost';
 import { queryClient } from '../../data/queryClient';
 import { qk } from '../../data/queryKeys';
 import { isRealRepo, type ItemOf } from '../../domain';
-import { native } from '../../native';
 import { patchData } from '../../store';
 import { changes, prChecksRunning, prPatch } from '../../sync/mapping';
 import { currentItem } from '../common';
@@ -11,7 +11,7 @@ import type { SyncJob } from '../types';
 async function refreshPr(id: string) {
   const p = currentItem(id, 'pr');
   if (!p) return;
-  const pr = await native.gh.prView({ repo: p.data.repo, number: p.data.number });
+  const pr = await codeHost(p.data.provider).prView(p.data.repo, p.data.number);
   queryClient.setQueryData(qk.gh.pr(p.data.repo, p.data.number), pr);
   const cur = currentItem(id, 'pr');
   if (!cur) return;

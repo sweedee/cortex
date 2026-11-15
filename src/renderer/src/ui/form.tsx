@@ -12,7 +12,7 @@
  *       { name: 'dir', label: 'Folder', type: 'directory' },    // native picker
  *     ],
  *     submitLabel: 'Create',
- *     onSubmit: async (v) => { await ghOps.prCreate({ … title: str(v, 'title'), draft: v.draft === true }) },
+ *     onSubmit: async (v) => { await codeHost(provider).prCreate({ … title: str(v, 'title'), draft: v.draft === true }) },
  *   });
  *
  * Resolves with the submitted values, or null when cancelled.

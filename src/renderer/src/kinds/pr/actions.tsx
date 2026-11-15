@@ -5,7 +5,7 @@
 import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { DeleteIcon, ArrowDownRightIcon } from '@dynatrace/strato-icons';
-import { ghOps } from '../../data/gh';
+import { codeHost } from '../../data/codehost';
 import { gitOps } from '../../data/git';
 import { isRealPath, type ItemOf } from '../../domain';
 import { getState, insertSkill, itemById, patchData, removeItems } from '../../store';
@@ -28,7 +28,7 @@ export async function triggerAiReview(p: Pr) {
     fields: [],
     submitLabel: 'Post comment',
     onSubmit: async () => {
-      await ghOps.requestAiReview(p.data.repo, p.data.number);
+      await codeHost(p.data.provider).requestAiReview(p.data.repo, p.data.number);
       toast('AI review requested', `Commented “${body}” on #${p.data.number}`);
     },
   });
@@ -49,7 +49,7 @@ export function openMerge(p: Pr, ctx: KindCtx) {
     ],
     onSubmit: async (v) => {
       const args = mergeArgs(p.data, v);
-      await ghOps.prMerge(...args);
+      await codeHost(p.data.provider).prMerge(...args);
       afterMerge(p, ctx, args[3].deleteBranch);
     },
   });
@@ -136,7 +136,7 @@ export async function removeWorktree(wt: ItemOf<'worktree'>, ctx: KindCtx) {
 
 /** `gh pr edit --base`: point a stacked PR at its merged parent's base branch. */
 export async function retargetPr(child: Pr, base: string) {
-  const ok = await runTask(`Retargeting #${child.data.number} onto ${base}`, ghOps.prEdit({ repo: child.data.repo, number: child.data.number, base }), { success: `#${child.data.number} now targets ${base}` });
+  const ok = await runTask(`Retargeting #${child.data.number} onto ${base}`, codeHost(child.data.provider).prEdit({ repo: child.data.repo, number: child.data.number, base }), { success: `#${child.data.number} now targets ${base}` });
   if (ok === undefined) return;
   const cur = itemById(child.id);
   if (cur?.kind === 'pr') patchData<'pr'>(cur, { baseBranch: base });
@@ -152,7 +152,7 @@ export async function rebasePr(p: Pr) {
     toast(`#${p.data.number} has conflicts`, 'Inserted /rebase into the chat box: Claude resolves them in the worktree.', 'warning');
     return;
   }
-  const r = await runTask(`Rebasing #${p.data.number}`, ghOps.prUpdateBranch(p.data.repo, p.data.number, { rebase: true }), { quiet: true });
+  const r = await runTask(`Rebasing #${p.data.number}`, codeHost(p.data.provider).prUpdateBranch(p.data.repo, p.data.number, { rebase: true }), { quiet: true });
   if (!r) return;
   if (r.ok) {
     toast(`#${p.data.number} rebased onto ${p.data.baseBranch}`, r.message || undefined);

@@ -26,7 +26,7 @@ export interface TaskOptions<T> {
  * Show a spinner toast while `work` runs, then a success toast (or a critical one with the
  * error message). Resolves with the result, or `undefined` when it failed (never rejects).
  *
- *   await runTask('Merging #482', ghOps.prMerge(repo, 482, 'squash'), { success: '#482 merged' });
+ *   await runTask('Merging #482', codeHost(provider).prMerge(repo, 482, 'squash'), { success: '#482 merged' });
  */
 export async function runTask<T>(label: string, work: Promise<T> | (() => Promise<T>), opts: TaskOptions<T> = {}): Promise<T | undefined> {
   const progress = startProgressToast({

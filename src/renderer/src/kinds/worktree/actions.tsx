@@ -1,7 +1,7 @@
 /** UI actions of the worktree kind: create PR (optionally stacked), launch app, run tests, remove. */
 import { gitOps } from '../../data/git';
 import { appOps } from '../../data/apps';
-import { ghOps } from '../../data/gh';
+import { codeHost } from '../../data/codehost';
 import { jiraUrl } from '../../data/jira';
 import { testOps } from '../../data/tests';
 import type { Item, ItemOf, NewLink } from '../../domain';
@@ -55,7 +55,7 @@ export async function createPr(w: Worktree, ctx: KindCtx) {
       const parent = prs.find((p) => p.id === form.stackOn);
       const base = prBase(form, prs);
       await gitOps.push(w.data.path, { setUpstream: true });
-      const { number, url } = await ghOps
+      const { number, url } = await codeHost(project.data.provider)
         .prCreate({ dir: w.data.path, repo: project.data.repo, title: form.title.trim(), body: form.body, base, head: w.data.branch, draft: form.draft || undefined })
         .catch((e: unknown) => {
           throw new Error(`${w.data.branch} was pushed to origin, but gh pr create failed: ${errorText(e)}`);

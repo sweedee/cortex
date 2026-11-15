@@ -10,6 +10,7 @@
  * migration in `migrations.ts`.
  */
 import { z } from 'zod';
+import { CODE_HOSTS } from '../../../shared/codeHost';
 
 export const WORKSPACE_VERSION = 4;
 
@@ -52,6 +53,8 @@ const common = {
 // ---- per-kind data -------------------------------------------------------------------------
 
 const count = z.number().int().nonnegative();
+/** which code host serves the repo (`data/codehost.ts`); absent = github, unknown values are dropped */
+const provider = z.enum(CODE_HOSTS).optional().catch(undefined);
 
 /** Aggregated CI state of a branch / PR. */
 export const CheckStateSchema = z.enum(['none', 'pending', 'success', 'failure']);
@@ -60,6 +63,7 @@ export const ChecksSchema = z.object({ state: CheckStateSchema, passed: count.op
 export const ProjectDataSchema = z.object({
   /** GitHub `owner/name` */
   repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'owner/name'),
+  provider,
   /** the main checkout; picked with a directory picker (unset until configured) */
   baseDir: z.string().optional(),
   /** where new worktrees go, e.g. `<baseDir>/../wt/<name>` */
@@ -161,6 +165,7 @@ export const AgentDataSchema = z.object({
 
 export const PrDataSchema = z.object({
   repo: z.string(),
+  provider,
   number: z.number().int().positive(),
   headBranch: z.string(),
   baseBranch: z.string(),
@@ -182,6 +187,7 @@ export const PrDataSchema = z.object({
 
 export const BuildDataSchema = z.object({
   repo: z.string(),
+  provider,
   /** workflow / job name */
   name: z.string(),
   /** details page (GitHub run or the Jenkins job behind a check) */

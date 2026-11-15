@@ -15,7 +15,7 @@ export const invalidate = (...keys: QueryKey[]) => Promise.all(keys.map((queryKe
 /** A query may run: in the desktop app, with every param present. */
 export const ready = (...params: unknown[]) => isDesktop && params.every((p) => p != null && p !== '' && p !== 0);
 
-/** A write op as a TanStack mutation: `const m = useOp(ghOps.prMerge); m.mutate([repo, n, 'squash'])`. */
+/** A write op as a TanStack mutation: `const m = useOp(codeHost().prMerge); m.mutate([repo, n, 'squash'])`. */
 export function useOp<A extends unknown[], R>(fn: (...args: A) => Promise<R>) {
   return useMutation<R, Error, A>({ mutationFn: (args: A) => fn(...args) });
 }

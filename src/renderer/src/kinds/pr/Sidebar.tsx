@@ -9,7 +9,7 @@ import { Chip, ProgressCircle } from '@dynatrace/strato-components/content';
 import { CriticalIcon, ExternalLinkIcon, MinusIcon, PendingIcon, PlusIcon, SuccessIcon } from '@dynatrace/strato-icons';
 import type { GhCheck, GhPullRequest } from '../../../../shared/integrations/github';
 import { userConfig } from '../../data/config';
-import { usePr, usePrChecks, usePrDiff } from '../../data/gh';
+import { usePr, usePrChecks, usePrDiff } from '../../data/codehost';
 import type { ItemOf } from '../../domain';
 import { isDesktop } from '../../native';
 import { ConnectionsSection, SidebarSection, SidebarTabs, SummarySection } from '../../sidebar';
@@ -84,7 +84,7 @@ const go = (id: string) => {
 // ---- overview ------------------------------------------------------------------------------
 
 function Overview({ pr, ctx, real }: { pr: Pr; ctx: KindCtx; real: boolean }) {
-  const q = usePr(real ? pr.data.repo : undefined, pr.data.number);
+  const q = usePr(real ? pr.data.repo : undefined, pr.data.number, pr.data.provider);
   const view = q.data;
 
   // write back what the ring needs (the refresher does the same in the background)
@@ -215,7 +215,7 @@ const BUCKET_ICON: Record<GhCheck['bucket'], React.ReactElement> = {
 };
 
 function Checks({ pr, ctx }: { pr: Pr; ctx: KindCtx }) {
-  const q = usePrChecks(pr.data.repo, pr.data.number);
+  const q = usePrChecks(pr.data.repo, pr.data.number, pr.data.provider);
   const checks = q.data;
   const plan = useMemo(() => (checks ? planBuildSync(ctx.items, pr, checks) : undefined), [checks, ctx.items, pr]);
 
@@ -334,7 +334,7 @@ function Stack({ pr, ctx }: { pr: Pr; ctx: KindCtx }) {
 // ---- files ---------------------------------------------------------------------------------
 
 function Files({ pr }: { pr: Pr }) {
-  const q = usePrDiff(pr.data.repo, pr.data.number);
+  const q = usePrDiff(pr.data.repo, pr.data.number, pr.data.provider);
   if (q.isPending) return <Loading what="the diff" />;
   if (q.isError) return <Failed what="the diff" error={q.error} />;
   if (!q.data.trim()) return <div className="pr-state">No changes.</div>;

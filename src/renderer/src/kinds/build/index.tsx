@@ -1,7 +1,7 @@
 import { CycleIcon, DescriptionIcon, ExternalLinkIcon, RepairIcon } from '@dynatrace/strato-icons';
 import { showToast } from '@dynatrace/strato-components/notifications';
 import { userConfig } from '../../data/config';
-import { ghOps } from '../../data/gh';
+import { codeHost } from '../../data/codehost';
 import type { ItemOf } from '../../domain';
 import { inspect, patchData } from '../../store';
 import { openForm } from '../../ui/form';
@@ -34,7 +34,7 @@ export async function rerunBuild(b: Build) {
     submitLabel: 'Re-run',
     fields: [{ name: 'failedOnly', label: 'Only the failed jobs', type: 'checkbox', default: failed, hint: failed ? undefined : 'Nothing failed: this re-runs every job.' }],
     onSubmit: async (v) => {
-      await ghOps.runRerun(b.data.repo, Number(b.data.runId), { failedOnly: v.failedOnly === true });
+      await codeHost(b.data.provider).runRerun(b.data.repo, Number(b.data.runId), { failedOnly: v.failedOnly === true });
       patchData<'build'>(b, { state: 'queued', conclusion: undefined }, { notice: undefined });
       toast('Re-run requested', b.title, 'info');
     },

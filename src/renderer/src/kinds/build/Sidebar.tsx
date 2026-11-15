@@ -7,7 +7,7 @@ import { Chip, ProgressCircle } from '@dynatrace/strato-components/content';
 import { CriticalIcon, MinusIcon, PendingIcon, SuccessIcon } from '@dynatrace/strato-icons';
 import type { GhRun, GhRunJob } from '../../../../shared/integrations/github';
 import { WebPanel } from '../../components/viewers';
-import { useRun } from '../../data/gh';
+import { useRun } from '../../data/codehost';
 import type { ItemOf } from '../../domain';
 import { isDesktop } from '../../native';
 import { ConnectionsSection, SidebarSection, SidebarTabs, SummarySection } from '../../sidebar';
@@ -51,7 +51,7 @@ const CONCLUSION_COLOR: Record<string, 'success' | 'critical' | 'neutral' | 'war
 function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
   const d = b.data;
   const actions = rerunMode(d) === 'actions';
-  const q = useRun(actions ? d.repo : undefined, actions ? Number(d.runId) : undefined);
+  const q = useRun(actions ? d.repo : undefined, actions ? Number(d.runId) : undefined, d.provider);
   const run = q.data;
 
   // the run's state back onto the bubble

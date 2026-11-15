@@ -1,8 +1,7 @@
 import { Button } from '@dynatrace/strato-components/buttons';
 import { CodeIcon, ExternalLinkIcon, FolderOpenIcon, PlusIcon, SettingIcon } from '@dynatrace/strato-icons';
 import { useMemo } from 'react';
-import { repoWebUrl } from '../../data/config';
-import { useRenovatePrs, usePrList } from '../../data/gh';
+import { codeHost, useDependencyPrs, usePrList } from '../../data/codehost';
 import { useWorktrees } from '../../data/git';
 import { KINDS, type Item, type ItemOf, type Tone } from '../../domain';
 import { ConnectionsSection, SidebarSection, SummarySection } from '../../sidebar';
@@ -38,9 +37,9 @@ function Setup({ item }: { item: Project }) {
         </Button>
       }
     >
-      <ValueRow label="Repo" actions={real && <IconBtn label="Open on GitHub" onClick={() => void openUrl(repoWebUrl(d.repo))}><ExternalLinkIcon /></IconBtn>}>
+      <ValueRow label="Repo" actions={real && <IconBtn label={`Open on ${codeHost(d.provider).label}`} onClick={() => void openUrl(codeHost(d.provider).repoUrl(d.repo))}><ExternalLinkIcon /></IconBtn>}>
         {real ? (
-          <a href={repoWebUrl(d.repo)} onClick={(e) => (e.preventDefault(), void openUrl(repoWebUrl(d.repo)))} style={{ color: 'var(--tone-primary)' }}>
+          <a href={codeHost(d.provider).repoUrl(d.repo)} onClick={(e) => (e.preventDefault(), void openUrl(codeHost(d.provider).repoUrl(d.repo)))} style={{ color: 'var(--tone-primary)' }}>
             {d.repo}
           </a>
         ) : (
@@ -100,8 +99,8 @@ function Tickets({ item, ctx }: SidebarProps<'project'>) {
 
 function PullRequests({ item }: { item: Project }) {
   const repo = item.data.repo.startsWith('unknown/') ? undefined : item.data.repo;
-  const open = usePrList(repo, { state: 'open', limit: 100 });
-  const renovate = useRenovatePrs(repo);
+  const open = usePrList(repo, { state: 'open', limit: 100 }, item.data.provider);
+  const renovate = useDependencyPrs(repo, item.data.provider);
   const sum = useMemo(() => (open.data ? summarizeOpenPrs(open.data) : undefined), [open.data]);
   const renovateCount = renovate.data?.length ?? sum?.renovate;
   return (

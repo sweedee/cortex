@@ -1,8 +1,8 @@
 /** Background refresh of a project (`KindModule.sync`): open PR count, Renovate PR count. */
+import { codeHost } from '../../data/codehost';
 import { queryClient } from '../../data/queryClient';
 import { qk } from '../../data/queryKeys';
 import { isRealRepo, type ItemOf } from '../../domain';
-import { native } from '../../native';
 import { patchData } from '../../store';
 import { changes, projectStatsPatch } from '../../sync/mapping';
 import { currentItem } from '../common';
@@ -12,7 +12,8 @@ async function refreshProject(id: string) {
   const p = currentItem(id, 'project');
   if (!p) return;
   const repo = p.data.repo;
-  const [open, renovate] = await Promise.all([native.gh.prList({ repo, state: 'open', limit: 200 }), native.gh.renovatePrs({ repo })]);
+  const host = codeHost(p.data.provider);
+  const [open, renovate] = await Promise.all([host.prList(repo, { state: 'open', limit: 200 }), host.dependencyPrs(repo)]);
   queryClient.setQueryData(qk.gh.prList(repo, { state: 'open', limit: 200 }), open);
   queryClient.setQueryData(qk.gh.renovate(repo), renovate);
   const cur = currentItem(id, 'project');

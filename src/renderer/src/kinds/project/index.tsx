@@ -1,5 +1,5 @@
 import { PlusIcon, SettingIcon, WorkflowIcon } from '@dynatrace/strato-icons';
-import { repoWebUrl } from '../../data/config';
+import { codeHost } from '../../data/codehost';
 import { KINDS, type ItemOf, type Segment } from '../../domain';
 import { external, openInEditorAction, openPathAction, paren, skill } from '../common';
 import type { KindModule } from '../types';
@@ -78,7 +78,7 @@ export const project: KindModule<'project'> = {
         icon: <PlusIcon />,
         run: ([x]) => void openNewWorktree(x as ItemOf<'project'>),
       },
-      external('repo', 'Open repo', (i) => (i.kind === 'project' ? repoWebUrl(i.data.repo) : ''), { disabled: p.data.repo.startsWith('unknown/') ? 'No GitHub repo set' : undefined }),
+      external('repo', 'Open repo', (i) => (i.kind === 'project' ? codeHost(i.data.provider).repoUrl(i.data.repo) : ''), { disabled: p.data.repo.startsWith('unknown/') ? 'No GitHub repo set' : undefined }),
       openPathAction('folder', 'Open folder', (i) => (i.kind === 'project' ? i.data.baseDir : undefined), { disabled: noBase }),
       openInEditorAction('editor', 'Open in editor', (i) => (i.kind === 'project' ? i.data.baseDir : undefined), { disabled: base ? noBase : SET_BASE_HINT }),
       {

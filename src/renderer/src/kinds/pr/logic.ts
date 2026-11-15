@@ -3,7 +3,7 @@
  * No React, no store, no native calls (unit-tested in `logic.test.ts`).
  */
 import type { GhMergeMethod } from '../../../../shared/integrations/github';
-import { repoWebUrl } from '../../data/config';
+import { codeHost } from '../../data/codehost';
 import { isRealRepo, type Item, type ItemOf, type PrData, type Segment } from '../../domain';
 
 type Pr = ItemOf<'pr'>;
@@ -11,7 +11,7 @@ type Pr = ItemOf<'pr'>;
 /** A GitHub `owner/name` that gh can reach (demo items use `unknown/…`). */
 export { isRealRepo };
 
-export const prUrl = (d: Pick<PrData, 'repo' | 'number'>) => repoWebUrl(d.repo, `/pull/${d.number}`);
+export const prUrl = (d: Pick<PrData, 'repo' | 'number' | 'provider'>) => codeHost(d.provider).prUrl(d.repo, d.number);
 
 /** Checks are fine for merging: green, or there are none. */
 const checksOk = (d: PrData) => !d.checks || d.checks.state === 'success' || d.checks.state === 'none';
@@ -71,7 +71,7 @@ export const MERGE_METHODS: { value: GhMergeMethod; label: string; hint: string 
   { value: 'rebase', label: 'Rebase and merge', hint: 'Replays the commits onto the base branch' },
 ];
 
-/** Merge form values → `ghOps.prMerge` arguments. */
+/** Merge form values → `CodeHost.prMerge` arguments. */
 export function mergeArgs(d: Pick<PrData, 'repo' | 'number'>, values: Record<string, string | boolean>): [string, number, GhMergeMethod, { deleteBranch: boolean }] {
   const m = values.method;
   const method: GhMergeMethod = m === 'merge' || m === 'rebase' ? m : 'squash';
