@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import '../kinds/registry';
+import { installKindInfo } from '../kinds/registry';
 import { NO_USAGE, type ClaudeSessionSummary } from '../../../shared/integrations/claude';
 import type { GhPullRequest } from '../../../shared/integrations/github';
 import type { JiraIssue } from '../../../shared/integrations/jira';
@@ -10,6 +10,9 @@ import { onClaudeState } from '../kinds/agent/live';
 import { onTestState } from '../kinds/testrun/live';
 import { reconcile } from './live';
 import { agentStatusOf, changes, mapAppState, mapClaudeState, mapTestState, prPatch, tailOf, ticketPatch, worktreeGitPatch } from './mapping';
+
+// the filter needs the kinds' levels, rings and search text
+installKindInfo();
 
 const session = (over: Partial<ClaudeSessionSummary> = {}): ClaudeSessionSummary => ({
   localId: 'a1',

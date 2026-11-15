@@ -1,6 +1,5 @@
 import './runtime';
-// the kind registry first: it registers what the store's filter needs to know about kinds
-import './kinds/registry';
+import { installKindInfo } from './kinds/registry';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +18,9 @@ import { loadWorkspace, startAutosave } from './persist';
 import { startSync } from './sync';
 import './debug';
 import './index.css';
+
+// the store's filter and layout need the kinds' levels, rings and search text before the first render
+installKindInfo();
 
 async function boot() {
   // load before the first render, so the layout warms up on the stored world, not the seed

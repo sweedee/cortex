@@ -101,6 +101,7 @@ export const pr: KindModule<'pr'> = {
   addable: {
     label: 'Import pull request…',
     hint: 'owner/repo#123 or a GitHub URL',
+    example: 'owner/repo#12',
     detect: (v) => /\/pull\/\d+|#\d+$/.test(v),
     create: (v, proj) => {
       const num = Number(v.match(/(\d+)\s*$/)?.[1] ?? 0) || 1;

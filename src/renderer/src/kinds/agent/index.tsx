@@ -60,6 +60,7 @@ export const agent: KindModule<'agent'> = {
   addable: {
     label: 'Start agent session…',
     hint: 'what should the agent do?',
+    example: 'Summarise the open PRs',
     multiline: true,
     // real sessions start from the chat box (it picks the directory from the mentions)
     open: () => {

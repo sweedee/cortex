@@ -95,6 +95,7 @@ export const project: KindModule<'project'> = {
   addable: {
     label: 'Add project…',
     hint: 'owner/repo',
+    example: 'octo/repo',
     // a project never belongs to a project
     linkLabel: false,
     open: (at) => void openProjectSettings(undefined, at),

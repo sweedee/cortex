@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import './kinds/registry';
+import { installKindInfo } from './kinds/registry';
 import { DEFAULT_PREFS } from './domain';
 import { SEED_ITEMS, SEED_LINKS } from './testing/fakeWorld';
 import { EMPTY_FILTER, getState, notify, removeItems, replaceWorld, restoreRemoved, setSynced, setSyncError } from './store';
+
+// the filter needs the kinds' levels, rings and search text
+installKindInfo();
 
 beforeEach(() => {
   replaceWorld(SEED_ITEMS, SEED_LINKS, { ...DEFAULT_PREFS, filter: EMPTY_FILTER });

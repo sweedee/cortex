@@ -2,7 +2,9 @@
  * The kind registry: one module per kind (`kinds/<kind>/index.tsx`), and the cached,
  * kind-agnostic derivations the UI uses (`viewsOf`, `ctxOf`, `actionsForItem`).
  *
- * Importing this module also registers the kind info the store's filter needs.
+ * The store knows nothing about kinds; `installKindInfo()` hands it what its filter and layout need
+ * (levels, ring tones, search text). `main.tsx` calls it before anything renders; tests that use the
+ * filter call it too. Importing this module has no side effects.
  */
 import type { Item, ItemOf, Kind, Link, Segment } from '../domain';
 import { KINDS, linkedIds } from '../domain';
@@ -158,7 +160,12 @@ export function actionsForItem(item: Item, ctx: KindCtx = ctxOf()): Action[] {
 
 // ---- the store's view of kinds ------------------------------------------------------------
 
-provideKindInfo({
+/** Give the store what it needs to know about kinds (call once at start; idempotent). */
+export function installKindInfo() {
+  provideKindInfo(KIND_INFO);
+}
+
+const KIND_INFO: Parameters<typeof provideKindInfo>[0] = {
   level: levelOf,
   status: (items, links) => {
     const views = viewsOf({ items, links });
@@ -169,4 +176,4 @@ provideKindInfo({
     }
     return out;
   },
-});
+};

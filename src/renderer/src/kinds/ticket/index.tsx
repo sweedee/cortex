@@ -84,6 +84,7 @@ export const ticket: KindModule<'ticket'> = {
   addable: {
     label: 'Import Jira ticket…',
     hint: 'CTX-1234 or a Jira URL',
+    example: 'CTX-1',
     linkLabel: 'in project',
     detect: (v) => /^[A-Z][A-Z0-9]+-\d+$/.test(v) || /\/browse\//.test(v),
     create: (v) => {

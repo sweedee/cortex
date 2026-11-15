@@ -3,9 +3,8 @@ import type { ItemOf } from '../../domain';
 import { place } from '../../layout';
 import { addItem, getState, inspect, itemById, makeItem, patchData, select } from '../../store';
 import { openForm, str } from '../../ui/form';
-import { oneLine } from '../common';
+import { defineKind, oneLine } from '../common';
 import { ChecklistIcon } from '../icons';
-import type { KindModule } from '../types';
 import { checklist, firstLine, handleOf, quickChecklist, shortLabel, toggleChecklistItem, todoFromForm } from './model';
 import { TodoSidebar } from './Sidebar';
 
@@ -38,7 +37,7 @@ async function quickAdd(at: { x: number; y: number }) {
 }
 
 /** A free-form note / to-do, markdown body. */
-export const todo: KindModule<'todo'> = {
+export const todo = defineKind({
   kind: 'todo',
   label: 'Todo',
   icon: (s) => <ChecklistIcon size={s} />,
@@ -89,6 +88,7 @@ export const todo: KindModule<'todo'> = {
   addable: {
     label: 'Add todo…',
     hint: 'what needs doing? (markdown)',
+    example: 'Ask Mara about quota',
     multiline: true,
     open: (at) => void quickAdd(at),
     create: (v) => {
@@ -96,4 +96,4 @@ export const todo: KindModule<'todo'> = {
       return { kind: 'todo', handle: handleOf(title), title, data: { body: v, done: false } };
     },
   },
-};
+});

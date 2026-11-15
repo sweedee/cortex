@@ -92,6 +92,7 @@ export const worktree: KindModule<'worktree'> = {
   addable: {
     label: 'Create worktree…',
     hint: 'branch name, e.g. feat/CTX-1234-thing',
+    example: 'feat/CTX-1-x',
     detect: (v) => /^(feat|fix|chore|spike)\//.test(v),
     create: (v, proj) => {
       const leaf = lastSegment(v);

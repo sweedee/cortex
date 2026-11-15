@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import './kinds/registry'; // provides the kind info the filter needs
+import { installKindInfo } from './kinds/registry';
 import { DEFAULT_PREFS } from './domain';
 import { SEED_ITEMS, SEED_LINKS } from './testing/fakeWorld';
 import { EMPTY_FILTER, getState, insertSkill, notify, patchData, replaceWorld, select, setArchived, setDraft, setFilter, visibleSet } from './store';
+
+// the filter needs the kinds' levels, rings and search text
+installKindInfo();
 
 const all = SEED_ITEMS.map((i) => i.id);
 

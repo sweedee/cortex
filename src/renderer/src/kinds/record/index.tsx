@@ -110,6 +110,7 @@ export const record: KindModule<'record'> = {
   addable: {
     label: 'New record…',
     hint: 'file name, e.g. PLAN-CTX-1234.md',
+    example: 'PLAN-CTX-1.md',
     detect: (v) => /^(PLAN|BRAINSTORM|GRILL|VERIFICATION)-.*\.md$/i.test(v),
     create: (v, proj) => {
       const name = /\.md$/i.test(v) ? v : `${v}.md`;

@@ -103,6 +103,7 @@ export const app: KindModule<'app'> = {
   addable: {
     label: 'Launch app…',
     hint: 'command, e.g. npm run dev',
+    example: 'npm run dev',
     create: (v, proj) => ({
       kind: 'app',
       handle: `app/${(proj?.title ?? 'app').toLowerCase()}`,

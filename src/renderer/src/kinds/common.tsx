@@ -5,11 +5,30 @@
 import { Button } from '@dynatrace/strato-components/buttons';
 import { dismissToast, showToast } from '@dynatrace/strato-components/notifications';
 import { CodeIcon, DeleteIcon, ExternalLinkIcon, FolderOpenIcon, SuccessIcon, UndoIcon } from '@dynatrace/strato-icons';
-import type { Item, ItemOf, Kind } from '../domain';
+import type { Item, ItemOf, Kind, Segment } from '../domain';
 import { insertSkill, itemById, patchData, removeItems, restoreItems, restoreRemoved, select, setArchived } from '../store';
 import { openInEditor, openPath, openUrl } from '../ui/task';
 import { ArchiveIcon, skillIcon } from './icons';
 import type { Action, KindModule } from './types';
+
+// ---- defineKind ----------------------------------------------------------------------------
+
+/** The `KindModule` fields `defineKind` fills in when they are left out. */
+type Defaulted = 'radius' | 'ring' | 'facts' | 'subtitle' | 'actions';
+export type KindSpec<K extends Kind> = Omit<KindModule<K>, Defaulted> & Partial<Pick<KindModule<K>, Defaulted>>;
+
+/** Default bubble radius (world px) of `defineKind`. */
+export const DEFAULT_RADIUS = 28;
+const NEUTRAL: Segment[] = [{ tone: 'neutral', label: 'No status' }];
+
+/**
+ * A kind module with defaults: radius 28, a neutral ring, no facts, no subtitle, no own actions
+ * (*Archive* and, with `complete`, *Mark done* are added by the registry anyway). Required are
+ * `kind`, `label`, `icon`, `level` and `describe`, so a small kind is a dozen lines.
+ */
+export function defineKind<K extends Kind>(spec: KindSpec<K>): KindModule<K> {
+  return { radius: DEFAULT_RADIUS, ring: () => NEUTRAL, facts: () => [], subtitle: () => undefined, actions: () => [], ...spec };
+}
 
 export type ToastType = 'info' | 'success' | 'warning' | 'critical';
 

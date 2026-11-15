@@ -1,8 +1,7 @@
 import { EditIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, Segment } from '../../domain';
-import { external, paren } from '../common';
+import { defineKind, external, paren } from '../common';
 import { RocketIcon } from '../icons';
-import type { KindModule } from '../types';
 import { openDeploymentForm } from './form';
 import { guessStage, mockStatus, stageLabel, STAGE_TONE } from './model';
 import { DeploymentSidebar } from './Sidebar';
@@ -23,11 +22,10 @@ export function deploymentRing({ data }: ItemOf<'deployment'>): Segment[] {
 }
 
 /** Where a project runs (dev / staging / prod …). Health is mocked until there is an integration (see `model.ts` `mockStatus`). */
-export const deployment: KindModule<'deployment'> = {
+export const deployment = defineKind({
   kind: 'deployment',
   label: 'Deployment',
   icon: (s) => <RocketIcon size={s} />,
-  radius: 28,
   level: 1,
 
   ring: deploymentRing,
@@ -65,6 +63,7 @@ export const deployment: KindModule<'deployment'> = {
   addable: {
     label: 'Add deployment…',
     hint: 'URL, e.g. https://dev.example.com',
+    example: 'https://dev.example.com',
     detect: (v) => /^https?:\/\//.test(v) && !/github\.com|\/browse\//.test(v),
     openIn: (project) => void openDeploymentForm({ project }),
     create: (v, proj) => {
@@ -73,4 +72,4 @@ export const deployment: KindModule<'deployment'> = {
       return { kind: 'deployment', handle: `${name}-${stage}`, title: `${name} ${stage}`, data: { url: v, stage, health: 'unknown' } };
     },
   },
-};
+});

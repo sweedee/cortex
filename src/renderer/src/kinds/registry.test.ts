@@ -7,6 +7,7 @@ import { agentRing } from './agent';
 import { prRing } from './pr';
 import { recordRing } from './record';
 import { actionsForItem, getKind, makeCtx, MODULES, viewOf } from './registry';
+import type { KindModule } from './types';
 import { testrunRing } from './testrun';
 import { worktreeRing } from './worktree';
 
@@ -27,7 +28,7 @@ describe('kind registry', () => {
       expect(m.radius, k).toBeGreaterThan(10);
       expect(m.level, k).toBeGreaterThanOrEqual(0);
       expect(isValidElement(m.icon(16)), k).toBe(true);
-      for (const fn of ['ring', 'facts', 'subtitle', 'actions'] as const) expect(typeof m[fn], `${k}.${fn}`).toBe('function');
+      for (const fn of ['ring', 'facts', 'subtitle', 'actions', 'describe'] as const) expect(typeof m[fn], `${k}.${fn}`).toBe('function');
     }
     expect(KINDS.filter((k) => getKind(k).level === 0)).toEqual(['project']);
   });
@@ -54,25 +55,39 @@ describe('kind registry', () => {
     expect(a.every((x) => x.id === 'unarchive' || x.type === 'view' || x.type === 'external')).toBe(true);
   });
 
-  it('every addable kind creates a schema-valid item', () => {
+  it('every addable kind creates a schema-valid item from its example', () => {
     const proj = seed('p-ingest', 'project');
     for (const k of KINDS) {
       const add = getKind(k).addable;
       if (!add) continue;
-      const it = makeItem(add.create(k === 'pr' ? 'owner/repo#12' : k === 'ticket' ? 'CTX-1' : 'feat/CTX-1-x', proj));
+      const it = makeItem(add.create(add.example, proj));
       const r = ItemSchema.safeParse(it);
       expect(r.success, `${k}: ${r.error?.message}`).toBe(true);
       expect(it.kind).toBe(k);
     }
   });
 
-  it('detects pasted references', () => {
+  it('a kind that detects pasted references recognises its example (and no earlier kind takes it)', () => {
     const detect = (v: string) => KINDS.find((k) => getKind(k).addable?.detect?.(v));
-    expect(detect('CTX-1234')).toBe('ticket');
-    expect(detect('https://github.com/o/r/pull/12')).toBe('pr');
-    expect(detect('feat/CTX-1-x')).toBe('worktree');
-    expect(detect('PLAN-CTX-1.md')).toBe('record');
-    expect(detect('https://dev.example.com')).toBe('deployment');
+    const detecting = KINDS.filter((k) => getKind(k).addable?.detect);
+    expect(detecting.length).toBeGreaterThan(0);
+    expect(detecting.map((k) => detect(getKind(k).addable!.example))).toEqual(detecting);
+  });
+
+  it('describes every seed item for the chat context, without holes', () => {
+    for (const it of SEED_ITEMS) {
+      const text = (getKind(it.kind) as unknown as KindModule).describe(it, ctx);
+      expect(text, it.id).toBeTruthy();
+      expect(text, it.id).not.toMatch(/undefined|null|\(\)/);
+    }
+  });
+
+  it('only real items get refresh jobs, and job ids are unique per item', () => {
+    for (const it of SEED_ITEMS) {
+      const jobs = (getKind(it.kind) as unknown as KindModule).sync?.(it) ?? [];
+      for (const j of jobs) expect(typeof j.run, it.id).toBe('function');
+      expect(new Set(jobs.map((j) => j.id)).size, it.id).toBe(jobs.length);
+    }
   });
 });
 

@@ -97,6 +97,7 @@ export const build: KindModule<'build'> = {
   addable: {
     label: 'Watch CI build…',
     hint: 'job/branch, e.g. console-ui/main',
+    example: 'console-ui/main',
     create: (v, proj) => {
       const [name, branch] = v.includes('/') ? [v.split('/')[0], v.split('/').slice(1).join('/')] : [proj?.title ?? v, v];
       const n = Math.floor(Math.random() * 900 + 1900);

@@ -61,6 +61,8 @@ export interface Addable {
   label: string;
   /** input placeholder */
   hint: string;
+  /** a typical input: `create` accepts it and `detect` (if any) recognises it (the registry test runs it) */
+  example: string;
   /** the field is a prompt (multi-line) rather than a reference */
   multiline?: boolean;
   /** does a pasted reference look like this kind? (auto-switches the dialog) */

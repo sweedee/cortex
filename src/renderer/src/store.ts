@@ -5,7 +5,7 @@
  * The exported functions are the API; components read with `useStore(selector)`.
  * The store knows nothing about individual kinds: what it needs from them (ring tones and
  * search text for the filter, hierarchy levels) is provided by the kind registry through
- * `provideKindInfo` (kinds/registry.ts), so kind modules can import the store without an
+ * `provideKindInfo` (`installKindInfo()` in kinds/registry.ts, called from main.tsx), so kind modules can import the store without an
  * import cycle.
  */
 import { create } from 'zustand';

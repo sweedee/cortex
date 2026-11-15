@@ -3,7 +3,7 @@ import type { GhCheck } from '../../../../shared/integrations/github';
 import type { ItemOf, PrData } from '../../domain';
 import { SEED_ITEMS, SEED_LINKS } from '../../testing/fakeWorld';
 import { makeItem } from '../../store';
-import { makeCtx } from '../registry';
+import { KINDS, getKind, makeCtx } from '../registry';
 import { buildKey, checkToBuild, planBuildSync, runIdFromUrl } from '../../sync/checks';
 import { pr as prKind } from './index';
 import { ghBlocked, isAiReviewer, isMergeable, mergeArgs, mergeBlocked, mergeWarnings, needsRetarget, prRing, retargetPlan, stackChildren, worktreeOf } from './logic';
@@ -169,5 +169,11 @@ describe('AI review bot', () => {
     expect(isAiReviewer('app/Claude', 'claude[bot]')).toBe(true);
     expect(isAiReviewer('claudette', 'claude[bot]')).toBe(false);
     expect(isAiReviewer(undefined, 'claude[bot]')).toBe(false);
+  });
+});
+
+describe('pr paste detection', () => {
+  it('a GitHub pull request URL is a PR, not a deployment', () => {
+    expect(KINDS.find((k) => getKind(k).addable?.detect?.('https://github.com/o/r/pull/12'))).toBe('pr');
   });
 });
