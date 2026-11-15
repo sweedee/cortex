@@ -7,6 +7,13 @@ const PX = 2;
 
 const COLORS = ['#1496FF', '#6F2DA8', '#B455B6', '#73BE28', '#B4DC00', '#00A1B2'];
 
+/** ~30 fps is plenty for slow drifting pixels (half the work of the display rate). */
+const FRAME_MS = 1000 / 30;
+/** particle speeds are per 60 fps frame */
+const BASE_FRAME_MS = 1000 / 60;
+/** stop animating after this long without input; the last frame stays on screen */
+const IDLE_MS = 60_000;
+
 interface P {
   x: number;
   y: number;
@@ -28,7 +35,9 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let w = 0,
       h = 0,
-      raf = 0;
+      raf = 0,
+      last = 0,
+      lastInput = performance.now();
     let ps: P[] = [];
 
     const resize = () => {
@@ -54,12 +63,22 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
     window.addEventListener('resize', resize);
 
     const draw = (t: number) => {
+      raf = 0;
+      if (document.hidden) return; // resumes on visibilitychange
+      if (t - lastInput > IDLE_MS) return; // resumes on the next input
+      if (last && t - last < FRAME_MS - 1) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      // same drift speed at any frame rate (capped, so a long pause does not jump)
+      const steps = last ? Math.min((t - last) / BASE_FRAME_MS, 4) : 1;
+      last = t;
       ctx.clearRect(0, 0, w, h);
       const { x: cx, y: cy } = cam.current;
       for (const p of ps) {
         if (!reduce) {
-          p.x += p.vx;
-          p.y += p.vy;
+          p.x += p.vx * steps;
+          p.y += p.vy * steps;
         }
         // parallax: deeper particles follow the camera less
         const sx = (((p.x + cx * p.depth) % w) + w) % w;
@@ -75,10 +94,23 @@ export function Backdrop({ cam }: { cam: React.MutableRefObject<{ x: number; y: 
       if (logo.current) logo.current.style.transform = `translate(calc(-50% + ${cx * 0.04}px), calc(-50% + ${cy * 0.04}px))`;
       raf = requestAnimationFrame(draw);
     };
+    const wake = () => {
+      lastInput = performance.now();
+      if (!raf && !document.hidden) {
+        last = 0;
+        raf = requestAnimationFrame(draw);
+      }
+    };
     raf = requestAnimationFrame(draw);
+    // resize clears the canvas, so it wakes the loop too
+    const inputs = ['pointermove', 'pointerdown', 'wheel', 'keydown', 'resize'] as const;
+    inputs.forEach((e) => window.addEventListener(e, wake, { passive: true }));
+    document.addEventListener('visibilitychange', wake);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      inputs.forEach((e) => window.removeEventListener(e, wake));
+      document.removeEventListener('visibilitychange', wake);
     };
   }, [cam]);
 
