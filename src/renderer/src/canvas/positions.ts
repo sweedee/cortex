@@ -40,6 +40,9 @@ function place(id: string, el: HTMLElement, r: number) {
   if (p?.x != null && p.y != null) el.style.transform = bubbleTransform(p.x, p.y, r);
 }
 
+/** The mounted element of a bubble (keyboard focus moves between them). */
+export const bubbleElement = (id: string): HTMLElement | undefined => bubbles.get(id)?.el;
+
 const placers = new Set<() => void>();
 
 /**

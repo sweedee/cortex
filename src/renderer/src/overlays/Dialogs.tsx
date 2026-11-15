@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { FormField, Label, TextArea, TextInput } from '@dynatrace/strato-components/forms';
 import { Flex } from '@dynatrace/strato-components/layouts';
@@ -10,6 +10,7 @@ import type { ItemOf, Kind } from '../domain';
 import { getKind, kindIcon, kindLabel, KINDS } from '../kinds/registry';
 import { place } from '../layout';
 import { addItem, closeDialog, makeItem, select, useStore } from '../store';
+import { isComposing, useAutoFocus } from '../ui/focus';
 
 export function Dialogs() {
   const dialog = useStore((s) => s.dialog);
@@ -61,13 +62,8 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
   const [project, setProject] = useState<string | null>(projects[0]?.id ?? null);
   const meta = getKind(kind).addable!;
   const guessed = detect(value.trim());
-  const field = useRef<HTMLDivElement>(null);
-  // Strato inputs have no autoFocus prop: focus the field once the modal is in place
-  useEffect(() => {
-    const t = setTimeout(() => field.current?.querySelector<HTMLElement>('input, textarea')?.focus(), 80);
-    return () => clearTimeout(t);
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- refocus only when the field type flips
-  }, [!!meta.multiline]);
+  // Strato inputs have no autoFocus prop: focus the field as it mounts (again when its type flips)
+  const field = useAutoFocus<HTMLDivElement>(!!meta.multiline);
 
   const submit = () => {
     const v = value.trim();
@@ -137,7 +133,7 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
                 if (g && g !== kind) setKind(g);
               }}
               placeholder={meta.hint}
-              onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && submit()}
+              onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && !isComposing(e) && submit()}
             />
           )}
         </FormField>

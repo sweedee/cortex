@@ -6,7 +6,9 @@ import { Bubble } from './Bubble';
 import { ChatThreads } from './ChatThreads';
 import { Links } from './Links';
 import { HoverCard, InlineActions } from './Overlays';
-import { placeAll, useFollow } from './positions';
+import { ARROW_DIRECTION, nearestInDirection, tabStopOf } from './nav';
+import { bubbleElement, placeAll, useFollow } from './positions';
+import { openShortcuts } from '../overlays/Shortcuts';
 import { sidebarWidth } from '../overlays/Sidebar';
 import { kindIcon, levelOf, radiusOf, useViews } from '../kinds/registry';
 import type { Metrics } from '../layout';
@@ -25,6 +27,8 @@ import { resetToDemo } from '../persist';
 import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, relatedItems, removeSelected } from '../actions';
 import { removeWithUndo } from '../kinds/common';
 import { draftMentions, focusChat, getState, insertSkill, inspect, openDialog, select, setHovered, useStore, useVisible, visibleSet } from '../store';
+import { applyMetricVars, METRICS } from '../ui/metrics';
+import { matchShortcut } from '../ui/shortcuts';
 import { accentOf, groupFill, useItemColors } from '../visual';
 
 const metrics: Metrics = (it) => ({ r: radiusOf(it.kind), level: levelOf(it.kind) });
@@ -34,8 +38,9 @@ type MenuState = { sx: number; sy: number; wx: number; wy: number; itemId?: stri
 
 const MIN_K = 0.25;
 const MAX_K = 2.2;
-const CHAT_SPACE = 170; // px reserved at the bottom for the chat box
-const TOP_SPACE = 70;
+const { chatSpace: CHAT_SPACE, topSpace: TOP_SPACE } = METRICS;
+// the stylesheet reads the same sizes as CSS custom properties
+applyMetricVars();
 const MAX_RELATED = 6;
 /** px covered by the details sidebar on the right (0 when it is closed) */
 const rightSpace = () => (getState().inspected ? sidebarWidth() + 32 : 0);
@@ -319,33 +324,97 @@ export function Canvas() {
   };
 
   // ---- keyboard -------------------------------------------------------------------------
+  // the shortcuts come from one table (ui/shortcuts.ts), which the `?` overlay lists too
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       const typing = t.closest('input, textarea, [contenteditable="true"], [role="dialog"]');
-      if (e.key === 'Escape' && !typing) {
-        // first Esc closes the details sidebar, the next one clears the selection
-        if (getState().inspected) inspect(null);
-        else select([]);
-      }
       if (typing) return;
-      if (e.key === '/' || (e.key === 'k' && (e.ctrlKey || e.metaKey))) {
-        e.preventDefault();
-        focusChat();
-      } else if (e.key === 'f' || e.key === 'F') fitTo(getState().selected.length ? getState().selected : undefined);
-      else if ((e.key === 'Delete' || e.key === 'Backspace') && getState().selected.length) removeSelected();
-      else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        select([...visibleSet()]);
-      } else if (e.key === 'Enter' && getState().selected.length) {
-        const { actions, items: its } = actionsForSelection(getState().selected);
-        actions.find((a) => a.primary && !a.disabled)?.run(its);
+      switch (matchShortcut(e, 'canvas')) {
+        case 'escape':
+          // first Esc closes the details sidebar, the next one clears the selection
+          if (getState().inspected) inspect(null);
+          else select([]);
+          break;
+        case 'chat':
+          e.preventDefault();
+          focusChat();
+          break;
+        case 'fit':
+          fitTo(getState().selected.length ? getState().selected : undefined);
+          break;
+        case 'remove':
+          if (getState().selected.length) removeSelected();
+          break;
+        case 'selectAll':
+          e.preventDefault();
+          select([...visibleSet()]);
+          break;
+        case 'primary':
+          if (getState().selected.length) {
+            const { actions, items: its } = actionsForSelection(getState().selected);
+            actions.find((a) => a.primary && !a.disabled)?.run(its);
+          }
+          break;
+        case 'help':
+          e.preventDefault();
+          openShortcuts();
+          break;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [fitTo]);
 
+  // ---- keyboard focus on bubbles: one tab stop, arrow keys between bubbles (canvas/nav.ts) ----
+  /** the bubble that has keyboard focus (null once focus leaves the bubbles) */
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const bubbleOf = (el: EventTarget | null) => (el instanceof HTMLElement && el.classList.contains('bubble') ? el.dataset.id : undefined);
+
+  /** Focus a bubble and pan it into view if it is off screen. */
+  const focusBubble = (id: string) => {
+    bubbleElement(id)?.focus({ preventScroll: true });
+    const p = positionOf(id);
+    if (p?.x == null || p.y == null) return;
+    const s = toScreen(p.x, p.y);
+    const W = window.innerWidth - rightSpace(),
+      H = window.innerHeight - CHAT_SPACE;
+    const m = 60;
+    if (s.x < m || s.x > W - m || s.y < TOP_SPACE + m / 2 || s.y > H - m / 2)
+      animateTo({ ...cam.current, x: cam.current.x + (W / 2 - s.x), y: cam.current.y + (TOP_SPACE + (H - TOP_SPACE) / 2 - s.y) }, 260);
+  };
+
+  const onBubbleKey = (e: React.KeyboardEvent) => {
+    const id = bubbleOf(e.target);
+    if (!id || e.nativeEvent.isComposing) return;
+    switch (matchShortcut(e, 'bubble')) {
+      case 'move': {
+        e.preventDefault();
+        const from = positionOf(id);
+        if (from?.x == null || from.y == null) return;
+        const vis = visibleSet();
+        const points = getState()
+          .items.filter((i) => vis.has(i.id) && i.id !== id)
+          .map((i) => ({ id: i.id, p: positionOf(i.id) }))
+          .filter((c) => c.p?.x != null && c.p.y != null)
+          .map((c) => ({ id: c.id, x: c.p!.x!, y: c.p!.y! }));
+        const next = nearestInDirection({ x: from.x, y: from.y }, ARROW_DIRECTION[e.key]!, points);
+        if (next) focusBubble(next);
+        break;
+      }
+      case 'open':
+        // like a double-click: select it and open the details (not the selection's main action)
+        e.preventDefault();
+        e.stopPropagation();
+        select([id]);
+        inspect(id);
+        break;
+      case 'toggle':
+        e.preventDefault();
+        select([id], true);
+        break;
+    }
+  };
   // hover card appears after a short delay
   useEffect(() => {
     setHoverShown(null);
@@ -386,6 +455,8 @@ export function Canvas() {
   const isDimmed = (id: string) => (hits ? !hits.has(id) : dimming && !lit.has(id) && !focus.has(id));
 
   const { x: cx, y: cy, k } = cam.current;
+  const shownIds = useMemo(() => items.filter((i) => !hiddenSet.has(i.id)).map((i) => i.id), [items, hiddenSet]);
+  const tabStop = tabStopOf(focusId, selected, shownIds);
   // derived from the store only (not positions), so memoized across camera renders
   const sel = useMemo(
     () => actionsForSelection(selected.filter((id) => !hiddenSet.has(id))),
@@ -407,11 +478,11 @@ export function Canvas() {
     if (!b) return null;
     const right = toScreen(b.x1, b.y0);
     const left = toScreen(b.x0, b.y0);
-    const flip = right.x + 16 + 230 > window.innerWidth - rightSpace();
+    const flip = right.x + METRICS.actionsGap + METRICS.actionsWidth > window.innerWidth - rightSpace();
     const nRel = related.length;
     const height = sel.actions.length * 34 + (sel.items.length > 1 ? 30 : 0) + (nRel ? nRel * 30 + 30 : 0) + 10;
     const y = Math.max(TOP_SPACE, Math.min(right.y, window.innerHeight - CHAT_SPACE - height));
-    return { x: flip ? left.x - 16 : right.x + 16, y, flip };
+    return { x: flip ? left.x - METRICS.actionsGap : right.x + METRICS.actionsGap, y, flip };
   });
 
   // hover card next to the bubble
@@ -422,8 +493,9 @@ export function Canvas() {
     if (!hoverItem || p?.x == null || p.y == null) return null;
     const r = radiusOf(hoverItem.kind) * cam.current.k;
     const s = toScreen(p.x, p.y);
-    const flip = s.x + r + 300 > window.innerWidth - rightSpace();
-    return { x: flip ? s.x - r - 18 : s.x + r + 18, y: s.y, flip };
+    const gap = METRICS.hoverCardGap;
+    const flip = s.x + r + gap + METRICS.hoverCardWidth > window.innerWidth - rightSpace();
+    return { x: flip ? s.x - r - gap : s.x + r + gap, y: s.y, flip };
   });
 
   // threads from the chat box to every mentioned bubble
@@ -451,9 +523,18 @@ export function Canvas() {
       onPointerLeave={() => !gesture.current && setHovered(null)}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
+      onKeyDown={onBubbleKey}
+      onFocus={(e) => {
+        const id = bubbleOf(e.target);
+        if (id && id !== focusId) setFocusId(id);
+      }}
+      onBlur={(e) => {
+        // leaving the bubbles: the tab stop goes back to the selection / first bubble
+        if (bubbleOf(e.target) && !bubbleOf(e.relatedTarget)) setFocusId(null);
+      }}
     >
       <Backdrop cam={cam} />
-      <div ref={world} className="world" style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}>
+      <div ref={world} className="world" role="group" aria-label="Canvas: Tab to the bubbles, arrow keys between them, ? for all shortcuts" style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}>
         <Links links={links} views={views} active={activeLinks} hidden={hiddenSet} />
         {items.map((it) => {
           if (hiddenSet.has(it.id)) return null;
@@ -471,6 +552,7 @@ export function Canvas() {
               isNew={freshIds.has(it.id)}
               fill={fills.get(it.id)}
               accent={accentOf(colors, it.id)}
+              tabbable={it.id === tabStop}
             />
           );
         })}

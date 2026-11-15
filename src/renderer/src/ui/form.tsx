@@ -25,6 +25,7 @@ import { Modal } from '@dynatrace/strato-components/overlays';
 import { Text } from '@dynatrace/strato-components/typography';
 import { FolderOpenIcon } from '@dynatrace/strato-icons';
 import { native } from '../native';
+import { isComposing, useAutoFocus } from './focus';
 import { errorText } from './task';
 import { cleanValues, initialValues, isVisible, optionsOf, validateForm, type FieldValue, type FormFieldSpec, type FormSpec, type FormValues } from './formModel';
 
@@ -103,15 +104,10 @@ function FormDialog({ form }: { form: OpenForm }) {
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const body = useRef<HTMLDivElement>(null);
+  // Strato inputs have no autoFocus: focus the first field as the form mounts
+  const body = useAutoFocus<HTMLDivElement>();
   // the newest values, also between a change and the next render (derive / submit read it)
   const latest = useRef(first);
-
-  // Strato inputs have no autoFocus: focus the first field once the modal is in place
-  useEffect(() => {
-    const t = setTimeout(() => body.current?.querySelector<HTMLElement>('input:not([type=hidden]), textarea')?.focus(), 80);
-    return () => clearTimeout(t);
-  }, []);
 
   const set = (name: string, v: FieldValue) => {
     const next = { ...latest.current, [name]: v };
@@ -295,7 +291,7 @@ function Field({ field: f, value, error, onChange, onCommit, onEnter }: FieldPro
           placeholder={f.placeholder}
           onChange={(v: string) => onChange(v)}
           onBlur={() => onCommit()}
-          onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && onEnter()}
+          onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && !isComposing(e) && onEnter()}
         />
       );
   }

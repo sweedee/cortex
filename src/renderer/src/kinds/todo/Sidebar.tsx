@@ -68,7 +68,7 @@ function TodoEditor({ item, ctx }: SidebarProps<'todo'>) {
           onChange={(e) => setTitle(e.target.value)}
           onBlur={commitTitle}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) (e.target as HTMLInputElement).blur();
             if (e.key === 'Escape') setTitle(item.title);
           }}
         />

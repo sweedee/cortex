@@ -70,7 +70,7 @@ export function InlineText({ value, placeholder, onCommit, label }: { value: str
     <div
       style={{ flex: 1, minWidth: 0 }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') commit();
+        if (e.key === 'Enter' && !e.nativeEvent.isComposing) commit();
         if (e.key === 'Escape') setText(value);
       }}
     >

@@ -4,6 +4,7 @@ import { getKind, type ItemView } from '../kinds/registry';
 import { useStore } from '../store';
 import { syncTooltip } from '../sync/status';
 import { TONE_COLOR } from '../tones';
+import { bubbleLabel, statusGlyph } from './nav';
 import { useBubblePosition } from './positions';
 
 export interface BubbleProps {
@@ -25,6 +26,8 @@ export interface BubbleProps {
   accent: string;
   /** disc fill from the group colours (related items share them); unset = neutral gray */
   fill?: string;
+  /** the canvas's one tab stop (roving tabindex); the others are focusable by the arrow keys only */
+  tabbable: boolean;
 }
 
 const RING_W = 3.5;
@@ -40,7 +43,7 @@ function Ring({ r, segments }: { r: number; segments: Segment[] }) {
   const c = size / 2;
   return (
     <svg className="bubble-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ left: -(c - r), top: -(c - r) }} aria-hidden>
-      <circle cx={c} cy={c} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={RING_W} />
+      <circle cx={c} cy={c} r={R} fill="none" stroke="var(--ring-track)" strokeWidth={RING_W} />
       <g transform={`rotate(-90 ${c} ${c})`}>
         {segments.map((s, i) => {
           const len = ((C - gaps) * (s.weight ?? 1)) / total;
@@ -74,7 +77,7 @@ const iconSize = (r: number) => (r >= 50 ? 28 : r <= 28 ? 18 : 22);
  * One bubble. Its position is not a prop: the layout moves it on every tick by writing the
  * transform directly (positions.ts), so the simulation does not re-render React.
  */
-export const Bubble = memo(function Bubble({ item, view, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent }: BubbleProps) {
+export const Bubble = memo(function Bubble({ item, view, selected, lit, dimmed, mentioned, hit, hitActive, isNew, fill, accent, tabbable }: BubbleProps) {
   const mod = getKind(item.kind);
   const r = mod.radius;
   const tone = view.ring[0]?.tone;
@@ -99,12 +102,17 @@ export const Bubble = memo(function Bubble({ item, view, selected, lit, dimmed, 
   const syncStatus = useStore((s) => s.sync[item.id]);
   const syncError = syncStatus?.error ? syncTooltip(syncStatus) : undefined;
   const ref = useBubblePosition(item.id, r);
+  const glyph = statusGlyph(view.ring);
 
   return (
     <div
       ref={ref}
       className={cls}
       data-id={item.id}
+      role="button"
+      tabIndex={tabbable ? 0 : -1}
+      aria-pressed={selected}
+      aria-label={bubbleLabel(item, view.ring, { waiting: view.waiting, syncError })}
       style={{ width: r * 2, height: r * 2, ['--tone' as string]: TONE_COLOR[tone ?? 'neutral'], ['--accent' as string]: accent }}
     >
       <div className="bubble-float">
@@ -125,6 +133,11 @@ export const Bubble = memo(function Bubble({ item, view, selected, lit, dimmed, 
         {item.notice && !item.notice.read && !item.archived && (
           <span className={`bubble-notice tone-${item.notice.tone}`} style={{ left: r + r * 0.7071 - 7, top: r - r * 0.7071 - 7 }}>
             <span className="bubble-notice-pulse" />
+          </span>
+        )}
+        {glyph && (
+          <span className={`bubble-status tone-${glyph.tone}`} aria-hidden style={{ left: r - r * 0.7071 - 7, top: r + r * 0.7071 - 7 }}>
+            {glyph.glyph}
           </span>
         )}
         {syncError && (

@@ -19,6 +19,7 @@ import { ActionButton } from '../canvas/Overlays';
 import { camera } from '../layout';
 import { mentionIndex, mentionOptions } from './mentionOptions';
 import { SKILLS } from './skills';
+import { isComposing } from '../ui/focus';
 
 export { SKILLS } from './skills';
 
@@ -173,6 +174,8 @@ export function ChatBox() {
   useEffect(() => () => setSearch(null), []);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // an IME composition owns Enter / arrows / Esc until it is committed
+    if (isComposing(e)) return;
     if (popup && popup.options.length) {
       if (e.key === 'ArrowDown') return (e.preventDefault(), setActive((a) => (a + 1) % popup.options.length));
       if (e.key === 'ArrowUp') return (e.preventDefault(), setActive((a) => (a - 1 + popup.options.length) % popup.options.length));

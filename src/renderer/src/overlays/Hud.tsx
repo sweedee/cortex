@@ -8,6 +8,7 @@ import {
   CheckmarkIcon,
   DeleteIcon,
   FilterIcon,
+  KeyboardIcon,
   MinusIcon,
   NotificationActiveIcon,
   NotificationIcon,
@@ -22,6 +23,7 @@ import {
 } from '@dynatrace/strato-icons';
 import { useAppInfo } from '../data/app';
 import { openSettings } from './settings';
+import { openShortcuts, ShortcutsHelp } from './Shortcuts';
 import { toggleDesktop, toggleSound } from '../desktop';
 import { camera } from '../layout';
 import { asset } from '../native';
@@ -41,6 +43,9 @@ import {
   useStore,
   useVisible,
 } from '../store';
+import { ThemeSync } from '../theme';
+import { useReturnFocus } from '../ui/focus';
+import { shortcutHint } from '../ui/shortcuts';
 import { accentOf, useItemColors } from '../visual';
 
 export function Hud() {
@@ -59,6 +64,9 @@ export function Hud() {
 
   return (
     <>
+      {/* app-wide singletons that live with the HUD: the theme, the shortcuts overlay */}
+      <ThemeSync />
+      <ShortcutsHelp />
       <div className="hud hud-brand">
         <img src={asset('brand/cortex-mark.svg')} alt="" width={22} height={22} />
         <div>
@@ -169,7 +177,7 @@ export function Hud() {
             </Button.Prefix>
           </Button>
         </Tooltip>
-        <Tooltip text="Fit everything (F)">
+        <Tooltip text={`Fit everything (${shortcutHint('fit')})`}>
           <Button variant="default" size="condensed" onClick={() => camera.fit()} aria-label="Fit everything">
             <Button.Prefix>
               <ZoomToFitIcon />
@@ -180,6 +188,13 @@ export function Hud() {
           <Button variant="default" size="condensed" onClick={() => camera.zoom(1.25)} aria-label="Zoom in">
             <Button.Prefix>
               <PlusIcon />
+            </Button.Prefix>
+          </Button>
+        </Tooltip>
+        <Tooltip text={`Keyboard shortcuts (${shortcutHint('help')})`}>
+          <Button variant="default" size="condensed" onClick={openShortcuts} aria-label="Keyboard shortcuts">
+            <Button.Prefix>
+              <KeyboardIcon />
             </Button.Prefix>
           </Button>
         </Tooltip>
@@ -210,6 +225,8 @@ function FilterPanel({ onClose }: { onClose: () => void }) {
   const views = useViews();
   const ref = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  // back to the filter button (or whatever opened it) when the panel closes
+  useReturnFocus(true, () => document.querySelector<HTMLElement>('.hud-filter-btn'));
 
   useEffect(() => {
     input.current?.focus();

@@ -8,12 +8,14 @@
  * the window) for webviews and diffs; kind sidebars can ask for it via `useSidebarLayout()`.
  */
 import { MaximizeIcon, MinimizeIcon, XmarkIcon } from '@dynatrace/strato-icons';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { bubbleElement } from '../canvas/positions';
 import { kindIcon, kindLabel, sidebarOf, useCtx } from '../kinds/registry';
 import type { SidebarProps } from '../kinds/types';
 import { DefaultSidebar, SidebarLayoutContext } from '../sidebar';
 import { inspect, setSettings, useStore } from '../store';
 import { syncTooltip } from '../sync/status';
+import { useReturnFocus } from '../ui/focus';
 
 const MIN_W = 280;
 const MARGIN = 16;
@@ -52,6 +54,12 @@ export function Sidebar() {
     // the chat dock (and anything else docked at the bottom) centres in the space left of the sidebar
     document.documentElement.style.setProperty('--sidebar-space', `${currentW ? currentW + MARGIN * 2 : 0}px`);
   }, [inspected, item, width]);
+  // closing (Esc, the close button) puts focus back where it was, else on the item's bubble
+  const lastInspected = useRef<string | null>(null);
+  useEffect(() => {
+    if (inspected) lastInspected.current = inspected;
+  }, [inspected]);
+  useReturnFocus(!!(inspected && item), () => (lastInspected.current ? bubbleElement(lastInspected.current) : null));
   const layout = useMemo(() => ({ wide, setWide: (w: boolean) => setWide(w), width }), [wide, setWide, width]);
 
   if (!inspected || !item) return null;
