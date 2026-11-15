@@ -28,7 +28,7 @@ Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decisi
 
 | # | Item | Agent | Status | Commit / notes |
 |---|---|---|---|---|
-| 11 | Packaging: electron-builder, `asarUnpack` jira-mock, icon, signing, updates (§9) | sonnet | 🔄 | Signing from env when present; auto-update documented only |
+| 11 | Packaging: electron-builder, `asarUnpack` jira-mock, icon, signing, updates (§9) | sonnet | ✅ | `f74c1fe`. electron-builder 26.18.1 (nsis / dmg / AppImage), `dist` / `dist:dir` / `icons` scripts, jira-mock + seed unpacked, `unpackedAsar()` path fix, icon (svg/png/ico), v0.1.0, `docs/RELEASING.md`. Renderer deps moved to devDependencies (asar 410 MB → 21 MB). Packaged Windows app starts. Open: macOS/Linux builds and the installer not run; no signing certs; auto-update not implemented; README doesn't mention `dist` yet |
 | 12 | First run: opt-in demo world; explicit "Jira not configured" state (§9) | | ⬜ | |
 | 13 | Real-world runs: real Claude session, throwaway PR (§10) | — | ⏸ | Needs the user: real GitHub and Claude accounts |
 
