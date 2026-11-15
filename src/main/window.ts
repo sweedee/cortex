@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, screen, shell, type Rectangle, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, nativeImage, screen, shell, type Rectangle, type WebContents } from 'electron';
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from './lib/log';
@@ -49,6 +49,7 @@ export function createMainWindow(): BrowserWindow {
     show: false,
     backgroundColor: BACKGROUND,
     title: 'Cortex',
+    icon: nativeImage.createFromPath(join(app.getAppPath(), 'build', 'icon.png')),
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),

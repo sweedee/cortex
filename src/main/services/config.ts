@@ -40,7 +40,7 @@ export interface JiraCliSpec {
 
 export function jiraCliSpec(cfg: IntegrationConfig, paths: { appRoot: string; userData: string; nodeBin?: string; isElectron?: boolean }, env = process.env): JiraCliSpec {
   if (cfg.jira.cli === 'acli') return { command: 'acli', prefix: [], env: {} };
-  const script = env['CORTEX_JIRA_MOCK_SCRIPT'] || join(paths.appRoot, 'scripts', 'jira-mock', 'jira-mock.mjs');
+  const script = env['CORTEX_JIRA_MOCK_SCRIPT'] || join(unpackedAsar(paths.appRoot), 'scripts', 'jira-mock', 'jira-mock.mjs');
   return {
     // Electron's own binary runs plain node scripts with ELECTRON_RUN_AS_NODE: no node on PATH needed
     command: paths.nodeBin ?? process.execPath,
@@ -52,3 +52,6 @@ export function jiraCliSpec(cfg: IntegrationConfig, paths: { appRoot: string; us
     },
   };
 }
+/** Files that child processes execute can't live inside app.asar: packaged builds unpack them next to it. */
+export const unpackedAsar = (p: string): string => p.replace(/app\.asar(?![\w.])/, 'app.asar.unpacked');
+
