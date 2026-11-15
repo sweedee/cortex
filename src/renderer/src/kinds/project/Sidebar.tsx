@@ -3,15 +3,13 @@ import { CodeIcon, ExternalLinkIcon, FolderOpenIcon, PlusIcon, SettingIcon } fro
 import { useMemo } from 'react';
 import { useRenovatePrs, usePrList } from '../../data/gh';
 import { useWorktrees } from '../../data/git';
-import type { ItemOf, Tone } from '../../domain';
+import { KINDS, type Item, type ItemOf, type Tone } from '../../domain';
 import { ConnectionsSection, SidebarSection, SummarySection } from '../../sidebar';
 import { patchData } from '../../store';
 import { agoShort } from '../../tones';
 import { openInEditor, openPath, openUrl } from '../../ui/task';
 import { plural } from '../common';
-import { stageLabel, STAGE_TONE } from '../deployment/model';
-import { openDeploymentForm } from '../deployment/form';
-import type { SidebarProps } from '../types';
+import type { KindModule, SidebarProps } from '../types';
 import { focusItem, IconBtn, InlineText, mono, Note, QueryNote, ToneChip, ValueRow } from './parts';
 import { summarizeOpenPrs } from './prSummary';
 import { openProjectSettings } from './settings';
@@ -192,33 +190,58 @@ function Worktrees({ item, ctx }: SidebarProps<'project'>) {
   );
 }
 
-function Deployments({ item, ctx }: SidebarProps<'project'>) {
-  const deployments = ctx.inProject(item.id, 'deployment').filter((d) => !d.archived);
-  const mod = ctx.kind('deployment');
+/**
+ * One section per kind with a `projectSection` (deployments today): the project's items of that kind,
+ * with the kind's chip and an "open" button, and an add button that uses the kind's `addable.openIn`.
+ */
+function KindSections({ item, ctx }: SidebarProps<'project'>) {
   return (
-    <SidebarSection
-      label={`Deployments · ${deployments.length}`}
-      actions={
-        <Button size="condensed" onClick={() => void openDeploymentForm({ project: item })}>
-          <Button.Prefix>
-            <PlusIcon />
-          </Button.Prefix>
-          Add deployment
-        </Button>
-      }
-    >
-      {deployments.length === 0 && <Note>No deployments yet.</Note>}
-      {deployments.map((dep) => (
-        <div key={dep.id} style={{ display: 'flex', alignItems: 'center' }}>
-          <button className="sidebar-row" onClick={() => focusItem(dep.id)} title={dep.data.url}>
-            <span className="sidebar-row-icon">{mod.icon(13)}</span>
-            <span className="sidebar-row-main">{dep.title}</span>
-            <ToneChip tone={STAGE_TONE[dep.data.stage]}>{stageLabel(dep.data)}</ToneChip>
-          </button>
-          <IconBtn label={`Open ${dep.data.url}`} onClick={() => void openUrl(dep.data.url)}><ExternalLinkIcon /></IconBtn>
-        </div>
-      ))}
-    </SidebarSection>
+    <>
+      {KINDS.map((k) => {
+        const mod = ctx.kind(k) as unknown as KindModule;
+        const sec = mod.projectSection;
+        if (!sec) return null;
+        const children = ctx.inProject(item.id, k).filter((c) => !c.archived) as Item[];
+        const openIn = mod.addable?.openIn;
+        return (
+          <SidebarSection
+            key={k}
+            label={`${sec.label} · ${children.length}`}
+            actions={
+              sec.addLabel &&
+              openIn && (
+                <Button size="condensed" onClick={() => openIn(item)}>
+                  <Button.Prefix>
+                    <PlusIcon />
+                  </Button.Prefix>
+                  {sec.addLabel}
+                </Button>
+              )
+            }
+          >
+            {children.length === 0 && sec.empty && <Note>{sec.empty}</Note>}
+            {children.map((c) => {
+              const chip = (sec.chip ?? mod.badge)?.(c);
+              const url = sec.url?.(c);
+              return (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center' }}>
+                  <button className="sidebar-row" onClick={() => focusItem(c.id)} title={sec.hint?.(c) ?? c.title}>
+                    <span className="sidebar-row-icon">{mod.icon(13)}</span>
+                    <span className="sidebar-row-main">{c.title}</span>
+                    {chip && <ToneChip tone={chip.tone}>{chip.label}</ToneChip>}
+                  </button>
+                  {url && (
+                    <IconBtn label={`Open ${url}`} onClick={() => void openUrl(url)}>
+                      <ExternalLinkIcon />
+                    </IconBtn>
+                  )}
+                </div>
+              );
+            })}
+          </SidebarSection>
+        );
+      })}
+    </>
   );
 }
 
@@ -231,7 +254,7 @@ export function ProjectSidebar(props: SidebarProps<'project'>) {
       <Tickets {...props} />
       <PullRequests item={item} />
       <Worktrees {...props} />
-      <Deployments {...props} />
+      <KindSections {...props} />
       <ConnectionsSection item={item} ctx={ctx} />
     </>
   );
