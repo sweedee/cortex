@@ -1,10 +1,9 @@
 /** Jira (`native.jira.*`, the mock CLI or acli): issues, searches, and the write ops. */
 import { useQuery } from '@tanstack/react-query';
 import type { IntegrationConfig } from '../../../shared/integrations/config';
-import { jiraBrowseUrl, summarizeIssue, type JiraIssue, type JiraStatusOption } from '../../../shared/integrations/jira';
+import { jiraBrowseUrl, type JiraIssue, type JiraStatusOption } from '../../../shared/integrations/jira';
 import type { JiraCreateIssueRequest, JiraEditIssueRequest } from '../../../shared/ipc';
 import { native } from '../native';
-import { userConfig } from './config';
 import { invalidate, ready } from './ops';
 import { queryClient } from './queryClient';
 import { qk } from './queryKeys';
@@ -12,18 +11,6 @@ import { qk } from './queryKeys';
 /** Full issue (REST v3 shape: ADF description, comments, links, …). */
 export function useJiraIssue(key: string | undefined) {
   return useQuery({ queryKey: qk.jira.issue(key ?? ''), queryFn: () => native.jira.view({ key: key! }), enabled: ready(key) });
-}
-
-/** with the site's custom field ids (config.json `jira.fields`) */
-const summarize = (issue: JiraIssue) => summarizeIssue(issue, userConfig().jira.fields);
-
-/** The same query reduced to `JiraIssueSummary` (status, type, assignee, sprint, points). */
-export function useJiraIssueSummary(key: string | undefined) {
-  return useQuery({ queryKey: qk.jira.issue(key ?? ''), queryFn: () => native.jira.view({ key: key! }), enabled: ready(key), select: summarize });
-}
-
-export function useJiraSearch(jql: string | undefined, limit?: number) {
-  return useQuery({ queryKey: qk.jira.search(jql ?? '', limit), queryFn: () => native.jira.search({ jql: jql!, limit }), enabled: ready(jql) });
 }
 
 /**

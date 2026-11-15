@@ -9,10 +9,6 @@ import { native } from '../native';
 import { invalidate, ready } from './ops';
 import { qk } from './queryKeys';
 
-export function useClaudeSessions() {
-  return useQuery({ queryKey: qk.claude.list(), queryFn: () => native.claude.list(), enabled: ready() });
-}
-
 /** One session with its folded messages (user / assistant / tool rows), status, usage. */
 export function useClaudeSession(localId: string | undefined) {
   return useQuery({ queryKey: qk.claude.session(localId ?? ''), queryFn: () => native.claude.session({ localId: localId! }), enabled: ready(localId), staleTime: 5_000 });

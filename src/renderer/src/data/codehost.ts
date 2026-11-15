@@ -7,7 +7,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_CODE_HOST, type CodeHost, type CodeHostId, type CodeHostPrFilter } from '../../../shared/codeHost';
-import { rollupBuckets, summarizePr } from '../../../shared/integrations/github';
+import { rollupBuckets } from '../../../shared/integrations/github';
 import { github } from './gh';
 import { pollWhile, ready } from './ops';
 import { qk } from './queryKeys';
@@ -20,11 +20,6 @@ export const codeHost = (provider: CodeHostId | undefined = DEFAULT_CODE_HOST): 
 /** Full PR: body, files, comments, reviews, mergeable, check rollup. */
 export function usePr(repo: string | undefined, number: number | undefined, provider?: CodeHostId) {
   return useQuery({ queryKey: qk.gh.pr(repo ?? '', number ?? 0), queryFn: () => codeHost(provider).prView(repo!, number!), enabled: ready(repo, number) });
-}
-
-/** The same query reduced to `PrSummary` (state, checks rollup, behind, conflicts). */
-export function usePrSummary(repo: string | undefined, number: number | undefined, provider?: CodeHostId) {
-  return useQuery({ queryKey: qk.gh.pr(repo ?? '', number ?? 0), queryFn: () => codeHost(provider).prView(repo!, number!), enabled: ready(repo, number), select: summarizePr });
 }
 
 export function usePrDiff(repo: string | undefined, number: number | undefined, provider?: CodeHostId) {

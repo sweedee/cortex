@@ -21,9 +21,6 @@ import { join } from 'node:path';
 import { DEFAULT_CONFIG, type IntegrationConfig } from '../../shared/integrations/config';
 import { DEFAULT_USER_CONFIG, type UserConfig } from '../../shared/userConfig';
 
-/** The env vars that override config.json (dev / test only). */
-export const CONFIG_ENV_KEYS = ['CORTEX_JIRA_CLI', 'CORTEX_JIRA_SITE', 'CORTEX_CLAUDE_BIN', 'CORTEX_AI_REVIEW_COMMENT', 'CORTEX_RENOVATE_APP'] as const;
-
 export function resolveConfig(env: NodeJS.ProcessEnv = process.env, user: UserConfig = DEFAULT_USER_CONFIG): IntegrationConfig {
   const c = structuredClone(DEFAULT_CONFIG);
   applyUserConfig(c, user, env);

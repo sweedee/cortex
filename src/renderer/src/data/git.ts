@@ -22,16 +22,6 @@ export function useGitLog(dir: string | undefined, opts: { range?: string; limit
   return useQuery({ queryKey: qk.git.log(dir ?? '', opts.range, opts.limit), queryFn: () => native.git.log({ ...opts, dir: dir! }), enabled: ready(dir) });
 }
 
-/** Current branch (null = detached). */
-export function useCurrentBranch(dir: string | undefined) {
-  return useQuery({ queryKey: qk.git.branch(dir ?? ''), queryFn: () => native.git.currentBranch({ dir: dir! }), enabled: ready(dir) });
-}
-
-/** `owner/name` of the origin remote (null = not GitHub-like). */
-export function useRemoteRepo(dir: string | undefined) {
-  return useQuery({ queryKey: qk.git.remote(dir ?? ''), queryFn: () => native.git.remoteRepo({ dir: dir! }), enabled: ready(dir), staleTime: Infinity });
-}
-
 /** `git worktree list` of a repo (the main checkout first). */
 export function useWorktrees(repoDir: string | undefined) {
   return useQuery({ queryKey: qk.git.worktrees(repoDir ?? ''), queryFn: () => native.git.worktreeList({ repoDir: repoDir! }), enabled: ready(repoDir) });

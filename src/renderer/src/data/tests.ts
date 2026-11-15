@@ -5,10 +5,6 @@ import { native } from '../native';
 import { invalidate, ready } from './ops';
 import { qk } from './queryKeys';
 
-export function useTestRuns() {
-  return useQuery({ queryKey: qk.tests.list(), queryFn: () => native.tests.list(), enabled: ready() });
-}
-
 /** Output of a run; `sync/live.ts` appends live `test:output` chunks to this cache. */
 export function useTestLog(id: string | undefined) {
   return useQuery({ queryKey: qk.tests.log(id ?? ''), queryFn: () => native.tests.log({ id: id! }), enabled: ready(id), staleTime: Infinity });

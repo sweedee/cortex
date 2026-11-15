@@ -5,10 +5,6 @@ import { native } from '../native';
 import { invalidate, ready } from './ops';
 import { qk } from './queryKeys';
 
-export function useApps() {
-  return useQuery({ queryKey: qk.apps.list(), queryFn: () => native.apps.list(), enabled: ready() });
-}
-
 /** Last 256 KB of output; `sync/live.ts` appends live `app:output` chunks to this cache. */
 export function useAppLog(id: string | undefined) {
   return useQuery({ queryKey: qk.apps.log(id ?? ''), queryFn: () => native.apps.log({ id: id! }), enabled: ready(id), staleTime: Infinity });

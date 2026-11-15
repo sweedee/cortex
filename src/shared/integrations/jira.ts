@@ -307,9 +307,6 @@ export function summarizeIssue(issue: JiraIssue, fields: JiraFieldIds = JIRA_FIE
   };
 }
 
-/** The mock's workflow; the fallback when a project's statuses are unknown. */
-export const JIRA_STATUSES = ['To Do', 'In Progress', 'In Review', 'Done', 'Blocked'] as const;
-
 export const MOCK_STATUS_OPTIONS: JiraStatusOption[] = [
   { name: 'To Do', category: 'new' },
   { name: 'In Progress', category: 'indeterminate' },

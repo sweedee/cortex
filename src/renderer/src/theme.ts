@@ -13,8 +13,6 @@ import { useUserConfig } from './data/config';
 export type ThemePref = 'dark' | 'light' | 'system';
 export type Theme = 'dark' | 'light';
 
-export const THEME_PREFS: readonly ThemePref[] = ['system', 'dark', 'light'];
-
 /** Anything stored (config, old builds) to a known preference; unknown means "follow the OS". */
 export const parseThemePref = (v: unknown): ThemePref => (v === 'dark' || v === 'light' || v === 'system' ? v : 'system');
 
