@@ -5,26 +5,27 @@ import { LinkSchema } from './schemas';
 import { isLinkLabel, linkFits } from './links';
 import type { Item, Link } from './types';
 
-const check = (items: Item[], links: Link[], strict: boolean) => {
-  expect(links.length).toBeGreaterThan(0);
+/** Links that do not fit their documented kinds (`strict`: unknown labels count too). */
+const misfits = (items: Item[], links: Link[], strict: boolean) => {
   const byId = new Map(items.map((i) => [i.id, i]));
-  for (const l of links) {
-    const from = byId.get(l.from);
-    const to = byId.get(l.to);
-    expect(from && to, `${l.id}: both ends exist`).toBeTruthy();
-    if (!strict && !isLinkLabel(l.label)) continue;
-    expect(linkFits(l.label, from!.kind, to!.kind), `${l.label}: ${from!.kind} → ${to!.kind}`).toBe(true);
-  }
+  return links.flatMap((l) => {
+    const from = byId.get(l.from)?.kind;
+    const to = byId.get(l.to)?.kind;
+    if (!from || !to) return [`${l.id}: missing end`];
+    if (!strict && !isLinkLabel(l.label)) return [];
+    return linkFits(l.label, from, to) ? [] : [`${l.label}: ${from} → ${to}`];
+  });
 };
 
 describe('link types', () => {
   it('the first-run demo world only uses known labels between the documented kinds', () => {
     const w = demoWorld('/home/me', 1);
-    check(w.items, w.links, true);
+    expect(w.links.length).toBeGreaterThan(0);
+    expect(misfits(w.items, w.links, true)).toEqual([]);
   });
 
   it('the fake world uses known labels between the documented kinds (plus some free-form ones, like old files)', () => {
-    check(SEED_ITEMS, SEED_LINKS, false);
+    expect(misfits(SEED_ITEMS, SEED_LINKS, false)).toEqual([]);
   });
 
   it('a stored link with a retired label still parses', () => {
