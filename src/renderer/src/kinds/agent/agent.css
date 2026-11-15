@@ -481,6 +481,18 @@
   border: 1px dashed var(--dt-colors-border-neutral-default);
 }
 
+/* ---- older entries behind "Show more" ---- */
+.ah-earlier {
+  align-self: center;
+  font-size: 11.5px;
+  color: var(--dt-colors-text-primary-default);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+.ah-earlier:hover {
+  background: var(--dt-colors-background-container-neutral-subdued);
+}
+
 /* ---- subagents ---- */
 .ah-subagent {
   border: 1px solid var(--dt-colors-border-neutral-default);

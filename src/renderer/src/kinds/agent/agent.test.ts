@@ -3,7 +3,7 @@ import type { ClaudeEvent } from '../../../../shared/integrations/claude';
 import type { ItemOf } from '../../domain';
 import { makeItem } from '../../store';
 import { agentActions } from './actions';
-import { answersOf, buildRows, contextTone, emptyChoice, groupRows, inputText, isAnswered, toggleChoice, toggleOther, tokens, usd } from './transcript';
+import { answersOf, buildRows, buildTranscript, contextTone, emptyChoice, groupRows, inputText, isAnswered, toggleChoice, toggleOther, tokens, transcriptBuilder, usd } from './transcript';
 
 const S = 'sess-1';
 const ev = (e: object, at = '2026-11-14T10:00:00.000Z') => ({ timestamp: at, session_id: S, ...e }) as ClaudeEvent;
@@ -46,6 +46,71 @@ describe('agent transcript rows', () => {
     expect(buildRows([ev({ type: 'assistant', parent_tool_use_id: 'tuX', message: { content: [{ type: 'text', text: 'sub' }] } })])).toEqual([]);
     expect(inputText('Bash', { command: 'ls' })).toBe('');
     expect(inputText('Grep', { pattern: 'x', glob: '*.ts' })).toContain('"glob"');
+  });
+});
+
+describe('incremental transcript', () => {
+  const delta = (text: string) => ev({ type: 'stream_event', parent_tool_use_id: null, event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } } });
+  const sub = (content: unknown[], id: string) => ev({ type: 'assistant', parent_tool_use_id: 'task1', message: { id, content } });
+  const subUser = (content: unknown) => ev({ type: 'user', parent_tool_use_id: 'task1', message: { role: 'user', content } });
+  const stream: ClaudeEvent[] = [
+    ev({ type: 'system', subtype: 'init', model: 'claude-x' }),
+    user('map the code'),
+    delta('Let '),
+    delta('me '),
+    delta('look.'),
+    asst([{ type: 'thinking', thinking: 'Delegate it.' }, { type: 'text', text: 'Let me look.' }, { type: 'tool_use', id: 'task1', name: 'Task', input: { description: 'Explore', prompt: 'find the router', subagent_type: 'Explore' } }]),
+    ev({ type: 'system', subtype: 'task_started', task_id: 'a1', tool_use_id: 'task1', description: 'Explore', subagent_type: 'Explore' }),
+    sub([{ type: 'text', text: 'Searching.' }, { type: 'tool_use', id: 'g1', name: 'Grep', input: { pattern: 'router' } }], 's1'),
+    subUser([{ type: 'tool_result', tool_use_id: 'g1', content: 'src/router.ts' }]),
+    sub([{ type: 'tool_use', id: 'task2', name: 'Agent', input: { description: 'Nested', prompt: 'deeper' } }], 's2'),
+    ev({ type: 'system', subtype: 'task_progress', task_id: 'a1', tool_use_id: 'task1', description: 'reading', usage: { tool_uses: 2, total_tokens: 900 } }),
+    user([{ type: 'tool_result', tool_use_id: 'task1', content: 'It is in src/router.ts' }]),
+    delta('Found '),
+    delta('it.'),
+    asst([{ type: 'tool_use', id: 'r1', name: 'Read', input: { file_path: '/src/router.ts' } }, { type: 'tool_use', id: 'r2', name: 'Bash', input: { command: 'ls' } }], 'm2'),
+    user([{ type: 'tool_result', tool_use_id: 'r1', content: 'export …' }]),
+    asst([{ type: 'text', text: 'Done.' }], 'm3'),
+    ev({ type: 'result', subtype: 'success', is_error: false, result: 'Done.', duration_ms: 10 }),
+  ];
+
+  it('equals a full rebuild after every event and for any chunking', () => {
+    const b = transcriptBuilder('x');
+    for (let i = 1; i <= stream.length; i++) expect(b.update(stream.slice(0, i))).toEqual(buildTranscript(stream.slice(0, i), 'x'));
+    for (const size of [2, 3, 5, 7]) {
+      const c = transcriptBuilder('x');
+      for (let i = size; i < stream.length + size; i += size) c.update(stream.slice(0, i));
+      expect(c.update(stream)).toEqual(buildTranscript(stream, 'x'));
+    }
+    const rows = buildRows(stream, 'x');
+    expect(rows.map((r) => r.kind)).toEqual(['user', 'assistant', 'thinking', 'subagent', 'assistant', 'tool', 'tool', 'assistant']) // the streamed draft is already there when thinking arrives;
+    expect(rows[3]).toMatchObject({ kind: 'subagent', prompt: 'find the router', result: 'It is in src/router.ts', children: [{ kind: 'assistant', text: 'Searching.' }, { kind: 'tool', tool: 'Grep', status: 'ok' }, { kind: 'subagent', tool: 'Agent', prompt: 'deeper' }] });
+  });
+
+  it('keeps unchanged rows (and the result when nothing changed) by identity', () => {
+    const b = transcriptBuilder('x');
+    const upTo = (n: number) => stream.slice(0, n);
+    const before = b.update(upTo(12)).rows;
+    expect(b.update(upTo(12))).toBe(b.update(upTo(12)));
+    const streaming = b.update(upTo(13)).rows; // the first "Found " delta
+    expect(streaming.slice(0, before.length)).toEqual(before);
+    streaming.slice(0, before.length).forEach((r, i) => expect(r).toBe(before[i]));
+    const next = b.update(upTo(14)).rows; // more text: only the draft row changes
+    next.slice(0, -1).forEach((r, i) => expect(r).toBe(streaming[i]));
+    expect(next.at(-1)).not.toBe(streaming.at(-1));
+    expect(next.at(-1)).toMatchObject({ kind: 'assistant', text: 'Found it.' });
+  });
+
+  it('rebuilds a subagent row when its children change, and starts over on a non-append', () => {
+    const b = transcriptBuilder('x');
+    const r8 = b.update(stream.slice(0, 8)).rows.find((r) => r.kind === 'subagent');
+    const r9 = b.update(stream.slice(0, 9)).rows.find((r) => r.kind === 'subagent');
+    expect(r9).not.toBe(r8);
+    expect(r9 && r9.kind === 'subagent' && r9.children[0]).toBe(r8 && r8.kind === 'subagent' && r8.children[0]);
+    const other = [user('something else')];
+    expect(b.update(other)).toEqual(buildTranscript(other, 'x'));
+    expect(b.update(stream)).toEqual(buildTranscript(stream, 'x'));
+    expect(b.update([...stream.slice(0, 3), user('edited')])).toEqual(buildTranscript([...stream.slice(0, 3), user('edited')], 'x'));
   });
 });
 

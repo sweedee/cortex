@@ -6,8 +6,11 @@
  * cache hits, cost, turns, subagents). Data: `useClaudeTranscript` (raw events → rows, see
  * transcript.ts) and `useClaudeSession` (status, usage, subagents, pending prompts). Demo agents
  * (no `localId`) show an empty state and their seeded question.
+ *
+ * Long sessions: the transcript is folded incrementally (`transcriptBuilder`), rows are memoized on
+ * their identity, and only the latest `WINDOW` blocks are drawn ("Show more" adds older ones).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { AiLoadingIndicator, Chip, ProgressCircle } from '@dynatrace/strato-components/content';
 import {
@@ -43,7 +46,7 @@ import { skillIcon } from '../icons';
 import type { SidebarProps } from '../types';
 import { answerQuestion, decidePermission, interruptAgent, stopAgent } from './session';
 import { agentRing } from './ring';
-import { answersOf, buildTranscript, emptyChoice, groupRows, inputText, isAnswered, toggleChoice, toggleOther, type Block, type Choice, type Row } from './transcript';
+import { answersOf, emptyChoice, groupRows, inputText, isAnswered, toggleChoice, toggleOther, transcriptBuilder, type Block, type Choice, type Row, type TranscriptBuilder } from './transcript';
 import { contextTone, duration, subagentTally, tokens, usageView, usd } from './usage';
 import './agent.css';
 
@@ -68,12 +71,20 @@ const clock = (iso: string) => {
   return Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
+/** Blocks drawn at the end of the transcript; older ones wait behind "Show more". */
+const WINDOW = 150;
+const EMPTY: never[] = [];
+const openLink = (h: string) => void openUrl(h);
+
 function Harness({ agent }: { agent: Agent }) {
   const localId = agent.data.localId;
   const real = !!localId && isDesktop;
   const session = useClaudeSession(localId);
   const transcript = useClaudeTranscript(localId);
-  const { rows, subagents: foldedSubs } = useMemo(() => buildTranscript(transcript.data ?? [], localId), [transcript.data, localId]);
+  // folds only the new events; unchanged rows keep their identity (see transcriptBuilder)
+  const [builder, setBuilder] = useState<TranscriptBuilder>(() => transcriptBuilder(localId));
+  if (builder.localId !== (localId ?? 'session')) setBuilder(transcriptBuilder(localId));
+  const { rows, subagents: foldedSubs } = useMemo(() => builder.update(transcript.data ?? EMPTY), [builder, transcript.data]);
   const s = session.data;
   // the session state is fresher while running; the transcript fold works for restored sessions too
   const subagents = s?.subagents?.length ? s.subagents : foldedSubs;
@@ -87,6 +98,12 @@ function Harness({ agent }: { agent: Agent }) {
   // keep the transcript scrolled to the end while the user hasn't scrolled up
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  // the same, as state for the render (only set when it flips)
+  const [following, setFollowing] = useState(true);
+  const follow = (v: boolean) => {
+    stick.current = v;
+    setFollowing(v);
+  };
   const last = rows[rows.length - 1];
   const tick = `${rows.length}:${last && 'text' in last ? last.text.length : last?.kind === 'subagent' ? last.children.length : (last?.status ?? '')}:${status}:${perms.length}`;
   useLayoutEffect(() => {
@@ -96,21 +113,36 @@ function Harness({ agent }: { agent: Agent }) {
 
   // a click on a subagent badge opens and reveals its group in the transcript
   const [openSubs, setOpenSubs] = useState<Set<string>>(() => new Set());
-  const toggleSub = (id: string, open?: boolean) =>
-    setOpenSubs((prev) => {
-      const next = new Set(prev);
-      if (open ?? !next.has(id)) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  const toggleSub = useCallback(
+    (id: string, open?: boolean) =>
+      setOpenSubs((prev) => {
+        const next = new Set(prev);
+        if (open ?? !next.has(id)) next.add(id);
+        else next.delete(id);
+        return next;
+      }),
+    [],
+  );
+
+  const blocks = useMemo(() => groupRows(rows), [rows]);
+  const hasOpenCard = useMemo(() => rows.some((r) => r.kind === 'question' && r.status === 'running'), [rows]);
+
+  // only the latest blocks are drawn; the window follows the end while the view sticks to it
+  // (while the user reads further up it stays put, so nothing shifts under them)
+  const [extra, setExtra] = useState(0);
+  const [start, setStart] = useState(0);
+  const wanted = Math.max(0, blocks.length - WINDOW - extra);
+  const from = wanted < start || following ? wanted : start;
+  if (from !== start) setStart(from);
+  const shown = useMemo(() => (from > 0 ? blocks.slice(from) : blocks), [blocks, from]);
+
   const reveal = (id: string) => {
+    const at = blocks.findIndex((b) => b.kind === 'row' && b.row.id === id);
+    if (at >= 0 && at < from) setExtra(Math.max(0, blocks.length - WINDOW - at));
     toggleSub(id, true);
-    stick.current = false;
+    follow(false);
     requestAnimationFrame(() => document.getElementById(subDomId(id))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   };
-
-  const blocks = groupRows(rows);
-  const hasOpenCard = rows.some((r) => r.kind === 'question' && r.status === 'running');
 
   let body: ReactNode;
   if (!real) {
@@ -134,7 +166,19 @@ function Harness({ agent }: { agent: Agent }) {
       <>
         {transcript.error && <div className="ah-error">Could not load the transcript: {errorText(transcript.error)}</div>}
         {!rows.length && !transcript.error && <div className="ah-empty">No messages yet.</div>}
-        <Blocks blocks={blocks} agent={agent} openSubs={openSubs} toggleSub={toggleSub} />
+        {from > 0 && (
+          <button
+            type="button"
+            className="ah-btn ah-earlier"
+            onClick={() => {
+              follow(false);
+              setExtra((n) => n + WINDOW);
+            }}
+          >
+            {from} earlier {from === 1 ? 'entry' : 'entries'} hidden · Show {Math.min(from, WINDOW)} more
+          </button>
+        )}
+        <Blocks blocks={shown} agent={agent} openSubs={openSubs} toggleSub={toggleSub} />
         {/* the question is known from the state before its event reached the transcript */}
         {pendingQ && !hasOpenCard && <QuestionCard agent={agent} questions={pendingQ.questions} />}
       </>
@@ -148,7 +192,8 @@ function Harness({ agent }: { agent: Agent }) {
         ref={scrollRef}
         onScroll={(e) => {
           const el = e.currentTarget;
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          const v = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          if (v !== stick.current) follow(v);
         }}
       >
         {body}
@@ -191,7 +236,19 @@ function Blocks({ blocks, agent, openSubs, toggleSub }: { blocks: Block[]; agent
   );
 }
 
-function RowView({ row, agent }: { row: Exclude<Row, { kind: 'subagent' }>; agent: Agent }) {
+/** Rows only re-render when they change; the agent matters only to an open question (and a subagent holding one). */
+const needsAgent = (r: Row): boolean => r.kind === 'question' || (r.kind === 'subagent' && r.children.some(needsAgent));
+
+const AssistantText = memo(function AssistantText({ text }: { text: string }) {
+  return (
+    <div className="ah-md">
+      <Markdown source={text} onLinkClick={openLink} />
+    </div>
+  );
+});
+
+const RowView = memo(RowViewImpl, (a, b) => a.row === b.row && (a.agent === b.agent || !needsAgent(b.row)));
+function RowViewImpl({ row, agent }: { row: Exclude<Row, { kind: 'subagent' }>; agent: Agent }) {
   switch (row.kind) {
     case 'user':
       return (
@@ -200,11 +257,7 @@ function RowView({ row, agent }: { row: Exclude<Row, { kind: 'subagent' }>; agen
         </div>
       );
     case 'assistant':
-      return (
-        <div className="ah-md">
-          <Markdown source={row.text} onLinkClick={(h) => void openUrl(h)} />
-        </div>
-      );
+      return <AssistantText text={row.text} />;
     case 'note':
       return <div className="ah-note">{row.text}</div>;
     case 'thinking':
@@ -229,8 +282,11 @@ const subFacts = (s: SubagentInfo) =>
   [s.type, s.background ? 'background' : '', `${s.toolUses} tool${s.toolUses === 1 ? '' : 's'}`, s.tokens ? `${tokens(s.tokens)} tokens` : '', s.durationMs ? duration(s.durationMs) : ''].filter(Boolean).join(' · ');
 
 /** A Task / Agent call: header with the subagent's status and numbers; open = its prompt, tool calls, text, result. */
-function SubagentRow({ row, agent, open, openSubs, toggleSub }: { row: Extract<Row, { kind: 'subagent' }>; agent: Agent; open: boolean; openSubs: Set<string>; toggleSub: (id: string) => void }) {
+type SubagentRowProps = { row: Extract<Row, { kind: 'subagent' }>; agent: Agent; open: boolean; openSubs: Set<string>; toggleSub: (id: string) => void };
+const SubagentRow = memo(SubagentRowImpl, (a, b) => a.row === b.row && a.open === b.open && a.toggleSub === b.toggleSub && (a.openSubs === b.openSubs || !b.open) && (a.agent === b.agent || !needsAgent(b.row)));
+function SubagentRowImpl({ row, agent, open, openSubs, toggleSub }: SubagentRowProps) {
   const [showPrompt, setShowPrompt] = useState(false);
+  const childBlocks = useMemo(() => groupRows(row.children), [row.children]);
   const s = row.sub;
   const now = s.status === 'running' ? (s.activity ?? (s.lastTool ? `using ${s.lastTool}` : 'starting')) : '';
   return (
@@ -256,7 +312,7 @@ function SubagentRow({ row, agent, open, openSubs, toggleSub }: { row: Extract<R
             </div>
           )}
           {row.children.length === 0 && <div className="ah-sub ah-small">{s.status === 'running' ? 'Working…' : 'No tool calls.'}</div>}
-          <Blocks blocks={groupRows(row.children)} agent={agent} openSubs={openSubs} toggleSub={toggleSub} />
+          <Blocks blocks={childBlocks} agent={agent} openSubs={openSubs} toggleSub={toggleSub} />
           {row.result && <pre className={`ah-pre ah-subagent-result ${row.status === 'error' ? 'is-error' : ''}`}>{row.result}</pre>}
         </div>
       )}
@@ -281,7 +337,7 @@ function SubagentStrip({ subagents, onPick }: { subagents: SubagentInfo[]; onPic
     </div>
   );
 }
-function Thinking({ text }: { text: string }) {
+const Thinking = memo(function Thinking({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="ah-thinking">
@@ -293,7 +349,7 @@ function Thinking({ text }: { text: string }) {
       {open && <div className="ah-thinking-body">{text}</div>}
     </div>
   );
-}
+});
 
 function ToolStatusIcon({ status }: { status: 'running' | 'ok' | 'error' }) {
   if (status === 'running') return <span className="ah-spinner" aria-label="Running" />;
@@ -301,7 +357,7 @@ function ToolStatusIcon({ status }: { status: 'running' | 'ok' | 'error' }) {
   return <CheckmarkIcon className="ah-ic-success" aria-label="Succeeded" />;
 }
 
-function ToolRow({ row }: { row: Extract<Row, { kind: 'tool' }> }) {
+const ToolRow = memo(function ToolRow({ row }: { row: Extract<Row, { kind: 'tool' }> }) {
   const [open, setOpen] = useState(false);
   const input = inputText(row.tool, row.input);
   const expandable = !!row.result || !!input;
@@ -322,7 +378,7 @@ function ToolRow({ row }: { row: Extract<Row, { kind: 'tool' }> }) {
       )}
     </div>
   );
-}
+});
 
 function AnsweredCard({ row }: { row: Extract<Row, { kind: 'question' }> }) {
   const unanswered = row.status !== 'ok';

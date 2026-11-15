@@ -3,7 +3,8 @@
  *
  * - `claude:state` → the agent item with that `data.localId` (status, question, permissions,
  *   activity, usage) + a notice on transitions; the session query is refreshed
- * - `claude:event` → appended to the transcript cache (if loaded)
+ * - `claude:event` → appended to the transcript cache (if loaded), batched once per animation frame;
+ *   the cache is dropped when its agent item is removed (or archived and not on screen)
  * - `app:state` / `test:state` → the app / test run item whose `data.procId` (or id) matches
  * - `app:output` / `test:output` → appended to the log caches; test output also feeds `outputTail`
  *
@@ -17,7 +18,7 @@ import { queryClient } from '../data/queryClient';
 import { qk } from '../data/queryKeys';
 import type { DataOf, Item, ItemOf, Kind } from '../domain';
 import { isDesktop, native } from '../native';
-import { getState, notify, patchData } from '../store';
+import { getState, notify, patchData, subscribe } from '../store';
 import { changes, mapAppState, mapClaudeState, mapTestState, STALE, tailOf, type Mapped, type NoticeSpec } from './mapping';
 
 const LOG_MAX = 256 * 1024;
@@ -84,6 +85,53 @@ function refreshSession(localId: string) {
   );
 }
 
+// claude:event → the transcript cache, one update per frame (a streaming turn sends dozens a second)
+const pendingEvents = new Map<string, ClaudeEvent[]>();
+let flushScheduled = false;
+const nextFrame = (f: () => void) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(f) : setTimeout(f, 16));
+
+/** Append the queued events to their transcript caches now (exported for tests). */
+export function flushClaudeEvents() {
+  flushScheduled = false;
+  for (const [localId, events] of pendingEvents) {
+    queryClient.setQueryData<ClaudeEvent[]>(qk.claude.transcript(localId), (old) => (old ? old.concat(events) : old));
+  }
+  pendingEvents.clear();
+}
+
+export function queueClaudeEvent(localId: string, event: ClaudeEvent) {
+  const list = pendingEvents.get(localId);
+  if (list) list.push(event);
+  else pendingEvents.set(localId, [event]);
+  if (flushScheduled) return;
+  flushScheduled = true;
+  // a hidden window gets no frames: fall back to a timer so the queue cannot grow unbounded
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    flushClaudeEvents();
+  };
+  nextFrame(run);
+  setTimeout(run, 250);
+}
+
+/** Agent items → transcript caches to keep: a removed agent loses its cache, an archived one too unless a sidebar shows it. */
+export function evictTranscripts(items: readonly Item[], prev: readonly Item[]) {
+  const live = new Set<string>();
+  const archived = new Set<string>();
+  for (const i of items) if (i.kind === 'agent' && i.data.localId) (i.archived ? archived : live).add(i.data.localId);
+  for (const i of prev) {
+    // only agents that were on the canvas before (one archived earlier was handled then; gcTime does the rest)
+    const id = i.kind === 'agent' && !i.archived ? i.data.localId : undefined;
+    if (!id || live.has(id)) continue;
+    const key = qk.claude.transcript(id);
+    if (archived.has(id) && (queryClient.getQueryCache().find({ queryKey: key, exact: true })?.getObserversCount() ?? 0) > 0) continue;
+    pendingEvents.delete(id);
+    queryClient.removeQueries({ queryKey: key, exact: true });
+  }
+}
+
 let started = false;
 /** Subscribe to main's events. Call once after the workspace is loaded. */
 export function startLiveSync(): () => void {
@@ -94,8 +142,9 @@ export function startLiveSync(): () => void {
       onClaudeState(s);
       refreshSession(s.localId);
     }),
-    native.on('claude:event', ({ localId, event }) => {
-      queryClient.setQueryData<ClaudeEvent[]>(qk.claude.transcript(localId), (old) => (old ? [...old, event] : old));
+    native.on('claude:event', ({ localId, event }) => queueClaudeEvent(localId, event)),
+    subscribe((s, prev) => {
+      if (s.items !== prev.items) evictTranscripts(s.items, prev.items);
     }),
     native.on('app:state', (s) => {
       onAppState(s);
