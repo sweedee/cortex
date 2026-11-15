@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   check:
-    name: typecheck, lint, test (${{ matrix.os }})
+    name: typecheck, lint, format, test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -40,6 +40,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
 
       - name: Test
         run: npm test

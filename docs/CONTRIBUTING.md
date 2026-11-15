@@ -8,7 +8,9 @@ file holds the rules.
 - `npm install` (if npm crashes with `reading 'edgesOut'`, use `npx npm@11.21.2 install`). In a fresh clone or
   worktree after `npm ci`: `node node_modules/electron/install.js`.
 - New dependencies only when really needed: exact version pins, versions at least two weeks old.
-- Before a commit: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` must pass.
+- Before a commit: `npm run typecheck`, `npm run lint`, `npm run format:check` (`npm run format` fixes), `npm test`, `npm run build` must pass.
+- Formatting is Prettier (`.prettierrc.json`); `git config blame.ignoreRevsFile .git-blame-ignore-revs` hides the bulk format commit in blame.
+- `noUncheckedIndexedAccess` is on: `arr[i]` and regex groups may be `undefined`; guard them (tests use `testing/must.ts`).
 
 ## Layering
 
