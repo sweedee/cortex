@@ -69,7 +69,7 @@ export interface RunnerOutputEvent {
 
 // ---- parsers --------------------------------------------------------------------------
 
-// eslint-disable-next-line no-control-regex
+// oxlint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07/g;
 export const stripAnsi = (s: string) => s.replace(ANSI, '');
 

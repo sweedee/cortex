@@ -98,7 +98,7 @@ export function Canvas() {
     }
     // new bubbles (and their links) are mounted by now: put them in place before the paint
     placeAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [items, links]);
 
   useEffect(
@@ -461,13 +461,13 @@ export function Canvas() {
   const sel = useMemo(
     () => actionsForSelection(selected.filter((id) => !hiddenSet.has(id))),
     // items / links: the actions read them through the store
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     [selected, hiddenSet, items, links],
   );
   const selIds = useMemo(() => sel.items.map((i) => i.id), [sel]);
   const related = useMemo(
     () => relatedItems(selIds).filter((i) => !hiddenSet.has(i.id)).slice(0, MAX_RELATED),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     [selIds, hiddenSet, items, links],
   );
 
@@ -504,12 +504,12 @@ export function Canvas() {
   const menuItem = menu?.itemId ? itemMap.get(menu.itemId) : undefined;
   const menuSel = useMemo(
     () => (menu?.itemId ? actionsForSelection(selected) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     [menu, selected, items, links],
   );
   const menuRelated = useMemo(
     () => (menuSel ? relatedItems(menuSel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).slice(0, 8) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
     [menuSel, hiddenSet, items, links],
   );
 

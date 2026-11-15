@@ -76,7 +76,7 @@ export function ChatBox() {
   const mentionedList = useStore(draftMentions);
   const mentioned = useMemo(() => mentionedList.map((id) => byId.get(id)).filter((i): i is Item => !!i), [mentionedList, byId]);
   // the actions read items and links through the store; ctx changes with either
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   const sel = useMemo(() => actionsForSelection(selected), [selected, ctx]);
   // lower-cased handles and titles, built once per items change instead of per keystroke
   const index = useMemo(() => mentionIndex(items), [items]);

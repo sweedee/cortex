@@ -108,7 +108,7 @@ export default function CodeEditorImpl({ value, onChange, language = 'text', rea
       view.current = null;
     };
     // The view is created once; props below are reconfigured by the effects that follow.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
