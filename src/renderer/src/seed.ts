@@ -11,7 +11,7 @@
  *
  * `firstRunWorld()` picks one (see persist.ts); "Reset workspace" uses it too.
  */
-import type { Item, Link, NewItem } from './domain';
+import type { Item, Link, LinkLabel, NewItem } from './domain';
 import { native } from './native';
 
 export const DEMO_REPO = 'sweedee/cortex-demo';
@@ -160,7 +160,7 @@ export function demoWorld(home: string, now = Date.now()): World {
   ];
 
   let n = 0;
-  const link = (from: string, to: string, label: string): Link => ({ id: `l${++n}`, from, to, label });
+  const link = (from: string, to: string, label: LinkLabel): Link => ({ id: `l${++n}`, from, to, label });
   const links: Link[] = [
     link('t-ctx4', 'p-demo', 'in project'),
     link('t-ctx5', 'p-demo', 'in project'),

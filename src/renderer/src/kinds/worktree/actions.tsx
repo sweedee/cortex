@@ -4,7 +4,7 @@ import { appOps } from '../../data/apps';
 import { ghOps } from '../../data/gh';
 import { jiraUrl } from '../../data/jira';
 import { testOps } from '../../data/tests';
-import type { Item, ItemOf } from '../../domain';
+import type { Item, ItemOf, NewLink } from '../../domain';
 import { place } from '../../layout';
 import { native } from '../../native';
 import { addItem, addLink, getState, inspect, makeItem, patchData, removeItems, select, setArchived } from '../../store';
@@ -61,10 +61,10 @@ export async function createPr(w: Worktree, ctx: KindCtx) {
           throw new Error(`${w.data.branch} was pushed to origin, but gh pr create failed: ${errorText(e)}`);
         });
       const existing = getState().items.find((i) => i.kind === 'pr' && i.data.repo === project.data.repo && i.data.number === number);
-      const links = [
+      const links: NewLink[] = [
         { from: '', to: w.id, label: 'from branch' },
-        ...(ticket ? [{ from: '', to: ticket.id, label: 'implements' }] : []),
-        ...(parent ? [{ from: '', to: parent.id, label: 'stacked on' }] : []),
+        ...(ticket ? [{ from: '', to: ticket.id, label: 'implements' as const }] : []),
+        ...(parent ? [{ from: '', to: parent.id, label: 'stacked on' as const }] : []),
       ];
       let id = existing?.id;
       if (existing) {

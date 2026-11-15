@@ -7,7 +7,7 @@ import { dismissToast, showToast } from '@dynatrace/strato-components/notificati
 import { ChatIcon, LinkIcon } from '@dynatrace/strato-icons';
 import { agentHandle, agentTarget, agentTitle, buildPrompt, resolveCwd, skillOf } from './chat/prompt';
 import { claudeOps } from './data/claude';
-import { isRealPath, type Item, type ItemOf, type Kind } from './domain';
+import { isRealPath, type Item, type ItemOf, type Kind, type NewLink } from './domain';
 import { camera, place } from './layout';
 import { archive, archiveAction, removeAction, skill, toast, unarchiveAction } from './kinds/common';
 import { actionsForItem, ctxOf, KINDS, getKind } from './kinds/registry';
@@ -115,7 +115,7 @@ export async function sendPrompt(text: string, mentioned: string[]): Promise<str
   const id = newId('a');
   const taken = new Set(getState().items.map((i) => i.handle.toLowerCase()));
   const { model, effort, permissionMode } = getState().settings;
-  const links = items.map((m) => ({ from: id, to: m.id, label: 'about' }));
+  const links: NewLink[] = items.map((m) => ({ from: id, to: m.id, label: 'about' }));
   if (project && !items.some((m) => m.id === project.id)) links.push({ from: id, to: project.id, label: 'belongs to' });
   const at = subject ? place.near(subject.id) : project ? place.near(project.id) : place.center();
   const agent = addItem(

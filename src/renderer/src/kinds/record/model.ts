@@ -2,7 +2,7 @@
  * Pure helpers of the record kind: file name → type, step counting, and the discovery plan
  * (which record items to add / update for the files found under `<baseDir>/records`). Unit-tested.
  */
-import type { Item, ItemOf, NewItem, RecordData } from '../../domain';
+import type { Item, ItemOf, LinkLabel, NewItem, RecordData } from '../../domain';
 
 type RecordType = RecordData['recordType'];
 
@@ -77,12 +77,12 @@ export interface DiscoveryUpdate {
 export interface DiscoveryAdd {
   item: NewItem;
   /** items to link the new record to (label from the record type) */
-  links: { to: string; label: string }[];
+  links: { to: string; label: LinkLabel }[];
 }
 export interface DiscoveryLink {
   from: string;
   to: string;
-  label: string;
+  label: LinkLabel;
 }
 export interface DiscoveryPlan {
   add: DiscoveryAdd[];
@@ -90,7 +90,7 @@ export interface DiscoveryPlan {
   links: DiscoveryLink[];
 }
 
-export const LINK_LABEL: Record<RecordType, string> = { plan: 'plan for', brainstorm: 'brainstorm for', grill: 'grill for', verification: 'verification of' };
+export const LINK_LABEL: Record<RecordType, LinkLabel> = { plan: 'plan for', brainstorm: 'brainstorm for', grill: 'grill for', verification: 'verification of' };
 
 /** Tickets / worktrees of a project whose branch is the records folder. */
 export function relatedTo(items: Item[], projectId: string, folder: string | undefined): { ticket?: ItemOf<'ticket'>; worktree?: ItemOf<'worktree'> } {

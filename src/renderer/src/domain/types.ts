@@ -1,5 +1,6 @@
 /** Domain types, inferred from the zod schemas (the schemas are the source of truth). */
 import type { z } from 'zod';
+import type { LinkLabel } from './links';
 import type {
   AgentDataSchema,
   AppDataSchema,
@@ -31,6 +32,8 @@ export type Tone = z.infer<typeof ToneSchema>;
 export type Segment = z.infer<typeof SegmentSchema>;
 export type Notice = z.infer<typeof NoticeSchema>;
 export type Link = z.infer<typeof LinkSchema>;
+/** A link about to be created: its label must be a known link type (`links.ts`). */
+export type NewLink = Omit<Link, 'id' | 'label'> & { label: LinkLabel };
 
 export type Item = z.infer<typeof ItemSchema>;
 /** The item type of one kind, e.g. `ItemOf<'pr'>`. */

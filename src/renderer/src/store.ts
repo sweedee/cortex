@@ -10,7 +10,7 @@
  */
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { ColorBy, DataOf, Filter, Item, ItemOf, Kind, Link, NewItem, Notice, Prefs, Segment } from './domain';
+import type { ColorBy, DataOf, Filter, Item, ItemOf, Kind, Link, LinkLabel, NewItem, NewLink, Notice, Prefs, Segment } from './domain';
 import { DEFAULT_PREFS, rootsOf, STATUS_GROUPS } from './domain';
 import { DEFAULT_USER_CONFIG, type ConfigPermissionMode } from '../../shared/userConfig';
 import type { ClaudeEffort } from '../../shared/integrations/claude';
@@ -303,7 +303,7 @@ export function makeItem(n: NewItem): Item {
   return { ...n, id: n.id || newId(n.kind), createdAt: now, updatedAt: now } as Item;
 }
 
-export const addItem = (item: Item | NewItem, links: Omit<Link, 'id'>[] = []) => {
+export const addItem = (item: Item | NewItem, links: NewLink[] = []) => {
   const it = 'createdAt' in item ? (item as Item) : makeItem(item);
   setState((s) => ({
     ...s,
@@ -394,7 +394,7 @@ export const setArchived = (ids: string[], archived: boolean) => {
   );
 };
 
-export const addLink = (from: string, to: string, label: string) =>
+export const addLink = (from: string, to: string, label: LinkLabel) =>
   setState((s) =>
     s.links.some((l) => (l.from === from && l.to === to) || (l.from === to && l.to === from))
       ? s

@@ -274,6 +274,7 @@ export const ItemSchemas = Object.fromEntries(KINDS.map((k) => [k, item(k, DATA_
 type AnyItemSchema = (typeof ItemSchemas)[KindName];
 export const ItemSchema = z.discriminatedUnion('kind', KINDS.map((k) => ItemSchemas[k]) as unknown as readonly [AnyItemSchema, ...AnyItemSchema[]]);
 
+/** A link as stored. `label` stays a plain string so old files with retired labels still load; new links use `LinkLabel` (`links.ts`). */
 export const LinkSchema = z.object({ id: z.string(), from: z.string(), to: z.string(), label: z.string() });
 
 // ---- workspace file ------------------------------------------------------------------------
