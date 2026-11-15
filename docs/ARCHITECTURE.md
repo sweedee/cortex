@@ -64,8 +64,8 @@ any program". What main enforces:
 - **Files** (`fs:*`, `shell:openPath`, `shell:openInEditor`) and the **cwd** of `proc:start`, `apps:start`,
   `tests:run` must lie inside an allowed root (`lib/pathPolicy.ts`): Cortex's data folder (`~/.cortex`),
   folders / files the user picked in a native dialog this run, and the roots the renderer registers with
-  `fs:setRoots` (`sync/roots.ts`: project base checkouts and worktrees folders, worktrees, app / test / agent
-  cwds, record files; re-sent whenever items change). Registration is renderer-controlled, so main also
+  `fs:setRoots` (`sync/roots.ts`: every kind's `cwdOf` and `paths`, i.e. project base checkouts and worktrees
+  folders, worktrees, app / test / agent cwds, record files; re-sent whenever items change). Registration is renderer-controlled, so main also
   refuses, regardless of roots: filesystem roots, the home folder and its parents as roots, home dot-entries
   (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.gitconfig`, … except `~/.cortex`), the Start menu / Startup folders,
   PowerShell profiles, `LaunchAgents`, `/etc`. Paths are compared after `path.resolve` (case-insensitive on
@@ -189,11 +189,12 @@ src/renderer/src/
 
 Import direction (keep it acyclic): `domain` ← `store` ← `kinds/common`, `sidebar` ← `kinds/<kind>` ←
 `kinds/registry` ← UI. The store and `layout.ts` never import the registry: what the store needs to know
-about kinds (ring tones and search text for the filter, hierarchy levels) is handed to it with
-`provideKindInfo()` when `kinds/registry.ts` is imported (`main.tsx` does that first; tests that use the
-filter import it too). Kind modules must not import `kinds/registry` or `visual.ts`; to reach another kind
-use `ctx.kind(k)`. `sync/` may import a kind's *pure* helpers (`kinds/build/logic`, `kinds/pr/builds`,
-`kinds/record/discovery`).
+about kinds (ring tones and search text for the filter, hierarchy levels) is handed to it by
+`installKindInfo()` from `kinds/registry.ts` (`provideKindInfo`); `main.tsx` calls it before the first render,
+tests that use the filter call it too. Importing the registry has no side effects. Kind modules must not import
+`kinds/registry`, `visual.ts` or another kind; to reach another kind use `ctx.kind(k)`. Kinds may import the
+pure mappers in `sync/mapping.ts` and `sync/checks.ts` (PR checks → build items, shared by pr and build).
+`sync/` drives the kinds' `sync` / `live` hooks through the registry and imports `kinds/record/discovery`.
 
 ### Domain model
 
@@ -239,12 +240,25 @@ Mutate with the store API: `patchData(item | id, partialData, commonPatch?)` for
 | `badge?(item)` → `{label, tone}` | chip under the bubble (deployment stage) |
 | `titleInside?`, `waiting?(item)` | title inside the disc (projects); pulse when the user is needed |
 | `actions(items, ctx)` → `Action[]` | kind actions (today always one item); `primaryAction?(item, ctx)` overrides which one is primary |
-| `complete?(item)` → data patch | present = the kind gets *Mark done* (patch, then archive) |
+| `complete?(item)` → data patch, `completeLabel?` | present = the kind gets *Mark done* (patch, then archive; label default "Mark done") |
+| `describe(item, ctx)` | **required**: what the item is, for the chat box's context block (`@handle = <describe>`) |
+| `cwdOf?(item)`, `paths?(item)` | working folder (agent sessions resolve their cwd from it) and other paths; both become file roots (`sync/roots.ts`) |
+| `sync?(item)` → `SyncJob[]` | background refresh jobs `{id, group?, fast, run}` (`kinds/<kind>/sync.ts`, run by `sync/refresher.ts`) |
+| `live?` `{start(), list(), reconcile(item, list)}` | process-backed kinds: push-event handlers and startup reconciliation (`kinds/<kind>/live.ts`, driven by `sync/live.ts`) |
+| `multiActions?(items, only)` | multi-select actions for the selected items of this kind (`only` = nothing else selected) |
+| `projectSection?` `{label, addLabel?, empty?, chip?, url?, hint?}` | a section in the project sidebar listing the project's items of this kind (+ a count in its facts) |
 | `Sidebar?` | details body; default `DefaultSidebar` |
-| `addable?` `{label, hint, multiline?, detect?(input), create(input, project), open?(at)}` | canvas *Add* menu, add dialog, paste detection; `open` replaces the add dialog with a custom flow (project → settings form, todo → quick form, agent → chat box) |
+| `addable?` `{label, hint, example, multiline?, detect?(input), create(input, project), open?(at), openIn?(project), linkLabel?}` | canvas *Add* menu, add dialog, paste detection; `open` replaces the add dialog with a custom flow (project → settings form, todo → quick form, agent → chat box); `openIn` adds one to a project (its project section); `linkLabel` is the link to the picked project (default 'belongs to', `false` = no project); `example` is a typical input (the registry test creates and detects it) |
 
 `ctx` (`KindCtx`, cached per items/links change): `items`, `links`, `get(id)`, `getAs(id, kind)`,
 `linked(id, kind?)`, `inProject(projectId, kind?)`, `projectOf(item)`, `kind(k)`.
+
+`defineKind<K>({...})` (`kinds/common.tsx`) fills in `radius` (28), a neutral `ring`, no `facts`, no
+`subtitle` and no own `actions`; `todo` and `deployment` use it.
+
+Links (`domain/links.ts`): `LINK_TYPES` lists every label the app creates (`'in project'`, `'checks'`,
+`'works on'`, …) with the kinds it connects; `addLink` / `addItem` take a `LinkLabel`. Stored links keep
+`label: string`, so a workspace with a retired label still loads (`links.test.ts` checks the demo world).
 
 Registry helpers (`kinds/registry.ts`): `getKind`, `kindIcon`, `kindLabel`, `levelOf`, `radiusOf`,
 `ctxOf` / `useCtx`, `viewsOf` / `useViews` (per-item `{ring, short, badge, subtitle, waiting, running}`,
@@ -253,15 +267,19 @@ get *Unarchive* + view / external actions only).
 
 #### How to add a kind
 
-1. `domain/schemas.ts`: add the name to `KINDS`, a `<Kind>DataSchema`, an entry in `ItemSchemas` and in
-   `ItemSchema`. A new kind needs no migration; an incompatible change to an existing data shape does
-   (bump `WORKSPACE_VERSION`, see below). Optional fields can be added without one.
-2. `domain/types.ts`: export the data type (optional).
-3. `kinds/<kind>/index.tsx`: export a `KindModule<'<kind>'>`. Build actions inside `actions()`; import only
-   from `domain`, `store`, `layout`, `native`, `data`, `ui`, `tones`, `kinds/common`, `kinds/icons`, `sidebar`,
-   `components/viewers`.
-4. `kinds/registry.ts`: add it to `MODULES` (typecheck fails until every kind has a module).
-5. Add a seed example and run `npm test` (the registry test checks every kind and every seed item).
+1. `domain/schemas.ts`: a `<Kind>DataSchema` and one entry in `DATA_SCHEMAS` (`KINDS`, `KindSchema`,
+   `ItemSchemas` and the `ItemSchema` union are derived from it). A new kind needs no migration; an
+   incompatible change to an existing data shape does (bump `WORKSPACE_VERSION`, see below). Optional
+   fields can be added without one. The schema stays in `domain` because `domain` must not import `kinds/`.
+2. `kinds/<kind>/index.tsx`: export `defineKind({...})` (or a full `KindModule<'<kind>'>`), with at least
+   `describe`. Build actions inside `actions()`; import only from `domain`, `store`, `layout`, `native`,
+   `data`, `ui`, `tones`, `kinds/common`, `kinds/icons`, `kinds/live`, `sidebar`, `sync/mapping`,
+   `components/viewers`. Syncing / process-backed kinds add `sync` (`sync.ts`) or `live` (`live.ts`) in their
+   folder; folders go in `cwdOf` / `paths`; new link labels go in `domain/links.ts`.
+3. `kinds/registry.ts`: add it to `MODULES` (typecheck fails until every kind has a module).
+4. A seed example in `testing/fakeWorld.ts` (and `seed.ts` if it belongs in the demo); `npm test` (the
+   registry test checks every kind, every seed item, every `addable.example`).
+5. Optional: an icon in `kinds/icons.tsx`, a type alias in `domain/types.ts`.
 
 ### Store
 
@@ -365,7 +383,7 @@ item id as runner id and store it as `data.procId`. Live sync matches events by 
 
 `startSync()` (main.tsx, desktop only):
 
-- **Live events** (`sync/live.ts`): `claude:state` → the agent with that `localId` (status, `pendingQuestion`,
+- **Live events** (`sync/live.ts` starts each kind's `live` hook; handlers in `kinds/{agent,app,testrun}/live.ts`): `claude:state` → the agent with that `localId` (status, `pendingQuestion`,
   `pendingPermissions`, activity, usage, error); `app:state` / `test:state` → the app / test run with that
   `procId` (state, url / port; state, summary, `outputTail`). Mappings are pure (`sync/mapping.ts`). Notices on
   transitions: agent asks / needs permission → warning, agent finished → success, agent failed / app crashed /
@@ -376,7 +394,8 @@ item id as runner id and store it as `data.procId`. Live sync matches events by 
 - **Reconcile** at start: items that were really started (`localId` / `procId`) and say they run, but main does
   not know them (the app restarted), become idle / stopped; known ones take main's state, without notices.
   Demo items (no ids) are left alone.
-- **Refresher** (`sync/refresher.ts`): every `settings.refreshSec` (default 60 s; 15 s for open PRs with
+- **Refresher** (`sync/refresher.ts` runs the jobs of each kind's `sync` hook, `kinds/<kind>/sync.ts`; a job id
+  shared by several items, like `checks:<repo>#<n>`, runs once): every `settings.refreshSec` (default 60 s; 15 s for open PRs with
   pending checks and for running builds), only while the window is visible: worktree → `git status` +
   ahead / behind `origin/<base>`; open PR → `gh pr view` (state, review, mergeable, mergeStateStatus, checks
   with counts); ticket → `jira view` (status, category, assignee, sprint, points, title); project → open /

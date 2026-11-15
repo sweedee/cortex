@@ -19,7 +19,8 @@ file holds the rules.
 - **Renderer** reaches native only through `native.ts`, and integrations through `data/*` (hooks for reads,
   `*Ops` for writes that invalidate their queries). Import direction: `domain` ← `store` ← `kinds/common`,
   `sidebar` ← `kinds/<kind>` ← `kinds/registry` ← UI. Kind modules never import the registry or another kind
-  (use `ctx.kind(k)`); `sync/` may import a kind's pure helpers.
+  (use `ctx.kind(k)`); kinds may import the pure `sync/mapping.ts` and `sync/checks.ts`. The store gets its kind
+  info from `installKindInfo()` (main.tsx), never by importing the registry.
 - A new IPC channel touches shared (type + schema), main (handler), preload, `native.ts` (fallback) and a
   `data/*` op: follow "Adding a channel" in ARCHITECTURE.md. `gh:prEdit` is a compact example.
 
@@ -39,7 +40,16 @@ Shared files that many features touch. Keep changes there small and additive, id
 ## Kinds and actions
 
 - A kind lives entirely in `kinds/<kind>/`: `index.tsx` (module), `actions.tsx`, `Sidebar.tsx`, pure helpers
-  (`logic.ts` / `model.ts`, unit-tested). See "How to add a kind" in ARCHITECTURE.md.
+  (`logic.ts` / `model.ts`, unit-tested), `sync.ts` (background refresh jobs) and `live.ts` (process push
+  events) when it has them. Generic code never names a kind: what differs per kind is a `KindModule` hook
+  (`describe`, `cwdOf`, `sync`, `live`, `multiActions`, `projectSection`, `addable.linkLabel`, …).
+- **Adding a kind** touches its own folder plus two shared lines:
+  1. `domain/schemas.ts`: the data schema and one `DATA_SCHEMAS` entry (everything else is derived);
+  2. `kinds/registry.ts`: the `MODULES` entry (typecheck fails without it; `describe` is required);
+  3. a fake-world item in `testing/fakeWorld.ts` (the registry test fails without one).
+  Optional: an icon in `kinds/icons.tsx`, new link labels in `domain/links.ts`, a demo item in `seed.ts`.
+  Details in "How to add a kind" in ARCHITECTURE.md.
+- Links use a label from `domain/links.ts` (`LinkLabel`; document `from` / `to` kinds there).
 - **AI** actions only insert a skill into the chat box. **UI** actions do the real thing with `openForm`,
   `runTask` and `data/*Ops`, and update the item through the store (`patchData`, `addItem`, `archive`).
 - The first-run demo world (`seed.ts`) is real (`sweedee/cortex-demo`, Jira CTX); unit tests use the fake world
