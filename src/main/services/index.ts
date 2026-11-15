@@ -16,7 +16,12 @@ export interface ServicePaths {
   userData: string;
   /** running inside Electron: node scripts run via process.execPath + ELECTRON_RUN_AS_NODE */
   isElectron: boolean;
+  /** a packaged build: Jira never falls back to the mock by itself */
+  isPackaged?: boolean;
 }
+
+/** What the UI shows when Jira has no working CLI. */
+export const JIRA_NOT_CONFIGURED = 'Jira not configured: install acli and run `acli jira auth login`, or set jira.cli in config.json';
 
 type Send = <C extends EventChannel>(channel: C, payload: EventChannels[C]) => void;
 
@@ -54,7 +59,8 @@ export function createServices(paths: ServicePaths, send: Send, env: NodeJS.Proc
     },
     /**
      * Once: reads the Jira site from `acli jira auth status` (`integrations:config` waits for it). When acli
-     * cannot be started and no CLI was chosen on purpose (CORTEX_JIRA_CLI, or `mock` in config.json), Jira falls back to the mock.
+     * cannot be started and no CLI was chosen on purpose (CORTEX_JIRA_CLI, or `mock` in config.json), a dev run falls back to the mock; a packaged build
+     * (and an explicit `acli`) marks Jira `unavailable` instead, which the UI shows as a banner.
      */
     initJira(): Promise<void> {
       jiraReady ??= (async () => {
@@ -62,11 +68,21 @@ export function createServices(paths: ServicePaths, send: Send, env: NodeJS.Proc
         try {
           const site = await jira.site();
           if (site && !jiraSiteFixed(env, userConfig)) config.jira.site = site;
-          if (!site) config.jira.note = 'acli is not logged in: run "acli jira auth login"';
+          if (!site) {
+            config.jira.note = JIRA_NOT_CONFIGURED;
+            config.jira.unavailable = true;
+          }
         } catch (e) {
           const why = e instanceof Error ? e.message : String(e);
           if (config.jira.explicit) {
             config.jira.note = `acli could not be started: ${why}`;
+            config.jira.unavailable = true;
+            return;
+          }
+          if (paths.isPackaged) {
+            // never show fake data in an installed app
+            config.jira.note = JIRA_NOT_CONFIGURED;
+            config.jira.unavailable = true;
             return;
           }
           config.jira.cli = 'mock';

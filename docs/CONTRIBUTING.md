@@ -52,7 +52,7 @@ Shared files that many features touch. Keep changes there small and additive, id
 - Links use a label from `domain/links.ts` (`LinkLabel`; document `from` / `to` kinds there).
 - **AI** actions only insert a skill into the chat box. **UI** actions do the real thing with `openForm`,
   `runTask` and `data/*Ops`, and update the item through the store (`patchData`, `addItem`, `archive`).
-- The first-run demo world (`seed.ts`) is real (`sweedee/cortex-demo`, Jira CTX); unit tests use the fake world
+- The first-run world is empty and the optional demo world (`seed.ts`) is made up (`unknown/demo`, no paths); unit tests use the fake world
   in `testing/fakeWorld.ts`. Items without a real checkout or repo (fake repos, unset or `~/…` paths) still
   happen: actions that need one are disabled with a reason;
   sidebars show a hint ("Set the project's base checkout in Settings…") or an inline error. Never crash and

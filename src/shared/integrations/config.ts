@@ -23,6 +23,8 @@ export interface IntegrationConfig {
     explicit?: boolean;
     /** why the effective setup differs from the default ("acli not found on PATH, using the mock") */
     note?: string;
+    /** Jira cannot be used (acli missing or not logged in, packaged build): the UI shows `note` instead of data */
+    unavailable?: boolean;
   };
   claude: {
     /** binary (resolved on PATH via cross-spawn) */

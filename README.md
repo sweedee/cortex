@@ -8,7 +8,7 @@ tests, merge), and one chat box at the bottom starts and steers Claude Code agen
 @mention as context.
 
 It is an Electron desktop app (electron-vite, React 18, Dynatrace Strato UI) that drives the real tools:
-`git`, `gh`, the `claude` CLI and the Atlassian CLI `acli` for Jira (a local mock when `acli` is missing).
+`git`, `gh`, the `claude` CLI and the Atlassian CLI `acli` for Jira (a local mock for development).
 
 ## Requirements
 
@@ -17,8 +17,8 @@ It is an Electron desktop app (electron-vite, React 18, Dynatrace Strato UI) tha
 - **GitHub CLI** `gh` on `PATH`, logged in (`gh auth status`): PRs, checks, Actions runs, merges
 - **Claude Code CLI** `claude` on `PATH`, logged in: agent sessions (each session is one
   `claude -p --input-format stream-json …` process)
-- **Atlassian CLI** `acli` on `PATH`, logged in (`acli jira auth login`): Jira work items. Without it Cortex
-  uses the bundled Jira mock (see [Jira](#jira-acli-or-the-mock))
+- **Atlassian CLI** `acli` on `PATH`, logged in (`acli jira auth login`): Jira work items. Without it Jira is
+  shown as "not configured" in an installed app (development runs fall back to the bundled mock, see [Jira](#jira-acli-or-the-mock))
 
 ## Install, run, build
 
@@ -43,11 +43,9 @@ after the move, an existing `workspace.json` (and its siblings) is copied over f
 
 ## First run
 
-The canvas starts with the **demo world** when the demo repo is checked out at `~/Documents/cortex-demo`:
-[sweedee/cortex-demo](https://github.com/sweedee/cortex-demo) (private; a tiny Node todo app with GitHub Actions
-CI), its worktrees in `~/Documents/wt/cortex-demo/`, the Jira project **CTX**, three open PRs (#2 stacked on
-#1, #3 with a failing test job), their CI jobs, a failed test run, a plan record, and `sweedee/cortex`
-read-only (no checkout set). Everything in it is real, so the background refresh only keeps it current.
+A new install starts with an **empty canvas** and a welcome panel with two buttons: **Add a project** (opens
+the add-project form, see step 1) and an optional **Load demo world**, a small made-up world (project
+`unknown/demo`, three tickets, two PRs, a todo) that never touches your disk or the network. To work on your own repo:
 Without that checkout the canvas starts empty with a welcome todo. To work on your own repo:
 
 1. Right-click the canvas → *Add to canvas* → **Add project…**. Pick the repo's main clone as **Base checkout** with the
@@ -65,11 +63,10 @@ Without that checkout the canvas starts empty with a welcome todo. To work on yo
 The **gear** (top right) opens the global settings: Claude model, effort and permission mode for new
 sessions, the AI-review comment, the refresh interval, notifications and sound. They are saved in
 `~/.cortex/config.json` (see [Configuration](#configuration)). Right-click the canvas → *Reset workspace to
-demo data* to start over (demo world or empty, as on the first run; the settings stay).
+demo data* to start over (an empty canvas, as on the first run; the settings stay).
 
 The workspace (bubbles, links, bubble colour, filter, sidebar width) is saved to `~/.cortex/workspace.json`
-(previous version in `.bak`; versioned and migrated on load). A workspace that still holds the old fake demo
-(`ctx-observability/*` repos) is replaced by the first-run world.
+(previous version in `.bak`; versioned and migrated on load).
 
 ## Configuration
 
@@ -110,10 +107,14 @@ edit`, verified with acli 1.3.40). Log in once with `acli jira auth login`; Cort
 list a workflow's transitions; the names are the site's, e.g. localized ones like *In Arbeit*), and Jira
 decides which moves are allowed. Settings → Jira shows the CLI, the site and any problem.
 
+Without a working `acli` (not installed, or not logged in) an **installed** build never shows the mock's fake
+data: Jira is marked *not configured*, a banner on the canvas says "Jira not configured: install acli and run
+`acli jira auth login`, or set jira.cli in config.json", and Settings → Jira repeats it.
+
 The **mock** (`scripts/jira-mock`) has the same commands, prints the same JSON and keeps its data in
 `~/.cortex/jira-mock.json`, seeded with made-up CTX-48xx tickets and a To Do → In Progress → In Review → Done
-workflow. It is used when `acli` is not on `PATH`, with `"jira": { "cli": "mock" }` in config.json (or `CORTEX_JIRA_CLI=mock`
-in development), and in smoke runs (they never touch a real Jira unless started with `CORTEX_JIRA_CLI=acli`).
+workflow. It is used with `"jira": { "cli": "mock" }` in config.json (or `CORTEX_JIRA_CLI=mock`
+in development), in development runs when `acli` is not on `PATH`, and in smoke runs (they never touch a real Jira unless started with `CORTEX_JIRA_CLI=acli`).
 `jira.site` in config.json (`CORTEX_JIRA_SITE=<url>` in development) overrides the site.
 
 ## CI

@@ -62,8 +62,8 @@ const PROBE = `(async () => {
     });
   }
   const d = window.__cortexDebug;
-  // CORTEX_SMOKE_WORLD=1: the first-run world (the real demo repo when it is checked out), one forced refresh with the
-  // real tools (read-only: gh / git / Jira views), then what each bubble shows and every refresher warning.
+  // CORTEX_SMOKE_WORLD=1: the demo world (made up, no checkout), one forced refresh, then what each bubble shows and every refresher warning.
+  // (nothing real is touched: the demo repo is unknown/demo).
   // Start with CORTEX_JIRA_CLI=acli to use the real Jira (smoke runs default to the mock).
   if (${JSON.stringify(process.env['CORTEX_SMOKE_WORLD'] === '1')} && d) {
     await step('world: first-run world after a forced refresh', async () => {
@@ -71,7 +71,7 @@ const PROBE = `(async () => {
       const orig = console.warn;
       console.warn = (...a) => { warnings.push(a.map((x) => (x instanceof Error ? x.message : typeof x === 'string' ? x : JSON.stringify(x))).join(' ').slice(0, 240)); orig(...a); };
       try {
-        await d.resetToDemo();
+        await d.loadDemoWorld();
         await d.refreshDue(true);
         await new Promise((r) => setTimeout(r, 1500));
       } finally {
@@ -99,8 +99,10 @@ const PROBE = `(async () => {
     let wt;
     await step('e2e: project on this repo + worktree git refresh', async () => {
       const remote = await c.git.remoteRepo(repo);
+      const slug = remote || ${JSON.stringify(process.env['CORTEX_SMOKE_GH_REPO'] ?? '')};
+      if (!slug) throw new Error('this checkout has no GitHub remote: set CORTEX_SMOKE_GH_REPO=owner/name');
       const branch = await c.git.currentBranch(repo);
-      const p = d.addItem({ kind: 'project', handle: 'smoke-cortex', title: 'cortex (smoke)', data: { repo: remote || 'sweedee/cortex', baseDir: repo, defaultBranch: 'main' } });
+      const p = d.addItem({ kind: 'project', handle: 'smoke-cortex', title: 'cortex (smoke)', data: { repo: slug, baseDir: repo, defaultBranch: 'main' } });
       wt = d.addItem({ kind: 'worktree', handle: 'wt/smoke', title: branch, projectId: p.id, data: { path: repo, branch: branch || 'HEAD', baseBranch: 'main' } });
       d.addLink(wt.id, p.id, 'belongs to');
       await d.refreshDue(true);

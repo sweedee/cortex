@@ -116,9 +116,9 @@ describe('GhService (fake runner)', () => {
   });
 });
 
-// CORTEX_LIVE_GH=1 npx vitest run src/main/services/gh.test.ts — read-only calls against a real repo
-describe.runIf(process.env['CORTEX_LIVE_GH'] === '1')('GhService (live, read-only)', () => {
-  const repo = process.env['CORTEX_LIVE_GH_REPO'] ?? 'sweedee/cortex';
+// CORTEX_LIVE_GH=1 CORTEX_LIVE_GH_REPO=owner/name npx vitest run src/main/services/gh.test.ts — read-only calls against a real repo
+describe.runIf(process.env['CORTEX_LIVE_GH'] === '1' && !!process.env['CORTEX_LIVE_GH_REPO'])('GhService (live, read-only)', () => {
+  const repo = process.env['CORTEX_LIVE_GH_REPO'] as string;
   it('lists and views PRs', async () => {
     const gh = new GhService(DEFAULT_CONFIG.github);
     // the repo needs at least one PR (any state)

@@ -4,7 +4,7 @@
  * through the migration + zod pipeline (`domain/migrations.ts`).
  *
  * - unreadable / corrupt JSON: main already falls back to `workspace.json.bak`
- * - not a workspace (or from a newer app): demo data, a copy of the file is kept as
+ * - not a workspace (or from a newer app): an empty canvas, a copy of the file is kept as
  *   `workspace.invalid-<time>.json` next to it, and a warning toast is shown
  * - single invalid items / links: dropped with a console warning (and a toast)
  * - an older version: migrated and written back right away (the old file becomes the `.bak`)
@@ -12,7 +12,7 @@
 import { shallow } from 'zustand/shallow';
 import { DEFAULT_PREFS, parseWorkspace, WORKSPACE_VERSION, type Workspace } from './domain';
 import { native } from './native';
-import { firstRunWorld } from './seed';
+import { demoWorld, firstRunWorld } from './seed';
 import { appStore, getState, prefsOf, replaceWorld, type State } from './store';
 import type { UserConfigPatch } from '../../shared/userConfig';
 
@@ -26,22 +26,18 @@ export interface LoadReport {
   /** settings a v3 workspace still held: they go to config.json once (`startConfigSync`) */
   movedPrefs?: UserConfigPatch;
 }
-
-/** Put the first-run world (demo repo if checked out, else empty) into the store. */
-async function loadFirstRun(prefs?: Workspace['prefs']): Promise<'demo' | 'empty'> {
-  const w = await firstRunWorld();
+/** Put the first-run world (empty: the canvas shows the welcome panel) into the store. */
+function loadFirstRun(prefs?: Workspace['prefs']): void {
+  const w = firstRunWorld();
   replaceWorld(w.items, w.links, prefs ?? prefsOf(getState()));
-  return w.kind;
 }
 
-/**
- * The fake demo world of earlier versions (`ctx-observability/*` repos, `~/…` paths): nothing in it
- * exists, so the refresher would only collect errors.
- */
-export const isOldFakeDemo = (items: { kind: string; data: unknown }[]) => {
-  const projects = items.filter((i) => i.kind === 'project');
-  return projects.length > 0 && projects.every((p) => String((p.data as { repo?: string }).repo ?? '').startsWith('ctx-observability/'));
-};
+/** "Load demo world": the made-up sample world (no filesystem, no network) instead of the current one. */
+export function loadDemoWorld(): void {
+  const w = demoWorld();
+  replaceWorld(w.items, w.links, prefsOf(getState()));
+}
+
 
 /** Load the stored workspace into the store (the first-run world when nothing usable is stored). */
 export async function loadWorkspace(): Promise<LoadReport> {
@@ -50,11 +46,11 @@ export async function loadWorkspace(): Promise<LoadReport> {
     raw = await native.workspace.load();
   } catch (err) {
     console.warn('[workspace] load failed, using the first-run world', err);
-    await loadFirstRun();
-    return { source: 'seed', warning: { title: 'Could not load the workspace', message: 'Showing the demo data instead.' } };
+    loadFirstRun();
+    return { source: 'seed', warning: { title: 'Could not load the workspace', message: 'Starting with an empty canvas instead.' } };
   }
   if (raw == null) {
-    await loadFirstRun();
+    loadFirstRun();
     return { source: 'seed' };
   }
 
@@ -62,20 +58,15 @@ export async function loadWorkspace(): Promise<LoadReport> {
   if (!r.ok) {
     console.warn(`[workspace] invalid workspace file, using the first-run world: ${r.error}`);
     const kept = await keepInvalidCopy(raw);
-    await loadFirstRun();
+    loadFirstRun();
     return {
       source: 'seed',
-      warning: { title: 'Workspace file could not be read', message: `Showing the demo data instead.${kept ? ` The file was kept as ${kept}.` : ''}` },
+      warning: { title: 'Workspace file could not be read', message: `Starting with an empty canvas instead.${kept ? ` The file was kept as ${kept}.` : ''}` },
     };
   }
   r.warnings.forEach((w) => console.warn(`[workspace] ${w}`));
   const { items, links, prefs } = r.workspace;
   const movedPrefs = r.movedPrefs;
-  if (isOldFakeDemo(items)) {
-    const kind = await loadFirstRun(prefs);
-    saveNow(true);
-    return { source: 'seed', movedPrefs, warning: { title: 'Replaced the old demo data', message: kind === 'demo' ? 'The fake demo repos are gone; the canvas now shows the real cortex-demo repo.' : 'The fake demo repos are gone. Add a project with a right-click on the canvas.' } };
-  }
   replaceWorld(items, links, prefs);
   if (r.migrated) saveNow(true);
   const dropped = r.warnings.filter((w) => w.startsWith('dropped')).length;
@@ -136,5 +127,5 @@ export function startAutosave(): void {
 
 /** Throw away the stored workspace and go back to the first-run world (prefs stay). */
 export async function resetToDemo(): Promise<void> {
-  await loadFirstRun({ ...DEFAULT_PREFS, ...prefsOf(getState()), filter: undefined });
+  loadFirstRun({ ...DEFAULT_PREFS, ...prefsOf(getState()), filter: undefined });
 }

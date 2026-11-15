@@ -19,7 +19,7 @@ const misfits = (items: Item[], links: Link[], strict: boolean) => {
 
 describe('link types', () => {
   it('the first-run demo world only uses known labels between the documented kinds', () => {
-    const w = demoWorld('/home/me', 1);
+    const w = demoWorld(1);
     expect(w.links.length).toBeGreaterThan(0);
     expect(misfits(w.items, w.links, true)).toEqual([]);
   });

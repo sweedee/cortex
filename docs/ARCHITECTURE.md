@@ -315,12 +315,11 @@ it is loaded).
 
 - Single invalid items and dangling links are dropped (console warning + toast); an outdated
   `prefs.filter` is dropped.
-- No file yet: the **first-run world** (`seed.ts` → `firstRunWorld()`): the demo world for the real
-  `sweedee/cortex-demo` repo when `~/Documents/cortex-demo` is a git checkout (`demoWorld(home)`: Jira CTX tickets,
-  worktrees, PRs #1–#3, their CI jobs, a test run, an app, `sweedee/cortex` read-only), else an empty canvas with a
-  welcome todo. *Reset workspace* loads it again. A stored workspace whose projects are all the old fake
-  `ctx-observability/*` repos is replaced by it (toast). The old fake world lives on as `testing/fakeWorld.ts`
-  for unit tests only.
+- No file yet: the **first-run world** (`seed.ts` → `firstRunWorld()`): an empty canvas; `overlays/Welcome.tsx`
+  shows a welcome panel with "Add a project" (the add-project form) and "Load demo world" (`loadDemoWorld()`:
+  `demoWorld()`, a made-up world with the repo `unknown/demo`, no checkout and no worktrees, so the refreshers
+  skip it and nothing touches disk or network). *Reset workspace* loads the empty world again. The old fake
+  world lives on as `testing/fakeWorld.ts` for unit tests only.
 - A file that is not a workspace, or comes from a newer app version: the first-run world, a copy is written as
   `workspace.invalid-<time>.json`, warning toast. Unreadable JSON: main falls back to `.bak` first.
 - A migrated file is saved right away (the old one becomes `.bak`).
@@ -734,7 +733,7 @@ What real acli does (captured in `src/main/services/__fixtures__/acli/`, replaye
   and Jira decides; *Mark done* targets the first status of category done and walks the flow if needed.
 - `create --label` (not `--labels`) adds labels; `edit --labels` sets them.
 
-When acli cannot be started and no CLI was chosen on purpose (`CORTEX_JIRA_CLI`, or `"cli": "mock"` in config.json), `initJira` switches to the mock and sets
+`config.jira.note`; not logged in → `unavailable` + a note. In a packaged build (`ServicePaths.isPackaged`) there is no automatic mock fallback: `config.jira.unavailable` is set with the note "Jira not configured: install acli and run `acli jira auth login`, or set jira.cli in config.json", and `overlays/Welcome.tsx` (`JiraBanner`) shows it when tickets are on the canvas. Every `jira:*` handler waits for `initJira` first.
 `config.jira.note`; not logged in → a note too. Every `jira:*` handler waits for `initJira` first.
 
 The mock (`scripts/jira-mock/jira-mock.mjs`, plain ESM, no build) prints Jira Cloud REST v3 issue JSON (ADF
@@ -906,7 +905,6 @@ smoke's temp folder) is added to the allowed roots.
 | Window state | `<userData>/window-state.json` |
 | Jira mock data | `<userData>/jira-mock.json` (seeded on first use) |
 | Claude session metadata | `<userData>/claude-sessions.json` |
-| Demo repo (first-run world) | `~/Documents/cortex-demo` (clone of `sweedee/cortex-demo`), worktrees in `~/Documents/wt/cortex-demo/` |
 | Build output | `out/main`, `out/preload/index.cjs`, `out/renderer` |
 | Static assets | `public/` (renderer `publicDir`); reference them with `asset('brand/…')` from `native.ts`, not `/brand/…`, so they resolve under `file://` too |
 | Separate profile | `CORTEX_USER_DATA=<dir>` |

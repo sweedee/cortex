@@ -10,7 +10,7 @@ import { actionsForItem } from './kinds/registry';
 import { addItem, addLink, getState, inspect, itemById, replaceWorld, select } from './store';
 import { refreshDue } from './sync';
 import { formDriver } from './ui/form';
-import { resetToDemo } from './persist';
+import { loadDemoWorld, resetToDemo } from './persist';
 
 declare global {
   interface Window {
@@ -42,4 +42,4 @@ async function showGallery() {
 }
 
 if (import.meta.env.DEV || location.hash === '#smoke')
-  window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue, inspect, select, runAction, forms: formDriver, showGallery, openAdd, replaceWorld, resetToDemo };
+  window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue, inspect, select, runAction, forms: formDriver, showGallery, openAdd, replaceWorld, resetToDemo, loadDemoWorld };

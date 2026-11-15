@@ -88,6 +88,19 @@ describe('integration config', () => {
     expect(ok.config.jira).toMatchObject({ cli: 'acli', site: 'https://acme.atlassian.net' });
     expect(ok.config.jira.note).toBeUndefined();
   });
+
+  it('a packaged build never falls back to the mock: Jira is marked unavailable', async () => {
+    const p = createServices({ appRoot: 'C:/app', userData: 'C:/ud', isElectron: false, isPackaged: true }, () => {}, {});
+    p.jira.site = () => Promise.reject(new Error('spawn acli ENOENT'));
+    await p.initJira();
+    expect(p.config.jira).toMatchObject({ cli: 'acli', unavailable: true, note: expect.stringMatching(/Jira not configured.*acli jira auth login/) });
+    expect(p.jira.command).toBe('acli');
+    // and "mock" in config.json is still honoured on purpose
+    const m = createServices({ appRoot: 'C:/app', userData: 'C:/ud', isElectron: false, isPackaged: true }, () => {}, {}, parseUserConfig({ jira: { cli: 'mock' } }));
+    await m.initJira();
+    expect(m.config.jira).toMatchObject({ cli: 'mock' });
+    expect(m.config.jira.unavailable).toBeUndefined();
+  });
 });
 
 describe('integration request schemas', () => {

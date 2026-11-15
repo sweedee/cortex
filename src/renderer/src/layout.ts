@@ -32,11 +32,7 @@ export type Metrics = (item: Item) => { r: number; level: number };
 type SimLink = SimulationLinkDatum<Node> & { id: string };
 
 /** Where each project's cluster gravitates to. New clusters are placed on a ring. */
-const clusterCenters = new Map<string, { x: number; y: number }>([
-  ['p-ingest', { x: -380, y: -30 }],
-  ['p-console', { x: 390, y: -50 }],
-  ['p-alert', { x: 10, y: 360 }],
-]);
+const clusterCenters = new Map<string, { x: number; y: number }>();
 const clusterCenter = (c?: string) => {
   if (!c) return { x: 0, y: 0 };
   let p = clusterCenters.get(c);

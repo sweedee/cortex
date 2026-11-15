@@ -11,6 +11,7 @@ import { startConfigSync } from './data/config';
 import { queryClient } from './data/queryClient';
 import { Dialogs } from './overlays/Dialogs';
 import { Hud } from './overlays/Hud';
+import { JiraBanner, Welcome } from './overlays/Welcome';
 import { Sidebar } from './overlays/Sidebar';
 import { FormHost } from './ui/form';
 import './desktop';
@@ -35,6 +36,8 @@ async function boot() {
         <AppRoot>
           <Canvas />
           <Hud />
+          <Welcome />
+          <JiraBanner />
           <Sidebar />
           <ChatBox />
           <Dialogs />
