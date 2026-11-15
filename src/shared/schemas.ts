@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { EXEC_ALLOWLIST, type InvokeChannel, type Req } from './ipc';
+import { envSchema } from './envPolicy';
 import { integrationSchemas } from './integrationSchemas';
 
 const isAbsolute = (p: string) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(p);
@@ -16,7 +17,7 @@ export const absPath = z
   .refine((p) => !p.includes('\0'), 'path must not contain NUL')
   .refine(isAbsolute, 'path must be absolute');
 
-const env = z.record(z.string(), z.string()).optional();
+const env = envSchema;
 const arg = z.string().max(32_768).refine((a) => !a.includes('\0'), 'argument must not contain NUL');
 
 export const execRunSchema = z.object({
@@ -72,6 +73,7 @@ export const schemas = {
   'fs:list': z.object({ dir: absPath, options: z.object({ glob: z.string().max(1000).optional() }).optional() }),
   'fs:watch': z.object({ dir: absPath }),
   'fs:unwatch': z.object({ watchId: z.string() }),
+  'fs:setRoots': z.object({ roots: z.array(absPath).max(5000) }),
   'app:info': z.undefined(),
   ...integrationSchemas,
 } satisfies { [C in InvokeChannel]: z.ZodType };

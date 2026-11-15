@@ -4,8 +4,11 @@
  * Runtime validation (zod) of every request lives in `./schemas.ts`, used by main.
  */
 
-/** Commands `exec.run` may spawn. Bare names only, resolved on PATH (no shell). */
-export const EXEC_ALLOWLIST = ['git', 'gh', 'claude', 'node', 'jira-mock'] as const;
+/**
+ * Commands `exec.run` may spawn. Bare names only, resolved on PATH (no shell). No `node`: with
+ * arbitrary args that is arbitrary code; main runs its own scripts (jira-mock) itself.
+ */
+export const EXEC_ALLOWLIST = ['git', 'gh', 'claude', 'jira-mock'] as const;
 export type ExecCommand = (typeof EXEC_ALLOWLIST)[number];
 
 // ---- exec -------------------------------------------------------------------------------
@@ -144,6 +147,14 @@ export interface AppInfo {
   electron?: string;
 }
 
+/** `<webview partition>`s the app uses; main refuses to attach a webview with any other partition. */
+export const WEBVIEW_PARTITIONS = ['persist:github', 'persist:ci', 'persist:jira', 'persist:apps', 'persist:deployments', 'persist:gallery'] as const;
+
+export interface RefusedRoot {
+  path: string;
+  reason: string;
+}
+
 // ---- channels -------------------------------------------------------------------------------
 
 /** Request / response channels (ipcRenderer.invoke ↔ ipcMain.handle): [request, response]. */
@@ -167,6 +178,8 @@ export interface InvokeChannels {
   'fs:list': [{ dir: string; options?: FsListOptions }, FsEntry[]];
   'fs:watch': [{ dir: string }, string];
   'fs:unwatch': [{ watchId: string }, void];
+  /** replace the folders the renderer works in (see ARCHITECTURE.md, Trust model); returns the refused ones */
+  'fs:setRoots': [{ roots: string[] }, RefusedRoot[]];
   'app:info': [void, AppInfo];
 }
 export type InvokeChannel = keyof InvokeChannels;
@@ -228,6 +241,8 @@ export interface CortexApi {
     watch(dir: string): Promise<string>;
     unwatch(watchId: string): Promise<void>;
     onChanged(cb: (e: FsChangedEvent) => void): Unsubscribe;
+    /** the folders fs / shell / proc calls may touch (besides Cortex's own data folder); returns the refused ones */
+    setRoots(roots: string[]): Promise<RefusedRoot[]>;
   };
   app: {
     info(): Promise<AppInfo>;

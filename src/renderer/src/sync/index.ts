@@ -7,6 +7,7 @@
 import { loadIntegrationConfig } from '../data/app';
 import { startRecordDiscovery } from '../kinds/record/discovery';
 import { reconcile, startLiveSync } from './live';
+import { startRootSync } from './roots';
 import { startRefresher } from './refresher';
 
 export { reconcile, startLiveSync } from './live';
@@ -14,6 +15,8 @@ export { refreshDue, startRefresher } from './refresher';
 
 /** Start everything. Call once, after the workspace is loaded. */
 export function startSync() {
+  // first: main refuses file access outside the registered folders
+  startRootSync();
   void loadIntegrationConfig().catch((e: unknown) => console.warn('[sync] integrations:config', e));
   startLiveSync();
   startRecordDiscovery();

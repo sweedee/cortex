@@ -54,6 +54,7 @@ const api: CortexApi = {
     watch: (dir) => invoke('fs:watch', { dir }),
     unwatch: (watchId) => invoke('fs:unwatch', { watchId }),
     onChanged: (cb) => on('fs:changed', cb),
+    setRoots: (roots) => invoke('fs:setRoots', { roots }),
   },
   app: {
     info: () => invoke('app:info'),

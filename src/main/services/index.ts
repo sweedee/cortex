@@ -43,7 +43,7 @@ export function createServices(paths: ServicePaths, send: Send, env: NodeJS.Proc
     /** `exec:run` keeps the allowlist name `jira-mock`; here it becomes the configured Jira CLI */
     resolveExec(req: ExecRequest): ExecSpawn {
       if (req.cmd !== 'jira-mock') return req;
-      return { ...req, cmd: jira.command, args: [...jira.prefix, ...req.args], env: { ...jira.env, ...req.env } };
+      return { ...req, cmd: jira.command, args: [...jira.prefix, ...req.args], env: { ...req.env, ...jira.env } };
     },
     /**
      * Once: reads the Jira site from `acli jira auth status` (`integrations:config` waits for it). When acli

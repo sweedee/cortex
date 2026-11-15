@@ -158,8 +158,15 @@ const PROBE = `(async () => {
       const after = await until(() => d.itemById(id), (a) => a.data.status === 'idle');
       return { permText, detail, options, answered: $('.ah-ask.is-done') && $('.ah-ask.is-done').textContent, afterEsc: { status: after.data.status, lastActivity: after.data.lastActivity }, blocks: $$('.ah-scroll > *').length, statusLine: $('.ah-status').textContent };
     });
-    const portState = async (port) => (await c.exec.run({ cmd: 'node', args: ['-e', "require('net').connect(" + port + ",'127.0.0.1').on('connect',function(){console.log('open');process.exit(0)}).on('error',function(){console.log('closed')})"], cwd: repo })).stdout.trim();
-    const pidState = async (pid) => (await c.exec.run({ cmd: 'node', args: ['-e', 'try{process.kill(' + pid + ',0);console.log("alive")}catch(e){console.log("gone")}'], cwd: repo })).stdout.trim();
+    // exec:run has no 'node' (any code); run the probe through the test runner's shell command line instead
+    let probeNo = 0;
+    const nodeEval = (code) => new Promise((resolve) => {
+      const id = 'smoke-probe-' + (++probeNo);
+      const off = c.on('test:state', async (s) => { if (s.id === id && s.status !== 'running') { off(); resolve((await c.tests.log(id)).trim().split(/\\r?\\n/).pop()); } });
+      c.tests.run({ id, cwd: repo, command: 'node -e "' + code + '"' }).catch((e) => { off(); resolve('ERROR: ' + e.message); });
+    });
+    const portState = (port) => nodeEval("require('net').connect(" + port + ",'127.0.0.1').on('connect',function(){console.log('open');process.exit(0)}).on('error',function(){console.log('closed')})");
+    const pidState = (pid) => nodeEval("try{process.kill(" + pid + ",0);console.log('alive')}catch(e){console.log('gone')}");
     let smokeApp;
     await step('e2e: app start → URL → preview → restart → stop (process tree gone) · crash', async () => {
       const a = d.addItem({ kind: 'app', handle: 'app/smoke', title: 'smoke server', data: { command: ${JSON.stringify(SMOKE_APP_CMD)}, cwd: repo, state: 'stopped' } });
@@ -227,11 +234,11 @@ const PROBE = `(async () => {
   return out;
 })()`;
 
-export function runSmoke(win: BrowserWindow) {
+export function runSmoke(win: BrowserWindow, allowRoot: (dir: string) => void = () => {}) {
   win.webContents.once('did-finish-load', () => {
     // CORTEX_SMOKE_REPO=1: the real-repo click-through (smokeRepo.ts) instead of the bridge probe
     if (process.env['CORTEX_SMOKE_REPO'] === '1') {
-      setTimeout(() => void runRepoSmoke(win).catch((err) => (console.error('[smoke-repo] failed:', err), app.quit())), 2500);
+      setTimeout(() => void runRepoSmoke(win, allowRoot).catch((err) => (console.error('[smoke-repo] failed:', err), app.quit())), 2500);
       return;
     }
     setTimeout(async () => {

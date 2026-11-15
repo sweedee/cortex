@@ -43,10 +43,55 @@ src/shared/integrations/*  tool DTOs and pure mappers both sides may import
 ## Window
 
 Dark background (`#07080f`), `contextIsolation`, `sandbox`, no `nodeIntegration`, `webviewTag: true`
-(GitHub, Jira, running apps and deployments are embedded as `<webview>` guests; attached webviews are
-stripped of preload / node and their popups go to the OS browser). Bounds are saved to
+(GitHub, Jira, running apps and deployments are embedded as `<webview>` guests). Bounds are saved to
 `<userData>/window-state.json`. `window.open` / `target=_blank` and navigations away from the app open in
-the OS browser (http/https only). Single-instance lock.
+the OS browser (http/https only; URLs are parsed and compared by origin, `lib/urlPolicy.ts`). Single-instance lock.
+
+**Embedded pages** (`window.ts`, `webSecurity.ts`): a `<webview>` attaches only with an http(s) `src` and one of
+`WEBVIEW_PARTITIONS` (`shared/ipc.ts`: `persist:github`, `persist:ci`, `persist:jira`, `persist:apps`,
+`persist:deployments`, `persist:gallery`); it is stripped of preload / node and forced into the sandbox. Guests
+may only navigate / redirect to http(s), their popups go to the OS browser. Every session (the default one,
+each partition, any later one) denies web permissions (camera, mic, location, notifications, …; only a
+sanitized clipboard write is allowed) and cancels downloads (http(s) downloads are handed to the OS browser).
+IPC handlers accept calls only from the app window's main frame (`handle.ts`).
+
+## Trust model
+
+The renderer shows untrusted content (PR bodies, Jira descriptions, LLM output) and embeds GitHub / Jira
+pages, so main treats it as *partly* trusted: a renderer bug must not turn into "read my SSH keys" or "run
+any program". What main enforces:
+
+- **Files** (`fs:*`, `shell:openPath`, `shell:openInEditor`) and the **cwd** of `proc:start`, `apps:start`,
+  `tests:run` must lie inside an allowed root (`lib/pathPolicy.ts`): Cortex's data folder (`~/.cortex`),
+  folders / files the user picked in a native dialog this run, and the roots the renderer registers with
+  `fs:setRoots` (`sync/roots.ts`: project base checkouts and worktrees folders, worktrees, app / test / agent
+  cwds, record files; re-sent whenever items change). Registration is renderer-controlled, so main also
+  refuses, regardless of roots: filesystem roots, the home folder and its parents as roots, home dot-entries
+  (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.gitconfig`, … except `~/.cortex`), the Start menu / Startup folders,
+  PowerShell profiles, `LaunchAgents`, `/etc`. Paths are compared after `path.resolve` (case-insensitive on
+  Windows / macOS); symlinks inside a root are not resolved.
+- **`shell:openPath`** never opens executables or scripts (`.exe .bat .cmd .lnk .ps1 .vbs .js .msi .scr .app
+  .sh …`, trailing dots and NTFS streams included).
+- **Child process env** from the renderer: allowlisted keys only (`shared/envPolicy.ts`: `FORCE_COLOR`,
+  `NO_COLOR`, `CI`, `NODE_ENV`, `PORT`, `HOST`, `BROWSER`, `DEBUG`, `TZ`, `LANG`, `LC_ALL`); `NODE_OPTIONS`,
+  `LD_PRELOAD`, `DYLD_*`, `GIT_SSH_COMMAND`, `ELECTRON_*`, `PATH`, … are rejected by the schema.
+- **`exec:run`**: no `node` in the allowlist, and the channel refuses in a packaged build (no UI flow uses it;
+  git / gh / claude with free-form args can run code). Main runs its own scripts (the Jira mock) itself with
+  Electron's binary and `ELECTRON_RUN_AS_NODE`.
+- **Claude permission modes** `bypassPermissions` / `dontAsk` from the renderer (`claude:start`,
+  `claude:configure`) need a native confirmation in main, once per mode per run (`lib/modeGate.ts`).
+- **Dev overrides are ignored in a packaged build** (`lib/devEnv.ts`, applied to `process.env` first thing):
+  `CORTEX_CLAUDE_BIN`, `CORTEX_JIRA_MOCK_SCRIPT`, `CORTEX_SMOKE*`, `ELECTRON_RENDERER_URL`, `JIRA_MOCK_*`. The
+  smoke harness is only imported when the app is not packaged.
+
+What it does *not* stop: `apps:start` / `tests:run` / `proc:start` run a command line through the shell (the
+user's own start / test commands need one), so a compromised renderer can still run commands in a project
+folder. The roots make that, and file access, at least stay in the user's project folders.
+
+**Secrets in child processes.** Every child (git, gh, claude, the Jira CLI, and user dev servers / test runs
+started with `apps:start` / `tests:run`) inherits Cortex's own environment, including `GH_TOKEN`,
+`ANTHROPIC_API_KEY` and anything else the app was started with. That is intended (gh and claude need them),
+but a dev server sees them too.
 
 **Content-Security-Policy**: a `<meta>` tag injected by the `cortex-csp` Vite plugin
 (`electron.vite.config.ts`). The build (file://) allows only the app's own scripts (`script-src 'self'`, no
@@ -60,21 +105,22 @@ that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#
 
 | Channel | Request → response | Notes |
 |---|---|---|
-| `exec:run` | `{cmd, args, cwd, env?, timeoutMs?, stdin?}` → `{code, stdout, stderr, timedOut}` | `cmd` ∈ `git gh claude node jira-mock` (`jira-mock` → the configured Jira CLI); no shell; tree-killed on timeout (default 120 s) |
-| `proc:start` | `{id, cmd, args, cwd, env?, shell?}` → `ProcInfo` | long-running; output via `proc:output`, end via `proc:exit` |
+| `exec:run` | `{cmd, args, cwd, env?, timeoutMs?, stdin?}` → `{code, stdout, stderr, timedOut}` | `cmd` ∈ `git gh claude jira-mock` (`jira-mock` → the configured Jira CLI); no shell; tree-killed on timeout (default 120 s); development builds only (smoke harness) |
+| `proc:start` | `{id, cmd, args, cwd, env?, shell?}` → `ProcInfo` | long-running; output via `proc:output`, end via `proc:exit`; `cwd` inside the roots |
 | `proc:stop` | `{id}` → `boolean` | kills the whole tree (Windows `taskkill /T /F`, POSIX process group) |
 | `proc:list` | → `ProcInfo[]` | running processes; all are killed on app quit |
 | `dialog:pickDirectory` | `{title?, defaultPath?}` → `string \| null` | |
 | `dialog:pickFile` | `{title?, defaultPath?, filters?}` → `string \| null` | |
 | `shell:openExternal` | `{url}` | http(s) only |
-| `shell:openPath` | `{path}` → `{ok, error?}` | folder / file in the OS |
-| `shell:openInEditor` | `{path}` → `{ok, error?}` | `code <path>`, falls back to `openPath` |
+| `shell:openPath` | `{path}` → `{ok, error?}` | folder / file in the OS; inside the roots, never an executable |
+| `shell:openInEditor` | `{path}` → `{ok, error?}` | `code <path>`, falls back to `openPath`; inside the roots |
 | `webview:setColorScheme` | `{webContentsId, scheme: "light" or "dark" or null}` | CDP `Emulation.setEmulatedMedia` (`prefers-color-scheme`) on an embedded webview guest only; used by the preview light / dark toggle (`WebPanel` `colorSchemeToggle`: app + deployment previews; default = the app theme) |
 | `notify:desktop` | `{title, body, tag?, itemId?}` | Electron `Notification`; click focuses the window and sends `notify:clicked` |
 | `workspace:load` | → `unknown \| null` | `<userData>/workspace.json`, falls back to `.bak` |
 | `workspace:save` | `{data}` | atomic (tmp + rename), serialized (last write wins), previous version kept as `.bak` |
 | `workspace:path` | → `string` | |
-| `fs:readText` / `fs:writeText` | `{path}` / `{path, text}` | absolute paths; writes are atomic |
+| `fs:setRoots` | `{roots}` → `{path, reason}[]` (refused) | replaces the renderer's roots (see [Trust model](#trust-model)); picked dialog paths and `~/.cortex` are always allowed |
+| `fs:readText` / `fs:writeText` | `{path}` / `{path, text}` | absolute paths inside the roots (also `fs:list`, `fs:watch`); writes are atomic |
 | `fs:list` | `{dir, options?: {glob?}}` → `FsEntry[]` | `*`, `?`, `**`, `{a,b}`; skips `node_modules` / `.git` when recursing |
 | `fs:watch` / `fs:unwatch` | `{dir}` → `watchId` / `{watchId}` | recursive `fs.watch`, events via `fs:changed`; all watches close on reload |
 | `app:info` | → `{platform, userData, home, version, electron}` | |
@@ -752,7 +798,8 @@ The user's command line, through the shell.
 
 Env, read once at start (`src/main/services/config.ts`): `CORTEX_JIRA_CLI=acli|mock` (default acli; smoke
 runs: mock), `CORTEX_JIRA_SITE`, `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`, `CORTEX_CLAUDE_BIN`,
-`CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, `CORTEX_USER_DATA`. Defaults in `shared/integrations/config.ts`;
+`CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, `CORTEX_USER_DATA`. `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_*` and
+`CORTEX_CLAUDE_BIN` are dev-only: a packaged build ignores them. Defaults in `shared/integrations/config.ts`;
 `integrations:config` returns the effective values once `initJira` is done (Settings shows the Jira CLI, site
 and `note`).
 
@@ -762,7 +809,9 @@ and `note`).
 inside the page and quits. Main opens the page as `index.html#smoke`, which exposes `window.__cortexDebug`
 (`debug.ts`: store access, `runAction(id, actionId)`, `forms` = `formDriver`, `sendPrompt`, `chooseOption`,
 `openAdd`, `replaceWorld`, `resetToDemo`, `refreshDue`, `showGallery`). Use a throw-away profile
-(`CORTEX_USER_DATA=<tmp>`). Smoke runs use the Jira mock unless `CORTEX_JIRA_CLI` is set.
+(`CORTEX_USER_DATA=<tmp>`). Smoke runs use the Jira mock unless `CORTEX_JIRA_CLI` is set. Not in a packaged
+build: `CORTEX_SMOKE*` is ignored there and the harness isn't loaded. The probe's checkout (and the repo
+smoke's temp folder) is added to the allowed roots.
 
 | Variable | What it adds |
 |---|---|

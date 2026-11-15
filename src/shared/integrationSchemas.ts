@@ -3,6 +3,7 @@
  * which also checks them against the contract at compile time).
  */
 import { z } from 'zod';
+import { envSchema } from './envPolicy';
 import { EFFORT_LEVELS } from './integrations/claude';
 
 // same rule as `absPath` in ./schemas.ts (not imported: schemas.ts imports this module)
@@ -19,7 +20,7 @@ const ref = str(500).refine((s) => !s.startsWith('-'), 'must not start with "-"'
 const repo = z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'expected owner/name');
 const prNo = z.number().int().positive();
 const text = z.string().max(65_536).refine((s) => !s.includes('\0'), 'must not contain NUL');
-const env = z.record(z.string(), z.string()).optional();
+const env = envSchema;
 const issueKey = z.string().regex(/^[A-Za-z][A-Za-z0-9_]*-\d+$/, 'expected an issue key like CTX-123');
 const localId = str(200);
 

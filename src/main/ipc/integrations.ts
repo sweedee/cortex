@@ -1,9 +1,11 @@
-import { app } from 'electron';
+import { app, dialog } from 'electron';
+import { ModeGate } from '../lib/modeGate';
+import type { Roots } from '../lib/pathPolicy';
 import type { Services } from '../services';
 import { handle, type IpcContext } from './handle';
 
 /** `integrations:*`, `git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*`. */
-export function registerIntegrations(ctx: IpcContext, s: Services) {
+export function registerIntegrations(ctx: IpcContext, s: Services, roots: Roots) {
   void s.initJira();
   // waits (at most 10 s) for the Jira site from `acli jira auth status`
   handle(ctx, 'integrations:config', async () => {
@@ -50,7 +52,24 @@ export function registerIntegrations(ctx: IpcContext, s: Services) {
   handle(ctx, 'jira:edit', async (req) => (await ready(), jira.edit(req)));
   handle(ctx, 'jira:statuses', async ({ project }) => (await ready(), jira.statuses(project)));
 
-  handle(ctx, 'claude:start', (req) => claude.start(req));
+  // bypassPermissions / dontAsk from the renderer: the user confirms once per run (lib/modeGate.ts)
+  const modes = new ModeGate(async (mode) => {
+    const win = ctx.getWindow();
+    const opts = {
+      type: 'warning' as const,
+      message: `Let agents run in "${mode}" mode?`,
+      detail:
+        mode === 'bypassPermissions'
+          ? 'Agents in this mode run commands and edit files without asking you first. Allow it for this session?'
+          : 'Agents in this mode never ask you: tools pre-approved in the Claude settings run without a prompt, everything else is denied. Allow it for this session?',
+      buttons: ['Allow for this session', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const r = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
+    return r.response === 0;
+  });
+  handle(ctx, 'claude:start', async (req) => (await modes.require(req.permissionMode), claude.start(req)));
   handle(ctx, 'claude:send', ({ localId, text }) => claude.send(localId, text));
   handle(ctx, 'claude:answer', ({ localId, toolUseId, answers }) => claude.answer(localId, toolUseId, answers));
   handle(ctx, 'claude:permission', ({ localId, requestId, decision }) => claude.permission(localId, requestId, decision));
@@ -60,17 +79,18 @@ export function registerIntegrations(ctx: IpcContext, s: Services) {
   handle(ctx, 'claude:list', () => claude.list());
   handle(ctx, 'claude:transcript', ({ localId }) => claude.transcript(localId));
   handle(ctx, 'claude:session', ({ localId }) => claude.session(localId));
-  handle(ctx, 'claude:configure', ({ localId, ...c }) => claude.configure(localId, c));
+  handle(ctx, 'claude:configure', async ({ localId, ...c }) => (await modes.require(c.permissionMode), claude.configure(localId, c)));
   handle(ctx, 'claude:catalog', () => claude.catalog());
 
-  handle(ctx, 'apps:start', (req) => apps.start(req));
+  // user command lines through the shell: only in a project / worktree folder
+  handle(ctx, 'apps:start', (req) => (roots.check(req.cwd, 'cwd'), apps.start(req)));
   handle(ctx, 'apps:stop', ({ id }) => apps.stop(id));
   handle(ctx, 'apps:restart', ({ id }) => apps.restart(id));
   handle(ctx, 'apps:list', () => apps.list());
   handle(ctx, 'apps:log', ({ id }) => apps.log(id));
   handle(ctx, 'apps:remove', ({ id }) => apps.remove(id));
 
-  handle(ctx, 'tests:run', (req) => tests.run(req));
+  handle(ctx, 'tests:run', (req) => (roots.check(req.cwd, 'cwd'), tests.run(req)));
   handle(ctx, 'tests:stop', ({ id }) => tests.stop(id));
   handle(ctx, 'tests:list', () => tests.list());
   handle(ctx, 'tests:log', ({ id }) => tests.log(id));

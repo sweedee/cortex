@@ -90,8 +90,9 @@ interface Step {
   detail: string;
 }
 
-export async function runRepoSmoke(win: BrowserWindow) {
+export async function runRepoSmoke(win: BrowserWindow, allowRoot: (dir: string) => void = () => {}) {
   const root = process.env['CORTEX_SMOKE_OUT'] || join(tmpdir(), `cortex-smoke-${Date.now().toString(36)}`);
+  allowRoot(root);
   const shots = join(root, 'shots');
   mkdirSync(shots, { recursive: true });
   const steps: Step[] = [];

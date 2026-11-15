@@ -4,12 +4,13 @@ import { join } from 'node:path';
 import { atomicWrite } from '../lib/atomicWrite';
 import { listDir } from '../lib/files';
 import { log } from '../lib/log';
+import type { Roots } from '../lib/pathPolicy';
 import { Watchers } from '../lib/watchers';
 import { WorkspaceFile } from '../lib/workspaceFile';
 import { handle, type IpcContext } from './handle';
 
 /** `workspace:*` and `fs:*`. */
-export function registerFiles(ctx: IpcContext) {
+export function registerFiles(ctx: IpcContext, roots: Roots) {
   const workspace = new WorkspaceFile(join(app.getPath('userData'), 'workspace.json'));
   handle(ctx, 'workspace:load', () => workspace.load());
   handle(ctx, 'workspace:save', ({ data }) => workspace.save(data));
@@ -26,12 +27,18 @@ export function registerFiles(ctx: IpcContext) {
     });
   });
 
-  handle(ctx, 'fs:readText', ({ path }) => fs.readFile(path, 'utf8'));
-  handle(ctx, 'fs:writeText', ({ path, text }) => atomicWrite(path, text));
-  handle(ctx, 'fs:list', ({ dir, options }) => listDir(dir, options));
+  // only inside the registered roots (lib/pathPolicy.ts)
+  handle(ctx, 'fs:setRoots', ({ roots: list }) => {
+    const refused = roots.set(list);
+    if (refused.length) log.warn(`[fs] refused roots: ${refused.map((r) => `${r.path} (${r.reason})`).join(', ')}`);
+    return refused;
+  });
+  handle(ctx, 'fs:readText', ({ path }) => (roots.check(path), fs.readFile(path, 'utf8')));
+  handle(ctx, 'fs:writeText', ({ path, text }) => (roots.check(path), atomicWrite(path, text)));
+  handle(ctx, 'fs:list', ({ dir, options }) => (roots.check(dir), listDir(dir, options)));
 
   const watchers = new Watchers((e) => ctx.send('fs:changed', e));
-  handle(ctx, 'fs:watch', ({ dir }) => watchers.watch(dir));
+  handle(ctx, 'fs:watch', ({ dir }) => (roots.check(dir), watchers.watch(dir)));
   handle(ctx, 'fs:unwatch', ({ watchId }) => watchers.unwatch(watchId));
   app.on('will-quit', () => watchers.closeAll());
   return { closeWatchers: () => watchers.closeAll() };

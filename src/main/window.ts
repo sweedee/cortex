@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, screen, shell, type Rectangle, type WebCont
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from './lib/log';
+import { isHttpUrl, sameOrigin, webviewRefusal } from './lib/urlPolicy';
+import { guardGuest } from './webSecurity';
 
 /** matches `--canvas-bg` in the renderer, so there is no white flash before first paint */
 const BACKGROUND = '#07080f';
@@ -27,12 +29,10 @@ function loadState(): { width: number; height: number; x?: number; y?: number; m
   }
 }
 
-const isHttp = (url: string) => /^https?:\/\//i.test(url);
-
 /** window.open / target=_blank: open http(s) in the OS browser, never in a new Electron window */
 function externalLinks(wc: WebContents) {
   wc.setWindowOpenHandler(({ url }) => {
-    if (isHttp(url)) void shell.openExternal(url);
+    if (isHttpUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
 }
@@ -94,16 +94,24 @@ export function createMainWindow(): BrowserWindow {
   win.webContents.on('will-navigate', (e, url) => {
     if (url === win.webContents.getURL()) return; // reload
     e.preventDefault();
-    if (isHttp(url) && !url.startsWith(process.env['ELECTRON_RENDERER_URL'] ?? '\0')) void shell.openExternal(url);
+    // links to the dev server itself stay blocked; everything else http(s) goes to the OS browser
+    if (isHttpUrl(url) && !sameOrigin(url, process.env['ELECTRON_RENDERER_URL'])) void shell.openExternal(url);
   });
-  // embedded <webview>s: no preload, no node, their popups go to the OS browser too
-  win.webContents.on('will-attach-webview', (_e, prefs) => {
+  // embedded <webview>s: http(s) src and one of the app's partitions only; no preload, no node
+  win.webContents.on('will-attach-webview', (e, prefs, params) => {
+    const why = webviewRefusal(params['src'], prefs.partition ?? params['partition']);
+    if (why) {
+      e.preventDefault();
+      log.warn(`[web] webview refused: ${why}`);
+      return;
+    }
     delete prefs.preload;
     prefs.nodeIntegration = false;
     prefs.contextIsolation = true;
     prefs.sandbox = true;
   });
-  win.webContents.on('did-attach-webview', (_e, wc) => externalLinks(wc));
+  // guests: http(s) navigations only, popups to the OS browser (webSecurity.ts)
+  win.webContents.on('did-attach-webview', (_e, wc) => guardGuest(wc));
 
   // surface renderer problems in the terminal (dev runs are often headless / unattended)
   win.webContents.on('preload-error', (_e, path, err) => log.error(`[preload] ${path}: ${err.message}`));

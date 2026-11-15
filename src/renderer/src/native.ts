@@ -73,6 +73,7 @@ function browserFallback(): CortexApi {
       watch: needsDesktop('fs.watch'),
       unwatch: async () => {},
       onChanged: noop,
+      setRoots: async () => [],
     },
     app: { info: async () => ({ platform: 'browser', userData: '', version: 'dev' }) },
     ...integrationFallbacks(),

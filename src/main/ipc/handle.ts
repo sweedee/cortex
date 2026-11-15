@@ -10,7 +10,7 @@ export interface IpcContext {
 }
 
 /**
- * Register a typed, validated invoke handler. Only the app's own window may call: webviews
+ * Register a typed, validated invoke handler. Only the app window's main frame may call: webviews
  * (GitHub, Jira, running apps) never get a preload, and this check makes sure of it.
  */
 export function handle<C extends InvokeChannel>(
@@ -20,7 +20,11 @@ export function handle<C extends InvokeChannel>(
 ): void {
   ipcMain.handle(channel, async (e, raw: unknown) => {
     const win = ctx.getWindow();
-    if (!win || e.sender !== win.webContents) throw new Error(`${channel}: caller not allowed`);
+    // the app window's own top-level page: no webview guest, no (future) iframe inside the app
+    const frame = e.senderFrame;
+    const main = win?.webContents.mainFrame;
+    const isMain = !!frame && !!main && frame.processId === main.processId && frame.routingId === main.routingId;
+    if (!win || e.sender !== win.webContents || !isMain) throw new Error(`${channel}: caller not allowed`);
     return fn(parseRequest(channel, raw), e);
   });
 }
