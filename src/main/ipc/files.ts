@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { atomicWrite } from '../lib/atomicWrite';
 import { listDir } from '../lib/files';
+import { log } from '../lib/log';
 import { Watchers } from '../lib/watchers';
 import { WorkspaceFile } from '../lib/workspaceFile';
 import { handle, type IpcContext } from './handle';
@@ -19,7 +20,7 @@ export function registerFiles(ctx: IpcContext) {
   app.on('before-quit', (e) => {
     if (flushed || !workspace.busy) return;
     e.preventDefault();
-    void workspace.flush().finally(() => {
+    void workspace.flush().catch((err) => log.error('[workspace] flush on quit failed', err)).finally(() => {
       flushed = true;
       app.quit();
     });

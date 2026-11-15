@@ -47,6 +47,7 @@ import {
 import { atomicWrite } from '../lib/atomicWrite';
 import { killTree, treeSpawnOptions } from '../lib/killTree';
 import { LogTail } from '../lib/batcher';
+import { log } from '../lib/log';
 
 export interface ClaudeManagerOptions {
   /** binary; tests pass `process.execPath` + a fake script in `prefixArgs` */
@@ -237,7 +238,13 @@ export class ClaudeSessions {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 1);
         const ev = parseStreamLine(line);
-        if (ev) this.onEvent(e, ev);
+        if (ev) {
+          try {
+            this.onEvent(e, ev);
+          } catch (err) {
+            log.error('[claude] failed to handle a stream event; skipped', err);
+          }
+        }
       }
     });
     child.stderr?.setEncoding('utf8').on('data', (c: string) => e.stderr.push(c));

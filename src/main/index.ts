@@ -1,7 +1,9 @@
 /** Main process: app lifecycle, the one app window, and the IPC handlers in `./ipc`. */
+import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import type { EventChannel, EventChannels } from '../shared/ipc';
 import { registerIpc } from './ipc';
+import { initLog, installCrashHandlers, log } from './lib/log';
 import { migrateUserData, resolveUserData } from './lib/userData';
 import { runSmoke } from './smoke';
 import { createMainWindow } from './window';
@@ -15,12 +17,14 @@ let win: BrowserWindow | null = null;
   const paths = resolveUserData(process.env, electronDefault);
   app.setPath('userData', paths.userData);
   app.setPath('sessionData', paths.sessionData);
+  initLog(join(paths.userData, 'logs'));
+  installCrashHandlers();
   if (!process.env['CORTEX_USER_DATA']) {
     try {
       const copied = migrateUserData(electronDefault, paths.userData);
-      if (copied.length) console.log(`[cortex] moved to ${paths.userData}: ${copied.join(', ')} (copied from ${electronDefault})`);
+      if (copied.length) log.info(`[cortex] moved to ${paths.userData}: ${copied.join(', ')} (copied from ${electronDefault})`);
     } catch (e) {
-      console.warn('[cortex] could not copy the old user data', e);
+      log.warn('[cortex] could not copy the old user data', e);
     }
   }
 }

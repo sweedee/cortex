@@ -1,6 +1,7 @@
-import { app, BrowserWindow, screen, shell, type Rectangle, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, screen, shell, type Rectangle, type WebContents } from 'electron';
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { log } from './lib/log';
 
 /** matches `--canvas-bg` in the renderer, so there is no white flash before first paint */
 const BACKGROUND = '#07080f';
@@ -105,9 +106,15 @@ export function createMainWindow(): BrowserWindow {
   win.webContents.on('did-attach-webview', (_e, wc) => externalLinks(wc));
 
   // surface renderer problems in the terminal (dev runs are often headless / unattended)
-  win.webContents.on('preload-error', (_e, path, err) => console.error(`[preload] ${path}: ${err.message}`));
-  win.webContents.on('render-process-gone', (_e, d) => console.error(`[renderer] gone: ${d.reason} (${d.exitCode})`));
-  win.webContents.on('did-fail-load', (_e, code, desc, url) => console.error(`[renderer] failed to load ${url}: ${desc} (${code})`));
+  win.webContents.on('preload-error', (_e, path, err) => log.error(`[preload] ${path}: ${err.message}`));
+  win.webContents.on('render-process-gone', (_e, d) => {
+    log.error(`[renderer] gone: ${d.reason} (${d.exitCode})`);
+    if (d.reason === 'clean-exit' || win.isDestroyed()) return;
+    void dialog
+      .showMessageBox(win, { type: 'error', message: 'The Cortex window crashed.', detail: `Reason: ${d.reason}. Your workspace is saved; reload to continue.`, buttons: ['Reload', 'Quit'], defaultId: 0, cancelId: 1 })
+      .then(({ response }) => (response === 0 && !win.isDestroyed() ? win.reload() : app.quit()));
+  });
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => log.error(`[renderer] failed to load ${url}: ${desc} (${code})`));
   win.webContents.on('did-finish-load', () => console.log(`[renderer] loaded ${win.webContents.getURL()}`));
   if (!app.isPackaged) {
     win.webContents.on('console-message', (e) => {
