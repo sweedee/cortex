@@ -1,11 +1,12 @@
 import { app, BrowserWindow, dialog, Notification, shell, webContents } from 'electron';
 import spawn from 'cross-spawn';
 import type { OpenResult } from '../../shared/ipc';
+import { editorArgs, type UserConfig } from '../../shared/userConfig';
 import { isExecutablePath, type Roots } from '../lib/pathPolicy';
 import { handle, type IpcContext } from './handle';
 
 /** `dialog:*`, `shell:*`, `notify:*`, `app:*`. */
-export function registerDesktop(ctx: IpcContext, roots: Roots) {
+export function registerDesktop(ctx: IpcContext, roots: Roots, editor: () => UserConfig['editor']) {
   const owner = () => ctx.getWindow() ?? BrowserWindow.getFocusedWindow();
 
   handle(ctx, 'dialog:pickDirectory', async ({ title, defaultPath }) => {
@@ -38,7 +39,9 @@ export function registerDesktop(ctx: IpcContext, roots: Roots) {
     return error ? { ok: false, error } : { ok: true };
   };
   handle(ctx, 'shell:openPath', ({ path }) => openPath(path));
-  // VS Code's `code` CLI (a .cmd shim on Windows, hence cross-spawn); OS default otherwise
+  // config.json `editor` (default VS Code's `code` CLI, a .cmd shim on Windows, hence cross-spawn; no
+  // shell). The command comes from the file only, never from the renderer; the renderer gives the path,
+  // which is inside the roots and becomes one argument. OS default when the editor can't be started.
   handle(
     ctx,
     'shell:openInEditor',
@@ -46,7 +49,8 @@ export function registerDesktop(ctx: IpcContext, roots: Roots) {
       new Promise<OpenResult>((resolve) => {
         const refused = roots.refusal(path);
         if (refused) return resolve({ ok: false, error: `Not opened: ${refused}` });
-        const child = spawn('code', [path], { detached: true, stdio: 'ignore', windowsHide: true });
+        const { command, args } = editor();
+        const child = spawn(command, editorArgs(args, path), { detached: true, stdio: 'ignore', windowsHide: true, shell: false });
         child.once('error', () => void openPath(path).then(resolve));
         child.once('spawn', () => {
           child.unref();

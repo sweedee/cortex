@@ -60,8 +60,8 @@ describe('slash commands', () => {
 
 describe('settings form: model / effort', () => {
   it('select or a custom id; default = unset', () => {
-    expect(settingsPatch({ model: 'default', modelCustom: '', effort: 'default', permissionMode: 'plan', refreshSec: '60' })).toMatchObject({ model: undefined, effort: undefined, permissionMode: 'plan' });
-    expect(settingsPatch({ model: 'opus', modelCustom: ' claude-x ', effort: 'xhigh', permissionMode: 'default', refreshSec: '60' })).toMatchObject({ model: 'claude-x', effort: 'xhigh' });
+    expect(settingsPatch({ model: 'default', modelCustom: '', effort: 'default', permissionMode: 'plan', refreshSec: '60' }).claude).toEqual({ model: null, effort: null, permissionMode: 'plan' });
+    expect(settingsPatch({ model: 'opus', modelCustom: ' claude-x ', effort: 'xhigh', permissionMode: 'default', refreshSec: '60' }).claude).toMatchObject({ model: 'claude-x', effort: 'xhigh' });
     expect(modelOptions(undefined, undefined)[0]).toEqual({ value: 'default', label: 'CLI default (no flag)' });
   });
 });

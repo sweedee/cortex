@@ -1,10 +1,22 @@
 /**
  * Dev / test overrides that must not work in an installed app: they swap binaries and scripts
  * (`CORTEX_CLAUDE_BIN`, `CORTEX_JIRA_MOCK_SCRIPT`), point the window at another URL
- * (`ELECTRON_RENDERER_URL`) or drive the UI and quit (`CORTEX_SMOKE*`). `CORTEX_USER_DATA` and the
- * user-facing `CORTEX_*` settings stay.
+ * (`ELECTRON_RENDERER_URL`), drive the UI and quit (`CORTEX_SMOKE*`), or override config.json
+ * (`CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`: an installed
+ * app is configured through `~/.cortex/config.json`). Only `CORTEX_USER_DATA` stays: it must be known
+ * before the config file can be found.
  */
-const DEV_ONLY = [/^CORTEX_CLAUDE_BIN$/, /^CORTEX_JIRA_MOCK_SCRIPT$/, /^CORTEX_SMOKE/, /^ELECTRON_RENDERER_URL$/, /^JIRA_MOCK_/];
+const DEV_ONLY = [
+  /^CORTEX_CLAUDE_BIN$/,
+  /^CORTEX_JIRA_MOCK_SCRIPT$/,
+  /^CORTEX_SMOKE/,
+  /^ELECTRON_RENDERER_URL$/,
+  /^JIRA_MOCK_/,
+  /^CORTEX_JIRA_CLI$/,
+  /^CORTEX_JIRA_SITE$/,
+  /^CORTEX_AI_REVIEW_COMMENT$/,
+  /^CORTEX_RENOVATE_APP$/,
+];
 
 export const isDevOnlyEnvKey = (key: string): boolean => DEV_ONLY.some((re) => re.test(key));
 

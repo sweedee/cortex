@@ -1,4 +1,5 @@
 import { AiIcon, CheckmarkIcon, CycleIcon, ArrowDownRightIcon } from '@dynatrace/strato-icons';
+import { userConfig } from '../../data/config';
 import { external, skill } from '../common';
 import { PullRequestIcon } from '../icons';
 import type { Action, KindModule } from '../types';
@@ -100,7 +101,7 @@ export const pr: KindModule<'pr'> = {
         kind: 'pr',
         handle: `PR-${num}`,
         title: `Pull request #${num}`,
-        data: { repo, number: num, headBranch: '', baseBranch: proj?.data.defaultBranch ?? 'main', state: 'open', isDraft: false, reviewDecision: 'REVIEW_REQUIRED', checks: { state: 'pending' } },
+        data: { repo, number: num, headBranch: '', baseBranch: proj?.data.defaultBranch ?? userConfig().git.defaultBranch, state: 'open', isDraft: false, reviewDecision: 'REVIEW_REQUIRED', checks: { state: 'pending' } },
       };
     },
   },

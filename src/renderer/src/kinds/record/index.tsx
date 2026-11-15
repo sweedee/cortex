@@ -1,5 +1,6 @@
 import { CheckmarkIcon, DocumentIcon, ViewIcon } from '@dynatrace/strato-icons';
 import type { ItemOf, RecordData, Segment } from '../../domain';
+import { userConfig } from '../../data/config';
 import { inspect, patchData, select } from '../../store';
 import { openInEditorAction, openPathAction, skill, toast } from '../common';
 import type { Action, KindModule } from '../types';
@@ -21,9 +22,9 @@ export function recordRing({ data }: ItemOf<'record'>): Segment[] {
   return [{ tone: 'success', label: 'Approved' }];
 }
 
-/** `<baseDir>/records/<ticket-branch>/<name>.md` */
-export const recordPath = (baseDir: string | undefined, ticketBranch: string | undefined, name: string) =>
-  [baseDir ?? '<project>', 'records', ticketBranch, name].filter(Boolean).join('/');
+/** `<baseDir>/<records.dir>/<ticket-branch>/<name>.md` (config.json `records.dir`, default `records`) */
+export const recordPath = (baseDir: string | undefined, ticketBranch: string | undefined, name: string, dir = userConfig().records.dir) =>
+  [baseDir ?? '<project>', dir, ticketBranch, name].filter(Boolean).join('/');
 
 const guessType = (name: string): RecordData['recordType'] => recordTypeOf(/\.md$/i.test(name) ? name : `${name}.md`) ?? 'plan';
 

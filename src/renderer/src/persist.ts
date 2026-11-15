@@ -14,6 +14,7 @@ import { DEFAULT_PREFS, parseWorkspace, WORKSPACE_VERSION, type Workspace } from
 import { native } from './native';
 import { firstRunWorld } from './seed';
 import { appStore, getState, prefsOf, replaceWorld, type State } from './store';
+import type { UserConfigPatch } from '../../shared/userConfig';
 
 const SAVE_DELAY = 500;
 
@@ -22,6 +23,8 @@ export interface LoadReport {
   source: 'file' | 'migrated' | 'seed';
   /** something the user should know about (shown as a toast once the UI is up) */
   warning?: { title: string; message: string };
+  /** settings a v3 workspace still held: they go to config.json once (`startConfigSync`) */
+  movedPrefs?: UserConfigPatch;
 }
 
 /** Put the first-run world (demo repo if checked out, else empty) into the store. */
@@ -67,16 +70,18 @@ export async function loadWorkspace(): Promise<LoadReport> {
   }
   r.warnings.forEach((w) => console.warn(`[workspace] ${w}`));
   const { items, links, prefs } = r.workspace;
+  const movedPrefs = r.movedPrefs;
   if (isOldFakeDemo(items)) {
     const kind = await loadFirstRun(prefs);
     saveNow(true);
-    return { source: 'seed', warning: { title: 'Replaced the old demo data', message: kind === 'demo' ? 'The fake demo repos are gone; the canvas now shows the real cortex-demo repo.' : 'The fake demo repos are gone. Add a project with a right-click on the canvas.' } };
+    return { source: 'seed', movedPrefs, warning: { title: 'Replaced the old demo data', message: kind === 'demo' ? 'The fake demo repos are gone; the canvas now shows the real cortex-demo repo.' : 'The fake demo repos are gone. Add a project with a right-click on the canvas.' } };
   }
   replaceWorld(items, links, prefs);
   if (r.migrated) saveNow(true);
   const dropped = r.warnings.filter((w) => w.startsWith('dropped')).length;
   return {
     source: r.migrated ? 'migrated' : 'file',
+    movedPrefs,
     warning: dropped ? { title: `${dropped} entr${dropped === 1 ? 'y' : 'ies'} of the workspace could not be loaded`, message: 'Details are in the developer console.' } : undefined,
   };
 }
@@ -99,7 +104,8 @@ export function toWorkspace(s: State): Workspace {
   return { version: WORKSPACE_VERSION, items: s.items, links: s.links, prefs: prefsOf(s) };
 }
 
-const persisted = (s: State) => [s.items, s.links, s.desktopNotify, s.soundOn, s.colorBy, s.filter, s.settings] as const;
+// the user settings (model, notifications, …) are not in here: they live in config.json (`data/config.ts`)
+const persisted = (s: State) => [s.items, s.links, s.colorBy, s.filter, s.settings.sidebarWidth] as const;
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let dirty = false;

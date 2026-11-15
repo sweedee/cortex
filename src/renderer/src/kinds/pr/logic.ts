@@ -102,3 +102,9 @@ export function worktreeOf(pr: Pr, linked: ItemOf<'worktree'>[], inProject: Item
   const live = (w: ItemOf<'worktree'>) => !w.archived;
   return linked.find(live) ?? (pr.data.headBranch ? inProject.find((w) => live(w) && w.data.branch === pr.data.headBranch) : undefined);
 }
+
+/** A comment / review by the AI review bot (config.json `github.aiReviewBot`; gh drops the `[bot]` suffix of app logins). */
+export const isAiReviewer = (login: string | undefined, bot: string) => {
+  const norm = (s: string) => s.toLowerCase().replace(/^app\//, '').replace(/\[bot\]$/, '');
+  return !!login && !!bot && norm(login) === norm(bot);
+};

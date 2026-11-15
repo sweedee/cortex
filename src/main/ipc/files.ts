@@ -5,6 +5,7 @@ import { atomicWrite } from '../lib/atomicWrite';
 import { listDir } from '../lib/files';
 import { log } from '../lib/log';
 import type { Roots } from '../lib/pathPolicy';
+import { isConfigFile } from '../lib/userConfig';
 import { Watchers } from '../lib/watchers';
 import { WorkspaceFile } from '../lib/workspaceFile';
 import { handle, type IpcContext } from './handle';
@@ -34,7 +35,12 @@ export function registerFiles(ctx: IpcContext, roots: Roots) {
     return refused;
   });
   handle(ctx, 'fs:readText', ({ path }) => (roots.check(path), fs.readFile(path, 'utf8')));
-  handle(ctx, 'fs:writeText', ({ path, text }) => (roots.check(path), atomicWrite(path, text)));
+  handle(ctx, 'fs:writeText', ({ path, text }) => {
+    roots.check(path);
+    // config.json holds the editor command and the claude binary: only main writes it (`config:update`)
+    if (isConfigFile(path, app.getPath('userData'))) throw new Error('fs:writeText: config.json is changed through config:update only');
+    return atomicWrite(path, text);
+  });
   handle(ctx, 'fs:list', ({ dir, options }) => (roots.check(dir), listDir(dir, options)));
 
   const watchers = new Watchers((e) => ctx.send('fs:changed', e));

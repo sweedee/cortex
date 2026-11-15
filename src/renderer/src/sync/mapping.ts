@@ -7,6 +7,7 @@ import type { GitStatus } from '../../../shared/integrations/git';
 import type { GhPullRequest, GhStatusCheck } from '../../../shared/integrations/github';
 import { summarizeIssue, type JiraIssue } from '../../../shared/integrations/jira';
 import type { AppState, TestState } from '../../../shared/integrations/runners';
+import { userConfig } from '../data/config';
 import type { AgentData, AppData, Notice, PrData, ProjectData, TestRunData, TicketData, WorktreeData } from '../domain';
 
 export type NoticeSpec = Pick<Notice, 'text' | 'tone'>;
@@ -15,8 +16,6 @@ export interface Mapped<D> {
   notice?: NoticeSpec;
 }
 
-/** Context window for `usage.contextPct` until the CLI reported the real one (with the first result). */
-export const CONTEXT_WINDOW = 200_000;
 
 const firstLine = (s: string | undefined, max = 90) => {
   const l = s?.trim().split(/\r?\n/).find((x) => x.trim())?.trim();
@@ -43,7 +42,8 @@ export function agentStatusOf(s: ClaudeSessionSummary, prev: AgentData['status']
 }
 
 /** `claude:state` → agent data patch + notice for the transition. */
-export function mapClaudeState(s: ClaudeSessionSummary, prev: AgentData, title: string, now = Date.now()): Mapped<AgentData> {
+/** `assumedWindow`: context window for `usage.contextPct` until the CLI reported the real one (config.json `claude.contextWindow`). */
+export function mapClaudeState(s: ClaudeSessionSummary, prev: AgentData, title: string, now = Date.now(), assumedWindow = userConfig().claude.contextWindow): Mapped<AgentData> {
   const status = agentStatusOf(s, prev.status);
   const ended = status === 'done' || status === 'failed' || status === 'idle';
   const patch: Partial<AgentData> = {
@@ -58,7 +58,7 @@ export function mapClaudeState(s: ClaudeSessionSummary, prev: AgentData, title: 
     pendingPermissions: s.pendingPermissions.length ? s.pendingPermissions.map((p) => ({ requestId: p.requestId, toolName: p.toolName, summary: firstLine(toolSummary(p.input), 120) })) : undefined,
     error: status === 'failed' ? (s.error ?? 'failed') : undefined,
     usage: {
-      contextPct: Math.min(100, Math.round((s.usage.contextTokens / (s.usage.contextWindow || CONTEXT_WINDOW)) * 100)),
+      contextPct: Math.min(100, Math.round((s.usage.contextTokens / (s.usage.contextWindow || assumedWindow)) * 100)),
       costUsd: s.usage.costUsd,
       turns: s.usage.turns,
       contextTokens: s.usage.contextTokens,
@@ -180,8 +180,8 @@ export function prPatch(pr: GhPullRequest): Partial<PrData> {
 export const prChecksRunning = (d: PrData) => d.state === 'open' && d.checks?.state === 'pending';
 
 /** `jira view` → the ticket's cached fields and its title (the summary). */
-export function ticketPatch(issue: JiraIssue): { patch: Partial<TicketData>; title: string } {
-  const s = summarizeIssue(issue);
+export function ticketPatch(issue: JiraIssue, fields = userConfig().jira.fields): { patch: Partial<TicketData>; title: string } {
+  const s = summarizeIssue(issue, fields);
   return {
     title: s.summary,
     patch: {

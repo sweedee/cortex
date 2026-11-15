@@ -59,6 +59,11 @@ const api: CortexApi = {
   app: {
     info: () => invoke('app:info'),
   },
+  config: {
+    get: () => invoke('config:get'),
+    update: (patch, opts = {}) => invoke('config:update', { patch, ifUnset: opts.ifUnset }),
+    onChanged: (cb) => on('config:changed', cb),
+  },
   ...integrationsApi(invoke, on, EVENT_CHANNELS),
 };
 

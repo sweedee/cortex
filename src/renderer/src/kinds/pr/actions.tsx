@@ -8,7 +8,6 @@ import { DeleteIcon, ArrowDownRightIcon } from '@dynatrace/strato-icons';
 import { ghOps } from '../../data/gh';
 import { gitOps } from '../../data/git';
 import { isRealPath, type ItemOf } from '../../domain';
-import { native } from '../../native';
 import { getState, insertSkill, itemById, patchData, removeItems } from '../../store';
 import { openForm } from '../../ui/form';
 import { errorText, runTask } from '../../ui/task';
@@ -18,21 +17,11 @@ import { hasConflicts, MERGE_METHODS, mergeArgs, mergeWarnings, retargetPlan, st
 
 type Pr = ItemOf<'pr'>;
 
-/** The comment that triggers the AI review: the setting, else main's config. */
-export async function aiReviewComment(): Promise<string> {
-  const own = getState().settings.aiReviewComment;
-  if (own) return own;
-  try {
-    return (await native.integrations.config()).github.aiReviewComment;
-  } catch (e) {
-    console.warn('[pr] could not read the AI review comment from the config', e);
-    toast('Using the default AI review comment', `Could not read the configured comment (${errorText(e)}); using “@claude review”.`, 'warning');
-    return '@claude review';
-  }
-}
+/** The comment that triggers the AI review (config.json `github.aiReviewComment`, mirrored in the store). */
+export const aiReviewComment = (): string => getState().settings.aiReviewComment;
 
 export async function triggerAiReview(p: Pr) {
-  const body = await aiReviewComment();
+  const body = aiReviewComment();
   await openForm({
     title: `Request AI review on #${p.data.number}?`,
     description: `Posts this comment on ${p.data.repo}#${p.data.number}: “${body}”`,

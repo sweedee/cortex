@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import type { EventChannel, EventChannels, ExecRequest } from '../../shared/ipc';
 import type { ExecSpawn } from '../lib/exec';
 import { ClaudeSessions } from './claude';
-import { jiraCliSpec, resolveConfig } from './config';
+import { DEFAULT_USER_CONFIG, type UserConfig } from '../../shared/userConfig';
+import { applyUserConfig, jiraCliSpec, jiraSiteFixed, resolveConfig } from './config';
 import { GhService } from './gh';
 import { GitService } from './git';
 import { JiraService } from './jira';
@@ -19,14 +20,20 @@ export interface ServicePaths {
 
 type Send = <C extends EventChannel>(channel: C, payload: EventChannels[C]) => void;
 
-export function createServices(paths: ServicePaths, send: Send, env: NodeJS.ProcessEnv = process.env) {
-  const config = resolveConfig(env);
+export function createServices(paths: ServicePaths, send: Send, env: NodeJS.ProcessEnv = process.env, user: UserConfig = DEFAULT_USER_CONFIG) {
+  let userConfig = user;
+  const config = resolveConfig(env, user);
   // CORTEX_CLAUDE_BIN may point at a node script (e.g. the fake CLI fixture): run it with this runtime
   const claudeScript = /\.[cm]?js$/i.test(config.claude.bin);
   const jira = new JiraService(jiraCliSpec(config, paths, env), { cwd: paths.userData });
   let jiraReady: Promise<void> | null = null;
   const services = {
     config,
+    /** config.json changed: apply what works without a restart (GitHub settings, a fixed Jira site) */
+    setUserConfig(next: UserConfig) {
+      userConfig = next;
+      applyUserConfig(config, next, env);
+    },
     git: new GitService(),
     gh: new GhService(config.github, { cwd: paths.userData }),
     jira,
@@ -47,14 +54,14 @@ export function createServices(paths: ServicePaths, send: Send, env: NodeJS.Proc
     },
     /**
      * Once: reads the Jira site from `acli jira auth status` (`integrations:config` waits for it). When acli
-     * cannot be started and no CLI was chosen with CORTEX_JIRA_CLI, Jira falls back to the mock.
+     * cannot be started and no CLI was chosen on purpose (CORTEX_JIRA_CLI, or `mock` in config.json), Jira falls back to the mock.
      */
     initJira(): Promise<void> {
       jiraReady ??= (async () => {
         if (config.jira.cli !== 'acli') return;
         try {
           const site = await jira.site();
-          if (site && !env['CORTEX_JIRA_SITE']) config.jira.site = site;
+          if (site && !jiraSiteFixed(env, userConfig)) config.jira.site = site;
           if (!site) config.jira.note = 'acli is not logged in: run "acli jira auth login"';
         } catch (e) {
           const why = e instanceof Error ? e.message : String(e);
@@ -63,7 +70,7 @@ export function createServices(paths: ServicePaths, send: Send, env: NodeJS.Proc
             return;
           }
           config.jira.cli = 'mock';
-          if (!env['CORTEX_JIRA_SITE']) config.jira.site = env['JIRA_MOCK_SITE'] || 'https://example.atlassian.net';
+          if (!jiraSiteFixed(env, userConfig)) config.jira.site = env['JIRA_MOCK_SITE'] || 'https://example.atlassian.net';
           config.jira.note = 'acli not found on PATH: using the Jira mock';
           jira.setSpec(jiraCliSpec(config, paths, env));
         }

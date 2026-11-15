@@ -87,8 +87,15 @@ export interface JiraIssue {
   };
 }
 
-/** Custom field ids of the (mock) site; check a real site with `acli jira workitem view <KEY> --json --fields "*all"`. */
+/**
+ * Default custom field ids (the mock's and many cloud sites'); they differ per site, so the effective ones
+ * come from config.json `jira.fields`. Check a site with `acli jira workitem view <KEY> --json --fields "*all"`.
+ */
 export const JIRA_FIELDS = { storyPoints: 'customfield_10016', sprint: 'customfield_10020' } as const;
+export interface JiraFieldIds {
+  storyPoints: string;
+  sprint: string;
+}
 
 /**
  * Browse URL of an issue, from its `self` REST URL. Empty when `self` points at Atlassian's API
@@ -280,9 +287,9 @@ function sprintName(v: unknown): string | undefined {
   return undefined;
 }
 
-export function summarizeIssue(issue: JiraIssue): JiraIssueSummary {
+export function summarizeIssue(issue: JiraIssue, fields: JiraFieldIds = JIRA_FIELDS): JiraIssueSummary {
   const f = issue.fields;
-  const points = f[JIRA_FIELDS.storyPoints];
+  const points = f[fields.storyPoints];
   return {
     key: issue.key,
     url: browseUrl(issue),
@@ -295,7 +302,7 @@ export function summarizeIssue(issue: JiraIssue): JiraIssueSummary {
     labels: f.labels ?? [],
     epic: f.parent ? { key: f.parent.key, summary: f.parent.fields.summary } : undefined,
     storyPoints: typeof points === 'number' ? points : undefined,
-    sprint: sprintName(f[JIRA_FIELDS.sprint]),
+    sprint: sprintName(f[fields.sprint]),
     updated: f.updated ?? '',
   };
 }

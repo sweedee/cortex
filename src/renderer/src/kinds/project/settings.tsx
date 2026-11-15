@@ -5,6 +5,7 @@
  * the GitHub repo (`git:remoteRepo`), the current branch, a worktrees folder next to it and
  * npm scripts from `package.json`.
  */
+import { userConfig } from '../../data/config';
 import { gitOps } from '../../data/git';
 import type { ItemOf } from '../../domain';
 import { place } from '../../layout';
@@ -12,12 +13,12 @@ import { native } from '../../native';
 import { addItem, getState, makeItem, patchData, select } from '../../store';
 import { openForm, str, type FormValues } from '../../ui/form';
 import { toast } from '../common';
+import { worktreesDirFor } from './worktreeModel';
 
 type Project = ItemOf<'project'>;
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 const sep = (p: string) => (p.includes('\\') && !p.includes('/') ? '\\' : '/');
-const parentOf = (p: string) => p.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]+$/, '');
 const baseName = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
 
 /** What a picked base checkout tells us (only fills fields that are still empty / defaults). */
@@ -25,10 +26,11 @@ export async function detectFromBaseDir(dir: string, v: FormValues): Promise<Par
   const patch: Partial<FormValues> = {};
   const name = str(v, 'name') || baseName(dir);
   if (!str(v, 'name')) patch.name = name;
-  if (!str(v, 'worktreesDir')) patch.worktreesDir = `${parentOf(dir)}${sep(dir)}wt${sep(dir)}${name}`;
+  const { worktreesDir, defaultBranch } = userConfig().git;
+  if (!str(v, 'worktreesDir')) patch.worktreesDir = worktreesDirFor(dir, worktreesDir, name);
   const git = await gitOps.detect(dir).catch(() => null);
   if (git?.repo && (!str(v, 'repo') || !REPO.test(str(v, 'repo')) || str(v, 'repo').startsWith('unknown/'))) patch.repo = git.repo;
-  if (git?.branch && (!str(v, 'defaultBranch') || str(v, 'defaultBranch') === 'main')) patch.defaultBranch = git.branch;
+  if (git?.branch && (!str(v, 'defaultBranch') || str(v, 'defaultBranch') === defaultBranch)) patch.defaultBranch = git.branch;
   try {
     const pkg = JSON.parse(await native.fs.readText(`${dir}${sep(dir)}package.json`)) as { scripts?: Record<string, string> };
     const scripts = pkg.scripts ?? {};
@@ -62,7 +64,7 @@ export async function openProjectSettings(project?: Project, at?: { x: number; y
       { name: 'baseDir', label: 'Base checkout', type: 'directory', hint: 'The main clone of the repo; agents and git run here.' },
       { name: 'name', label: 'Name', type: 'text', required: true },
       { name: 'repo', label: 'GitHub repo', type: 'text', required: true, placeholder: 'owner/name', validate: (x) => (REPO.test(String(x)) ? undefined : 'Use owner/name') },
-      { name: 'defaultBranch', label: 'Default branch', type: 'text', required: true, default: 'main' },
+      { name: 'defaultBranch', label: 'Default branch', type: 'text', required: true, default: userConfig().git.defaultBranch },
       { name: 'worktreesDir', label: 'Worktrees folder', type: 'directory', hint: 'New worktrees are created in here.' },
       { name: 'startCommand', label: 'Start command', type: 'text', placeholder: 'npm run dev', hint: 'Runs in a shell, from the checkout or worktree.' },
       { name: 'testCommand', label: 'Test command', type: 'text', placeholder: 'npm test' },

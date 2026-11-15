@@ -8,6 +8,7 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { Chip, ProgressCircle } from '@dynatrace/strato-components/content';
 import { CriticalIcon, ExternalLinkIcon, MinusIcon, PendingIcon, PlusIcon, SuccessIcon } from '@dynatrace/strato-icons';
 import type { GhCheck, GhPullRequest } from '../../../../shared/integrations/github';
+import { userConfig } from '../../data/config';
 import { usePr, usePrChecks, usePrDiff } from '../../data/gh';
 import type { ItemOf } from '../../domain';
 import { isDesktop } from '../../native';
@@ -21,7 +22,7 @@ import { toast } from '../common';
 import type { KindCtx, SidebarProps } from '../types';
 import { retargetPr } from './actions';
 import { planBuildSync } from './builds';
-import { isRealRepo, needsRetarget, prUrl } from './logic';
+import { isAiReviewer, isRealRepo, needsRetarget, prUrl } from './logic';
 import './pr.css';
 
 type Pr = ItemOf<'pr'>;
@@ -276,6 +277,7 @@ const ORDER: Record<GhCheck['bucket'], number> = { fail: 0, cancel: 1, pending: 
 function Comments({ view }: { view: GhPullRequest }) {
   const all = view.comments ?? [];
   const shown = all.slice(-COMMENTS);
+  const bot = userConfig().github.aiReviewBot;
   return (
     <SidebarSection label={`Comments${all.length ? ` · ${all.length}` : ''}`}>
       {all.length > shown.length && (
@@ -287,6 +289,7 @@ function Comments({ view }: { view: GhPullRequest }) {
         <div key={c.id} className="pr-comment">
           <div className="pr-comment-head">
             <strong>{c.author.login}</strong>
+            {isAiReviewer(c.author.login, bot) && <Chip size="condensed">AI review</Chip>}
             <span className="subdued">{agoText(Date.parse(c.createdAt))}</span>
           </div>
           <Markdown source={c.body} onLinkClick={(h) => void openUrl(h)} className="pr-md" />

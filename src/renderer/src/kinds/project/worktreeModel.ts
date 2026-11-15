@@ -1,11 +1,12 @@
 /**
  * Pure helpers of the "new worktree" flow (project action, ticket action, "add to canvas" for
  * worktrees found on disk): branch names, paths and the arguments for `gitOps.worktreeAdd`.
+ * Templates come from config.json (`git.branchTemplate`, `git.worktreesDir`); callers pass them.
  */
+import { DEFAULT_USER_CONFIG, renderBranchTemplate } from '../../../../shared/userConfig';
 
 export const isAbsolutePath = (p: string) => /^([a-zA-Z]:[\\/]|\/|\\\\)/.test(p);
 const sepOf = (p: string) => (p.includes('\\') && !p.includes('/') ? '\\' : '/');
-const parentOf = (p: string) => p.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]+$/, '');
 const leafOf = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
 
 /** Same folder? Ignores slash style, trailing slashes and (Windows drive paths) case. */
@@ -29,20 +30,39 @@ export function slugify(text: string, max = 40): string {
   return (at > max / 2 ? cut.slice(0, at) : cut).replace(/-+$/, '');
 }
 
-/** `<KEY>-<slug>` for a ticket. */
-export const branchForTicket = (key: string, title: string) => [key, slugify(title)].filter(Boolean).join('-');
+/** A ticket's branch from config.json `git.branchTemplate` (`{key}`, `{slug}`; default `{key}-{slug}` → `CTX-12-retry`). */
+export const branchForTicket = (key: string, title: string, template = DEFAULT_USER_CONFIG.git.branchTemplate) => renderBranchTemplate(template, { key, slug: slugify(title) });
 
 /** The Jira key a branch name mentions (`feat/CTX-12-x` -> `CTX-12`). */
 export const ticketKeyOf = (branch: string): string | undefined => /[A-Z][A-Z0-9]+-\d+/.exec(branch)?.[0];
 
-/** `<worktreesDir>/<branch>`; without a configured folder: `wt/<name>` next to the base checkout. '' = nothing to go on. */
-export function defaultWorktreePath(p: { baseDir?: string; worktreesDir?: string }, branch: string): string {
+/**
+ * A project's worktrees folder from config.json `git.worktreesDir`: absolute, or relative to the base
+ * checkout (`..` allowed); `{repo}` = `repo` (default: the checkout's folder name). Default
+ * `../wt/{repo}`: `C:/code/app` → `C:/code/wt/app`.
+ */
+export function worktreesDirFor(baseDir: string, template = DEFAULT_USER_CONFIG.git.worktreesDir, repo = leafOf(baseDir)): string {
+  const t = template.trim().split('{repo}').join(repo);
+  const sep = sepOf(baseDir);
+  if (isAbsolutePath(t)) return t.replace(/[\\/]+$/, '');
+  const parts = baseDir.replace(/[\\/]+$/, '').split(/[\\/]/);
+  for (const seg of t.split(/[\\/]+/)) {
+    if (!seg || seg === '.') continue;
+    if (seg === '..') {
+      if (parts.length > 1) parts.pop();
+    } else parts.push(seg);
+  }
+  return parts.join(sep);
+}
+
+/** `<worktreesDir>/<branch>`; without a configured folder: config.json `git.worktreesDir` (default `wt/<name>` next to the base checkout). '' = nothing to go on. */
+export function defaultWorktreePath(p: { baseDir?: string; worktreesDir?: string }, branch: string, template = DEFAULT_USER_CONFIG.git.worktreesDir): string {
   const name = branch.trim();
   if (!name) return '';
   const dir = p.worktreesDir?.trim();
   if (dir) return `${dir.replace(/[\\/]+$/, '')}${sepOf(dir)}${name}`;
   const base = p.baseDir?.trim();
-  return base ? `${parentOf(base)}${sepOf(base)}wt${sepOf(base)}${leafOf(base)}${sepOf(base)}${name}` : '';
+  return base ? `${worktreesDirFor(base, template)}${sepOf(base)}${name}` : '';
 }
 
 /** The project can host worktrees: it has an absolute base checkout. */

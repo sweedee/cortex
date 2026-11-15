@@ -19,6 +19,8 @@ export const qk = {
     all: ['app'] as const,
     info: () => ['app', 'info'] as const,
     config: () => ['app', 'config'] as const,
+    /** config.json (`config:get`; kept fresh by `config:changed`) */
+    userConfig: () => ['app', 'userConfig'] as const,
   },
   git: {
     all: ['git'] as const,

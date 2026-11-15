@@ -12,13 +12,29 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { ColorBy, DataOf, Filter, Item, ItemOf, Kind, Link, NewItem, Notice, Prefs, Segment } from './domain';
 import { DEFAULT_PREFS, rootsOf, STATUS_GROUPS } from './domain';
-import { notifyPermitted } from './native';
+import { DEFAULT_USER_CONFIG, type ConfigPermissionMode } from '../../shared/userConfig';
+import type { ClaudeEffort } from '../../shared/integrations/claude';
 
 export type { ColorBy, Filter } from './domain';
 
-/** Persisted settings for integrations and layout (part of the workspace prefs, v2). */
-export type Settings = Pick<Prefs, 'model' | 'effort' | 'permissionMode' | 'aiReviewComment' | 'refreshSec' | 'sidebarWidth'>;
-const settingsOf = (p: Prefs): Settings => ({ model: p.model, effort: p.effort, permissionMode: p.permissionMode, aiReviewComment: p.aiReviewComment, refreshSec: p.refreshSec, sidebarWidth: p.sidebarWidth });
+/**
+ * Settings: all but `sidebarWidth` mirror `~/.cortex/config.json` (kept in sync both ways by
+ * `data/config.ts`); `sidebarWidth` is workspace UI state.
+ */
+export interface Settings {
+  model?: string;
+  effort?: ClaudeEffort;
+  permissionMode: ConfigPermissionMode;
+  aiReviewComment: string;
+  refreshSec: number;
+  sidebarWidth: number;
+}
+const DEFAULT_SETTINGS: Settings = {
+  permissionMode: DEFAULT_USER_CONFIG.claude.permissionMode,
+  aiReviewComment: DEFAULT_USER_CONFIG.github.aiReviewComment,
+  refreshSec: DEFAULT_USER_CONFIG.refresh.intervalSec,
+  sidebarWidth: DEFAULT_PREFS.sidebarWidth,
+};
 
 export type Dialog =
   | { type: 'add'; kind: Kind; at: { x: number; y: number } }
@@ -86,8 +102,8 @@ const initial = (): State => ({
   inspected: null,
   colorBy: DEFAULT_PREFS.colorBy,
   desktopNotify: false,
-  soundOn: DEFAULT_PREFS.soundOn,
-  settings: settingsOf(DEFAULT_PREFS),
+  soundOn: DEFAULT_USER_CONFIG.ui.sound,
+  settings: DEFAULT_SETTINGS,
   sync: {},
 });
 
@@ -421,7 +437,7 @@ export const setSoundOn = (on: boolean) => setState((s) => ({ ...s, soundOn: on 
 export const setSettings = (patch: Partial<Settings>) => setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
 
 /** The persisted prefs of a state (a new object each call: don't use it as a `useStore` selector). */
-export const prefsOf = (s: State): Prefs => ({ desktopNotify: s.desktopNotify, soundOn: s.soundOn, colorBy: s.colorBy, filter: s.filter, ...s.settings });
+export const prefsOf = (s: State): Prefs => ({ colorBy: s.colorBy, filter: s.filter, sidebarWidth: s.settings.sidebarWidth });
 
 /** Replace the whole world (workspace load / reset); drops selection and other pointers into the old one. */
 export const replaceWorld = (items: Item[], links: Link[], prefs?: Prefs) =>
@@ -436,12 +452,9 @@ export const replaceWorld = (items: Item[], links: Link[], prefs?: Prefs) =>
     search: null,
     dialog: null,
     ...(prefs && {
-      // desktop notifications also need the OS / browser permission
-      desktopNotify: prefs.desktopNotify && notifyPermitted(),
-      soundOn: prefs.soundOn,
       colorBy: prefs.colorBy,
       filter: prefs.filter ?? EMPTY_FILTER,
-      settings: settingsOf({ ...DEFAULT_PREFS, ...prefs }),
+      settings: { ...s.settings, sidebarWidth: prefs.sidebarWidth ?? DEFAULT_PREFS.sidebarWidth },
     }),
   }));
 

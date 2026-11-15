@@ -1,11 +1,13 @@
 /**
- * Record discovery: for every project with a real base checkout, scan `<baseDir>/records/**\/*.md`,
+ * Record discovery: for every project with a real base checkout, scan `<baseDir>/<records.dir>/**\/*.md`
+ * (config.json `records.dir`, default `records`),
  * add / refresh `record` items (keyed by path, never duplicated) and keep watching the folder.
  * Started once from `sync/` via `startRecordDiscovery()` (desktop only).
  */
 import type { ItemOf } from '../../domain';
 import { isDesktop, native } from '../../native';
 import { addItem, addLink, getState, makeItem, patchData, subscribe } from '../../store';
+import { userConfig } from '../../data/config';
 import { isAbsolutePath, planDiscovery, type FoundRecord } from './model';
 
 type Project = ItemOf<'project'>;
@@ -25,7 +27,10 @@ interface Watch {
 const watches = new Map<string, Watch>(); // by project id
 
 const sep = (p: string) => (p.includes('\\') && !p.includes('/') ? '\\' : '/');
-export const recordsDir = (baseDir: string) => `${baseDir.replace(/[\\/]+$/, '')}${sep(baseDir)}records`;
+/** config.json `records.dir` as path segments (`.cortex/records` → ['.cortex', 'records']) */
+const recordsSegments = (rel: string) => rel.split(/[\\/]+/).filter((s) => s && s !== '.');
+/** `<baseDir>/<rel>` with the base's separator (`rel`: config.json `records.dir`, relative, no `..`). */
+export const recordsDir = (baseDir: string, rel = userConfig().records.dir) => [baseDir.replace(/[\\/]+$/, ''), ...recordsSegments(rel)].join(sep(baseDir));
 
 /** Scan one project's records folder and apply the plan to the store. Returns the number of changes. */
 export async function scanProject(project: Project): Promise<number> {
@@ -65,10 +70,18 @@ export async function scanProject(project: Project): Promise<number> {
   return plan.add.length + plan.update.length;
 }
 
-/** `<baseDir>/records` exists (listing the base checkout, not the folder itself, never throws ENOENT). */
-async function hasRecordsDir(baseDir: string): Promise<boolean> {
-  const entries = await native.fs.list(baseDir, { glob: 'records' }).catch(() => []);
-  return entries.some((e) => e.isDir && e.name === 'records');
+/**
+ * The records folder exists: lists each parent for the next segment instead of the folder itself, so
+ * a missing folder never throws ENOENT (and never logs an IPC error every poll).
+ */
+async function hasRecordsDir(baseDir: string, rel = userConfig().records.dir): Promise<boolean> {
+  let dir = baseDir.replace(/[\\/]+$/, '');
+  for (const seg of recordsSegments(rel)) {
+    const entries = await native.fs.list(dir, { glob: seg }).catch(() => []);
+    if (!entries.some((e) => e.isDir && e.name === seg)) return false;
+    dir = `${dir}${sep(baseDir)}${seg}`;
+  }
+  return true;
 }
 
 async function startWatch(project: Project, w: Watch) {
@@ -148,8 +161,11 @@ export function startRecordDiscovery(): () => void {
       }, RESCAN_MS);
     }
   });
+  // config.json `records.dir` changed: watch the new folders (once data/config.ts has applied it)
+  const unsubConfig = native.config.onChanged(() => setTimeout(reconcileWatches, 0));
   return () => {
     started = false;
+    unsubConfig();
     unsubStore();
     unsubFs();
     for (const w of watches.values()) stopWatch(w);

@@ -479,3 +479,30 @@ export interface CortexApi {
   /** typed subscription to any event channel; returns an unsubscribe function */
   on<C extends EventChannel>(channel: C, cb: (payload: EventChannels[C]) => void): Unsubscribe;
 }
+
+// =============================================================================================
+// User config: `<userData>/config.json` (`./userConfig.ts`). `config:update` takes only the keys the
+// renderer may change (`RendererConfigPatchSchema`); `config:changed` follows edits of the file.
+// =============================================================================================
+
+import type { ConfigUpdateRequest, UserConfigPatch, UserConfigState } from './userConfig';
+
+export interface InvokeChannels {
+  'config:get': [void, UserConfigState];
+  'config:update': [ConfigUpdateRequest, UserConfigState];
+}
+
+export interface EventChannels {
+  'config:changed': UserConfigState;
+}
+
+EVENT_CHANNELS.push('config:changed');
+
+export interface CortexApi {
+  config: {
+    get(): Promise<UserConfigState>;
+    /** merge a patch into config.json (validated in main); `ifUnset`: only keys the file doesn't set */
+    update(patch: UserConfigPatch, opts?: { ifUnset?: boolean }): Promise<UserConfigState>;
+    onChanged(cb: (s: UserConfigState) => void): Unsubscribe;
+  };
+}

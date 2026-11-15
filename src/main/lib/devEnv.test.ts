@@ -11,6 +11,7 @@ describe('stripDevEnv', () => {
     JIRA_MOCK_DB: '/x/db.json',
     CORTEX_USER_DATA: '/tmp/profile',
     CORTEX_JIRA_CLI: 'mock',
+    CORTEX_AI_REVIEW_COMMENT: '/review',
     GH_TOKEN: 'secret',
   });
 
@@ -22,8 +23,8 @@ describe('stripDevEnv', () => {
 
   it('drops the dev-only keys in a packaged build and keeps the rest', () => {
     const e: NodeJS.ProcessEnv = env();
-    expect(stripDevEnv(e, true).sort()).toEqual(['CORTEX_CLAUDE_BIN', 'CORTEX_JIRA_MOCK_SCRIPT', 'CORTEX_SMOKE', 'CORTEX_SMOKE_E2E', 'ELECTRON_RENDERER_URL', 'JIRA_MOCK_DB']);
-    expect(e).toEqual({ CORTEX_USER_DATA: '/tmp/profile', CORTEX_JIRA_CLI: 'mock', GH_TOKEN: 'secret' });
+    expect(stripDevEnv(e, true).sort()).toEqual(['CORTEX_AI_REVIEW_COMMENT', 'CORTEX_CLAUDE_BIN', 'CORTEX_JIRA_CLI', 'CORTEX_JIRA_MOCK_SCRIPT', 'CORTEX_SMOKE', 'CORTEX_SMOKE_E2E', 'ELECTRON_RENDERER_URL', 'JIRA_MOCK_DB']);
+    expect(e).toEqual({ CORTEX_USER_DATA: '/tmp/profile', GH_TOKEN: 'secret' });
   });
 
   it('matches by name', () => {

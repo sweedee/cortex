@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseRequest } from '../lib/validate';
+import { parseUserConfig } from '../../shared/userConfig';
 import { jiraCliSpec, resolveConfig } from './config';
 import { createServices } from '.';
 
@@ -11,6 +12,37 @@ describe('integration config', () => {
     expect(c.github.aiReviewComment).toBe('/review');
     expect(c.claude.bin).toBe('C:/bin/claude.exe');
     expect(resolveConfig({}).github.aiReviewComment).toBe('@claude review');
+  });
+
+  it('resolves DEFAULT_CONFIG ← config.json ← env', () => {
+    const user = parseUserConfig({
+      claude: { bin: 'C:/tools/claude.exe' },
+      github: { aiReviewComment: '/review please', aiReviewBot: 'reviewer[bot]', renovate: { app: 'dependabot', label: 'dependencies' } },
+      jira: { site: 'https://acme.atlassian.net/' },
+    });
+    const fromFile = resolveConfig({}, user);
+    expect(fromFile.claude.bin).toBe('C:/tools/claude.exe');
+    expect(fromFile.github).toEqual({ aiReviewComment: '/review please', aiReviewBot: 'reviewer[bot]', renovateApp: 'dependabot', renovateLabel: 'dependencies' });
+    expect(fromFile.jira).toMatchObject({ cli: 'acli', site: 'https://acme.atlassian.net' });
+    // env (dev builds only: a packaged build strips these first, lib/devEnv.ts) wins over the file
+    const env = resolveConfig({ CORTEX_AI_REVIEW_COMMENT: '/env', CORTEX_CLAUDE_BIN: '/env/claude', CORTEX_JIRA_SITE: 'https://env.atlassian.net', CORTEX_RENOVATE_APP: 'renovate-env' }, user);
+    expect(env.github).toMatchObject({ aiReviewComment: '/env', aiReviewBot: 'reviewer[bot]', renovateApp: 'renovate-env' });
+    expect(env.claude.bin).toBe('/env/claude');
+    expect(env.jira.site).toBe('https://env.atlassian.net');
+    // without either: the shared defaults
+    expect(resolveConfig({}).github).toEqual({ aiReviewComment: '@claude review', aiReviewBot: 'claude[bot]', renovateApp: 'renovate', renovateLabel: 'renovate' });
+  });
+
+  it('jira.cli from config.json: mock is a deliberate choice; a fixed site survives the mock', () => {
+    expect(resolveConfig({}, parseUserConfig({ jira: { cli: 'mock' } })).jira).toMatchObject({ cli: 'mock', explicit: true, site: 'https://example.atlassian.net' });
+    expect(resolveConfig({ CORTEX_JIRA_CLI: 'acli' }, parseUserConfig({ jira: { cli: 'mock' } })).jira.cli).toBe('acli');
+    expect(resolveConfig({ CORTEX_SMOKE: '1' }, parseUserConfig({ jira: { site: 'https://acme.atlassian.net' } })).jira).toMatchObject({ cli: 'mock', site: 'https://acme.atlassian.net' });
+  });
+
+  it('applies config.json changes while running (GitHub settings)', () => {
+    const s = createServices({ appRoot: 'C:/app', userData: 'C:/ud', isElectron: false }, () => {}, {});
+    s.setUserConfig(parseUserConfig({ github: { aiReviewComment: '/now' } }));
+    expect(s.config.github.aiReviewComment).toBe('/now');
   });
 
   it('resolves the Jira CLI: mock via node (Electron as node), or acli', () => {

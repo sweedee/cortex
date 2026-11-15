@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SEED_ITEMS, SEED_LINKS } from '../testing/fakeWorld';
 import v0 from './fixtures/workspace-v0.json';
 import v1 from './fixtures/workspace-v1.json';
-import { DEFAULT_PREFS, migrate, parseWorkspace } from './migrations';
+import v3 from './fixtures/workspace-v3.json';
+import { DEFAULT_PREFS, migrate, movedPrefsPatch, parseWorkspace } from './migrations';
 import { KindSchema, WORKSPACE_VERSION, WorkspaceSchema } from './schemas';
 import type { Item, ItemOf, Kind } from './types';
 
@@ -88,11 +89,12 @@ describe('migration v1 → v2 (phase-2b settings)', () => {
   const r = parseWorkspace(v1);
   if (!r.ok) throw new Error(r.error);
 
-  it('adds the new prefs with their defaults and keeps the old ones', () => {
+  it('adds the new prefs with their defaults and keeps the old ones (the user settings move on in v4)', () => {
     expect(r.migrated).toBe(true);
     expect(r.workspace.version).toBe(WORKSPACE_VERSION);
-    expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, desktopNotify: true, soundOn: false, colorBy: 'ticket', permissionMode: 'default', refreshSec: 60, sidebarWidth: 360 });
-    expect(r.workspace.prefs.model).toBeUndefined();
+    expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, colorBy: 'ticket', sidebarWidth: 360 });
+    // the v2 defaults (permission mode, refresh) are not frozen into config.json
+    expect(r.movedPrefs).toEqual({ ui: { notifications: true, sound: false } });
   });
 
   it('keeps items and links as they are', () => {
@@ -106,7 +108,8 @@ describe('migration v1 → v2 (phase-2b settings)', () => {
 
   it('falls back to defaults for bad new prefs instead of resetting all prefs', () => {
     const bad = parseWorkspace({ ...v1, version: 2, prefs: { ...v1.prefs, refreshSec: 1, permissionMode: 'yolo', sidebarWidth: 'wide' } });
-    expect(bad.ok && bad.workspace.prefs).toMatchObject({ soundOn: false, refreshSec: 60, permissionMode: 'default', sidebarWidth: 360 });
+    expect(bad.ok && bad.workspace.prefs).toMatchObject({ colorBy: 'ticket', sidebarWidth: 360 });
+    expect(bad.ok && bad.movedPrefs).toEqual({ ui: { notifications: true, sound: false } });
   });
 });
 
@@ -134,13 +137,13 @@ describe('parseWorkspace', () => {
 
   it('drops single invalid items, duplicates and an outdated filter', () => {
     const bad = { ...SEED_ITEMS[0], id: 'bad', data: { repo: 'not a repo' } };
-    const r = parseWorkspace({ ...current, items: [...SEED_ITEMS, bad, SEED_ITEMS[1]], prefs: { soundOn: false, filter: { hiddenKinds: ['plan'] } } });
+    const r = parseWorkspace({ ...current, items: [...SEED_ITEMS, bad, SEED_ITEMS[1]], prefs: { sidebarWidth: 500, filter: { hiddenKinds: ['plan'] } } });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.workspace.items).toHaveLength(SEED_ITEMS.length);
     expect(r.warnings.filter((w) => w.startsWith('dropped'))).toHaveLength(2);
     // the outdated filter goes, the rest of the prefs survives
-    expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, soundOn: false, filter: undefined });
+    expect(r.workspace.prefs).toEqual({ ...DEFAULT_PREFS, sidebarWidth: 500, filter: undefined });
   });
 });
 
@@ -170,7 +173,38 @@ describe('migration v2 to v3 (filter selects kinds to show)', () => {
 
   it('keeps a file without a filter', () => {
     const r = parseWorkspace(file());
-    expect(r.ok && r.workspace.version).toBe(3);
+    expect(r.ok && r.workspace.version).toBe(WORKSPACE_VERSION);
     expect(r.ok && r.workspace.prefs.filter).toBeUndefined();
+  });
+});
+
+describe('migration v3 → v4 (user settings move to config.json)', () => {
+  const r = parseWorkspace(v3);
+  if (!r.ok) throw new Error(r.error);
+
+  it('keeps the UI state in the workspace', () => {
+    expect(r.migrated).toBe(true);
+    expect(r.workspace.prefs).toEqual({ colorBy: 'ticket', sidebarWidth: 420, filter: v3.prefs.filter });
+    expect(r.workspace.prefs).not.toHaveProperty('model');
+    expect(r.workspace.items).toHaveLength(1);
+  });
+
+  it('hands the settings over as a config.json patch (defaults left out)', () => {
+    expect(r.movedPrefs).toEqual({
+      claude: { model: 'claude-opus-5-5', effort: 'high', permissionMode: 'acceptEdits' },
+      github: { aiReviewComment: '/review' },
+      ui: { notifications: true, sound: false },
+    });
+  });
+
+  it('drops invalid and default values one by one', () => {
+    expect(movedPrefsPatch({ effort: 'ludicrous', permissionMode: 'yolo', refreshSec: 5, soundOn: true, model: '', aiReviewComment: '@claude review' })).toBeUndefined();
+    expect(movedPrefsPatch({ refreshSec: 120, effort: 'nope' })).toEqual({ refresh: { intervalSec: 120 } });
+    expect(movedPrefsPatch(undefined)).toBeUndefined();
+  });
+
+  it('a current file has nothing to move', () => {
+    const cur = parseWorkspace({ version: WORKSPACE_VERSION, items: [], links: [], prefs: DEFAULT_PREFS });
+    expect(cur.ok && cur.movedPrefs).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { branchForTicket, defaultWorktreePath, samePath, slugify, ticketKeyOf, untrackedWorktrees, worktreeAddArgs, worktreeHandle } from './worktreeModel';
+import { branchForTicket, defaultWorktreePath, samePath, slugify, ticketKeyOf, untrackedWorktrees, worktreeAddArgs, worktreeHandle, worktreesDirFor } from './worktreeModel';
 
 describe('worktree model', () => {
   it('slugifies and builds ticket branches', () => {
@@ -16,6 +16,22 @@ describe('worktree model', () => {
     expect(defaultWorktreePath({ baseDir: '/home/me/code/app' }, 'x')).toBe('/home/me/code/wt/app/x');
     expect(defaultWorktreePath({}, 'x')).toBe('');
     expect(defaultWorktreePath({ worktreesDir: '/w' }, ' ')).toBe('');
+  });
+
+  it('uses the configured branch template (git.branchTemplate)', () => {
+    expect(branchForTicket('CTX-4821', 'Retry: back-off', '{key}-{slug}')).toBe('CTX-4821-retry-back-off');
+    expect(branchForTicket('CTX-4821', 'Retry: back-off', 'feat/{key}-{slug}')).toBe('feat/CTX-4821-retry-back-off');
+    expect(branchForTicket('CTX-4821', 'Retry', 'sven/{key}')).toBe('sven/CTX-4821');
+    expect(branchForTicket('CTX-1', '', 'feat/{key}-{slug}')).toBe('feat/CTX-1');
+  });
+
+  it('resolves the worktrees folder template (git.worktreesDir)', () => {
+    expect(worktreesDirFor('C:\\code\\app')).toBe('C:\\code\\wt\\app');
+    expect(worktreesDirFor('/home/me/code/app/', '../wt/{repo}')).toBe('/home/me/code/wt/app');
+    expect(worktreesDirFor('/home/me/code/app', '.worktrees')).toBe('/home/me/code/app/.worktrees');
+    expect(worktreesDirFor('/home/me/code/app', '/srv/wt/{repo}', 'my-app')).toBe('/srv/wt/my-app');
+    expect(worktreesDirFor('/app', '../../../x')).toBe('/x');
+    expect(defaultWorktreePath({ baseDir: '/home/me/code/app' }, 'x', '../{repo}-worktrees')).toBe('/home/me/code/app-worktrees/x');
   });
 
   it('compares paths loosely', () => {

@@ -1,0 +1,42 @@
+{
+  "version": 3,
+  "items": [
+    {
+      "id": "p-ingest",
+      "kind": "project",
+      "handle": "ingest-gateway",
+      "title": "ingest-gateway",
+      "createdAt": 1763000000000,
+      "updatedAt": 1763000000000,
+      "data": {
+        "repo": "ctx-observability/ingest-gateway",
+        "baseDir": "~/code/ingest-gateway",
+        "defaultBranch": "main",
+        "stats": {
+          "mainChecks": "success",
+          "openPrs": 3
+        }
+      }
+    }
+  ],
+  "links": [],
+  "prefs": {
+    "desktopNotify": true,
+    "soundOn": false,
+    "colorBy": "ticket",
+    "filter": {
+      "kinds": [],
+      "status": [],
+      "projects": [],
+      "query": "",
+      "unreadOnly": false,
+      "showArchived": false
+    },
+    "model": "claude-opus-5-5",
+    "effort": "high",
+    "permissionMode": "acceptEdits",
+    "aiReviewComment": "/review",
+    "refreshSec": 60,
+    "sidebarWidth": 420
+  }
+}

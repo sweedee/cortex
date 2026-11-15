@@ -1,4 +1,5 @@
 import { CodeIcon, DeleteIcon, DesktopIcon, UploadIcon } from '@dynatrace/strato-icons';
+import { userConfig } from '../../data/config';
 import type { ItemOf, Segment } from '../../domain';
 import { openInEditorAction, openPathAction, skill } from '../common';
 import { FlaskIcon } from '../icons';
@@ -97,7 +98,7 @@ export const worktree: KindModule<'worktree'> = {
         data: {
           path: `${dir}/${leaf}`,
           branch: v,
-          baseBranch: proj?.data.defaultBranch ?? 'main',
+          baseBranch: proj?.data.defaultBranch ?? userConfig().git.defaultBranch,
           ticketKey: v.match(/[A-Z][A-Z0-9]+-\d+/)?.[0],
           git: { ahead: 0, behind: 0, dirty: false, changedFiles: 0 },
         },

@@ -7,6 +7,7 @@
  * Rule: nothing else in the renderer touches `window.cortex` (or node) directly.
  */
 import type { CortexApi, NotifyClickedEvent } from '../../shared/ipc';
+import { configProblems, mergePatch, parseUserConfig, RendererConfigPatchSchema, type UserConfigState } from '../../shared/userConfig';
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ declare global {
 export type { CortexApi } from '../../shared/ipc';
 
 const WORKSPACE_KEY = 'cortex.workspace';
+const CONFIG_KEY = 'cortex.config';
 
 const needsDesktop = (what: string) => () => Promise.reject(new Error(`${what} needs the Cortex desktop app (window.cortex is missing; running in a plain browser?)`));
 const noop = () => () => {};
@@ -76,7 +78,40 @@ function browserFallback(): CortexApi {
       setRoots: async () => [],
     },
     app: { info: async () => ({ platform: 'browser', userData: '', version: 'dev' }) },
+    config: configFallback(),
     ...integrationFallbacks(),
+  };
+}
+
+/** config.json in the browser: the same schema and patch rules, kept in localStorage. */
+function configFallback(): CortexApi['config'] {
+  const changed = new Set<(s: UserConfigState) => void>();
+  const raw = (): Record<string, unknown> => {
+    try {
+      const v: unknown = JSON.parse(localStorage.getItem(CONFIG_KEY) ?? '{}');
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+  const state = (r: Record<string, unknown>): UserConfigState => ({ config: parseUserConfig(r), path: `localStorage:${CONFIG_KEY}`, problems: configProblems(r) });
+  return {
+    get: async () => state(raw()),
+    update: async (patch, opts = {}) => {
+      const next = mergePatch(raw(), RendererConfigPatchSchema.parse(patch), opts.ifUnset);
+      try {
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
+      } catch {
+        /* private mode / quota */
+      }
+      const s = state(next);
+      changed.forEach((cb) => cb(s));
+      return s;
+    },
+    onChanged: (cb) => {
+      changed.add(cb);
+      return () => void changed.delete(cb);
+    },
   };
 }
 

@@ -6,7 +6,7 @@ import { makeItem } from '../../store';
 import { makeCtx } from '../registry';
 import { buildKey, checkToBuild, planBuildSync, runIdFromUrl } from './builds';
 import { pr as prKind } from './index';
-import { ghBlocked, isMergeable, mergeArgs, mergeBlocked, mergeWarnings, needsRetarget, prRing, retargetPlan, stackChildren, worktreeOf } from './logic';
+import { ghBlocked, isAiReviewer, isMergeable, mergeArgs, mergeBlocked, mergeWarnings, needsRetarget, prRing, retargetPlan, stackChildren, worktreeOf } from './logic';
 
 const seed = (id: string) => SEED_ITEMS.find((i) => i.id === id) as ItemOf<'pr'>;
 const withData = (p: ItemOf<'pr'>, d: Partial<PrData>): ItemOf<'pr'> => ({ ...p, data: { ...p.data, ...d } });
@@ -159,5 +159,15 @@ describe('builds from checks', () => {
     const data = checkToBuild(check({}), pr.data);
     const b = makeItem({ kind: 'build', handle: 'b', title: 'b', data });
     expect(planBuildSync([pr, b], pr, [check({})])).toEqual({ updates: [], creates: [] });
+  });
+});
+
+describe('AI review bot', () => {
+  it('matches the configured bot login with or without the [bot] / app/ decoration', () => {
+    expect(isAiReviewer('claude', 'claude[bot]')).toBe(true);
+    expect(isAiReviewer('claude[bot]', 'claude[bot]')).toBe(true);
+    expect(isAiReviewer('app/Claude', 'claude[bot]')).toBe(true);
+    expect(isAiReviewer('claudette', 'claude[bot]')).toBe(false);
+    expect(isAiReviewer(undefined, 'claude[bot]')).toBe(false);
   });
 });

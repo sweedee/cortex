@@ -8,6 +8,7 @@ import { AppRoot } from '@dynatrace/strato-components/core';
 import { showToast, ToastContainer } from '@dynatrace/strato-components/notifications';
 import { Canvas } from './canvas/Canvas';
 import { ChatBox } from './chat/ChatBox';
+import { startConfigSync } from './data/config';
 import { queryClient } from './data/queryClient';
 import { Dialogs } from './overlays/Dialogs';
 import { Hud } from './overlays/Hud';
@@ -22,6 +23,8 @@ import './index.css';
 async function boot() {
   // load before the first render, so the layout warms up on the stored world, not the seed
   const report = await loadWorkspace();
+  // ~/.cortex/config.json: the settings (and v3 workspace prefs moved there once), before sync reads them
+  await startConfigSync(report.movedPrefs);
   startAutosave();
   startSync();
   createRoot(document.getElementById('root')!).render(

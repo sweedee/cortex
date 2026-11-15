@@ -3,6 +3,7 @@
  * `worktree` bubble. Used by the project action and the ticket's "Create worktree"; the sidebar's
  * "add to canvas" for worktrees that exist on disk uses `addWorktreeBubble` directly.
  */
+import { userConfig } from '../../data/config';
 import { gitOps } from '../../data/git';
 import type { ItemOf } from '../../domain';
 import { place } from '../../layout';
@@ -55,11 +56,12 @@ export async function openNewWorktree(project: Project, opts: { ticket?: Ticket 
   const tickets = ticketsOf(project.id);
   if (opts.ticket && !tickets.some((t) => t.id === opts.ticket!.id)) tickets.push(opts.ticket);
   const byId = (id: string) => tickets.find((t) => t.id === id);
-  const branchOf = (t: Ticket) => branchForTicket(t.data.key, t.title);
+  const { branchTemplate, worktreesDir } = userConfig().git;
+  const branchOf = (t: Ticket) => branchForTicket(t.data.key, t.title, branchTemplate);
 
   const initialBranch = opts.ticket ? branchOf(opts.ticket) : '';
   // the last value we derived: a path the user typed over is left alone
-  let autoPath = defaultWorktreePath(project.data, initialBranch);
+  let autoPath = defaultWorktreePath(project.data, initialBranch, worktreesDir);
   let autoBranch = initialBranch;
 
   let created = null as ItemOf<'worktree'> | null;
@@ -93,11 +95,11 @@ export async function openNewWorktree(project: Project, opts: { ticket?: Ticket 
         if (!t || (str(v, 'branch') && str(v, 'branch') !== autoBranch)) return;
         autoBranch = branchOf(t);
         const patch: Record<string, string> = { branch: autoBranch };
-        if (!str(v, 'path') || str(v, 'path') === autoPath) patch.path = autoPath = defaultWorktreePath(project.data, autoBranch);
+        if (!str(v, 'path') || str(v, 'path') === autoPath) patch.path = autoPath = defaultWorktreePath(project.data, autoBranch, worktreesDir);
         return patch;
       }
       if (name === 'branch' && (!str(v, 'path') || str(v, 'path') === autoPath)) {
-        autoPath = defaultWorktreePath(project.data, str(v, 'branch'));
+        autoPath = defaultWorktreePath(project.data, str(v, 'branch'), worktreesDir);
         return { path: autoPath };
       }
     },

@@ -5,6 +5,7 @@ import { TextArea } from '@dynatrace/strato-components/forms';
 import { ExternalLinkIcon, StepIcon } from '@dynatrace/strato-icons';
 import { adfToMarkdown, summarizeIssue, type JiraIssue } from '../../../../shared/integrations/jira';
 import { Markdown, WebPanel } from '../../components/viewers';
+import { userConfig } from '../../data/config';
 import { jiraOps, useJiraIssue } from '../../data/jira';
 import { SidebarSection, SidebarTabs, SummarySection } from '../../sidebar';
 import { useStore } from '../../store';
@@ -20,7 +21,7 @@ const labelStyle = { fontSize: 11, color: 'var(--ink-faint)' } as const;
 function Fields({ item, issue }: { item: SidebarProps<'ticket'>['item']; issue?: JiraIssue }) {
   const d = item.data;
   const f = issue?.fields;
-  const s = issue ? summarizeIssue(issue) : undefined;
+  const s = issue ? summarizeIssue(issue, userConfig().jira.fields) : undefined;
   const points = s?.storyPoints ?? d.points;
   const sprint = s?.sprint ?? d.sprint;
   const parent = f?.parent;

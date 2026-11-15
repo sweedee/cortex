@@ -3,9 +3,7 @@
  * meter, token totals, cache hit rates, cost, turns, time; and the subagent tally.
  */
 import type { SessionUsage, SubagentInfo } from '../../../../shared/integrations/claude';
-
-/** Claude Code's default window, used until the CLI reports the real one with the first result. */
-export const DEFAULT_WINDOW = 200_000;
+import { userConfig } from '../../data/config';
 
 export interface UsageView {
   contextTokens: number;
@@ -32,8 +30,9 @@ const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : undef
 /** context bar tone: warning from 80 %, critical from 95 % */
 export const contextTone = (p: number): UsageView['tone'] => (p >= 95 ? 'critical' : p >= 80 ? 'warning' : 'normal');
 
-export function usageView(u: SessionUsage): UsageView {
-  const window = u.contextWindow || DEFAULT_WINDOW;
+/** `assumedWindow`: until the CLI reports the real window with the first result (config.json `claude.contextWindow`) */
+export function usageView(u: SessionUsage, assumedWindow = userConfig().claude.contextWindow): UsageView {
+  const window = u.contextWindow || assumedWindow;
   const contextPct = Math.min(100, Math.round((u.contextTokens / window) * 100));
   const last = u.last;
   return {

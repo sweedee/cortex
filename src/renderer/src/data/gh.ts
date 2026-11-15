@@ -65,7 +65,7 @@ export const ghOps = {
     await invalidate(qk.gh.pr(repo, number));
     return r;
   },
-  /** Posts the AI-review trigger comment (the `aiReviewComment` setting, else main's config). */
+  /** Posts the AI-review trigger comment (config.json `github.aiReviewComment`). */
   async requestAiReview(repo: string, number: number) {
     const r = await native.gh.prComment(repo, number, getState().settings.aiReviewComment);
     await invalidate(qk.gh.pr(repo, number));

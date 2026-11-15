@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 
-export const WORKSPACE_VERSION = 3;
+export const WORKSPACE_VERSION = 4;
 
 // ---- shared vocabulary ---------------------------------------------------------------------
 
@@ -295,29 +295,15 @@ export const FilterSchema = z.object({
 
 export const ColorBySchema = z.enum(['none', 'project', 'ticket']);
 
-/** Claude Code `--permission-mode` for new sessions ('default' = the CLI asks for tools it may not run). */
-/** `claude --permission-mode` choices (Claude Code 2.1.325) plus `default` = don't pass the flag */
-export const PermissionModeSchema = z.enum(['default', 'manual', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions']);
-
+/**
+ * Workspace UI state. Machine / user settings (Claude model, effort, permission mode, AI-review comment,
+ * refresh interval, notifications, sound) moved to `~/.cortex/config.json` in v4 (`shared/userConfig.ts`).
+ */
 export const PrefsSchema = z.object({
-  /** OS notifications for new notices */
-  desktopNotify: z.boolean(),
-  /** chime for new notices */
-  soundOn: z.boolean(),
   /** what bubbles are coloured by */
   colorBy: ColorBySchema,
   /** last filter; an outdated one (e.g. unknown kinds) is dropped rather than failing the prefs */
   filter: FilterSchema.optional().catch(undefined),
-  // v2: integrations / layout settings (a bad value falls back to its default instead of resetting all prefs)
-  /** Claude Code model for new sessions; unset = the CLI's default */
-  model: z.string().min(1).optional().catch(undefined),
-  permissionMode: PermissionModeSchema.catch('default'),
-  /** Claude Code `--effort` for new sessions; unset = the CLI's default */
-  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().catch(undefined),
-  /** PR comment that triggers the AI review; unset = main's config (`@claude review` / CORTEX_AI_REVIEW_COMMENT) */
-  aiReviewComment: z.string().min(1).optional().catch(undefined),
-  /** background refresh of the canvas caches (git stats, PR / ticket status), seconds */
-  refreshSec: z.number().int().min(10).max(3600).catch(60),
   /** details sidebar width, px */
   sidebarWidth: z.number().int().min(280).max(2400).catch(360),
 });

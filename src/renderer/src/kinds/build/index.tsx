@@ -1,5 +1,6 @@
 import { CycleIcon, DescriptionIcon, ExternalLinkIcon, RepairIcon } from '@dynatrace/strato-icons';
 import { showToast } from '@dynatrace/strato-components/notifications';
+import { userConfig } from '../../data/config';
 import { ghOps } from '../../data/gh';
 import type { ItemOf } from '../../domain';
 import { inspect, patchData } from '../../store';
@@ -98,7 +99,7 @@ export const build: KindModule<'build'> = {
         kind: 'build',
         handle: `build-${n}`,
         title: `${name} #${n}`,
-        data: { repo: proj?.data.repo ?? `unknown/${name}`, name, url: '', number: n, state: 'queued', branch: branch || 'main' },
+        data: { repo: proj?.data.repo ?? `unknown/${name}`, name, url: '', number: n, state: 'queued', branch: branch || userConfig().git.defaultBranch },
       };
     },
   },
