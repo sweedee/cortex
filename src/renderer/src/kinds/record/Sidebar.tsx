@@ -8,7 +8,8 @@ import { errorText, openUrl } from '../../ui/task';
 import { ConnectionsSection, FactsSection, SidebarSection, SummarySection } from '../../sidebar';
 import { toast } from '../common';
 import type { SidebarProps } from '../types';
-import { countSteps, isAbsolutePath, RECORD_HINT } from './model';
+import { countSteps, RECORD_HINT } from './model';
+import { isAbsolutePath } from '../../../../shared/paths';
 import { useRecordFile } from './useRecordFile';
 import './record.css';
 

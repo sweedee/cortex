@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { native } from '../../native';
 import { errorText } from '../../ui/task';
-import { dirOf, isAbsolutePath, normPath } from './model';
+import { dirOf, isAbsolutePath, normPath } from '../../../../shared/paths';
 
 export interface RecordFile {
   /** undefined until the first read finished */

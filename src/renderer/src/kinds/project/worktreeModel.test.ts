@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { branchForTicket, defaultWorktreePath, samePath, slugify, ticketKeyOf, untrackedWorktrees, worktreeAddArgs, worktreeHandle, worktreesDirFor } from './worktreeModel';
+import { ticketKeyOf } from '../../../../shared/util';
+import { samePath } from '../../../../shared/paths';
+import { branchForTicket, defaultWorktreePath, slugify, untrackedWorktrees, worktreeAddArgs, worktreeHandle, worktreesDirFor } from './worktreeModel';
 
 describe('worktree model', () => {
   it('slugifies and builds ticket branches', () => {

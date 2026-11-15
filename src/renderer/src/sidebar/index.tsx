@@ -7,7 +7,7 @@
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Chip } from '@dynatrace/strato-components/content';
-import type { Item } from '../domain';
+import { DEFAULT_SIDEBAR_WIDTH, type Item } from '../domain';
 import type { KindCtx, KindModule, SidebarProps } from '../kinds/types';
 import { camera } from '../layout';
 import { inspect, select } from '../store';
@@ -24,7 +24,7 @@ export interface SidebarLayout {
   /** current width, px */
   width: number;
 }
-export const SidebarLayoutContext = createContext<SidebarLayout>({ wide: false, setWide: () => {}, width: 360 });
+export const SidebarLayoutContext = createContext<SidebarLayout>({ wide: false, setWide: () => {}, width: DEFAULT_SIDEBAR_WIDTH });
 /** Width / expand state of the sidebar shell (e.g. a webview tab calls `setWide(true)`). */
 export const useSidebarLayout = () => useContext(SidebarLayoutContext);
 

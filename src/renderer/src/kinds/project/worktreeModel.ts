@@ -3,20 +3,8 @@
  * worktrees found on disk): branch names, paths and the arguments for `gitOps.worktreeAdd`.
  * Templates come from config.json (`git.branchTemplate`, `git.worktreesDir`); callers pass them.
  */
+import { baseName as leafOf, isAbsolutePath, samePath, sepOf } from '../../../../shared/paths';
 import { DEFAULT_USER_CONFIG, renderBranchTemplate } from '../../../../shared/userConfig';
-
-export const isAbsolutePath = (p: string) => /^([a-zA-Z]:[\\/]|\/|\\\\)/.test(p);
-const sepOf = (p: string) => (p.includes('\\') && !p.includes('/') ? '\\' : '/');
-const leafOf = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
-
-/** Same folder? Ignores slash style, trailing slashes and (Windows drive paths) case. */
-export function samePath(a: string, b: string): boolean {
-  const norm = (p: string) => {
-    const s = p.replace(/\\/g, '/').replace(/\/+$/, '');
-    return /^[a-zA-Z]:/.test(s) ? s.toLowerCase() : s;
-  };
-  return norm(a) === norm(b);
-}
 
 /** "Retry with exponential backoff!" -> "retry-with-exponential-backoff" (max `max` chars, cut at a word). */
 export function slugify(text: string, max = 40): string {
@@ -32,9 +20,6 @@ export function slugify(text: string, max = 40): string {
 
 /** A ticket's branch from config.json `git.branchTemplate` (`{key}`, `{slug}`; default `{key}-{slug}` → `CTX-12-retry`). */
 export const branchForTicket = (key: string, title: string, template = DEFAULT_USER_CONFIG.git.branchTemplate) => renderBranchTemplate(template, { key, slug: slugify(title) });
-
-/** The Jira key a branch name mentions (`feat/CTX-12-x` -> `CTX-12`). */
-export const ticketKeyOf = (branch: string): string | undefined => /[A-Z][A-Z0-9]+-\d+/.exec(branch)?.[0];
 
 /**
  * A project's worktrees folder from config.json `git.worktreesDir`: absolute, or relative to the base

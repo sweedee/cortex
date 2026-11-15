@@ -39,19 +39,18 @@ export type DoneResult = { ok: true; via: 'direct' | 'steps' } | { ok: false; er
  * `transition` is `jiraOps.transition` (injected for tests); `statuses` the project's workflow.
  */
 export async function transitionToDone(key: string, status: string, transition: (key: string, status: string) => Promise<void>, statuses: JiraStatusOption[] = MOCK_STATUS_OPTIONS): Promise<DoneResult> {
-  const text = ipcErrorMessage;
   const done = doneStatus(statuses);
   try {
     await transition(key, done);
     return { ok: true, via: 'direct' };
   } catch (direct) {
     const steps = stepsToDone(status, statuses).filter((s) => s !== done);
-    if (steps.length === 0) return { ok: false, error: text(direct) };
+    if (steps.length === 0) return { ok: false, error: ipcErrorMessage(direct) };
     try {
       for (const s of [...steps, done]) await transition(key, s);
       return { ok: true, via: 'steps' };
     } catch (e) {
-      return { ok: false, error: text(e) };
+      return { ok: false, error: ipcErrorMessage(e) };
     }
   }
 }

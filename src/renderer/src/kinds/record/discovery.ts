@@ -8,7 +8,8 @@ import type { ItemOf } from '../../domain';
 import { isDesktop, native } from '../../native';
 import { addItem, addLink, getState, makeItem, patchData, subscribe } from '../../store';
 import { userConfig } from '../../data/config';
-import { isAbsolutePath, planDiscovery, type FoundRecord } from './model';
+import { planDiscovery, type FoundRecord } from './model';
+import { isAbsolutePath } from '../../../../shared/paths';
 
 type Project = ItemOf<'project'>;
 

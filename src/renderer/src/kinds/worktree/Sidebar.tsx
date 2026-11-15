@@ -11,7 +11,8 @@ import { ConnectionsSection, FactsSection, SidebarSection, SidebarTabs, SummaryS
 import { agoText } from '../../tones';
 import { errorText } from '../../ui/task';
 import type { SidebarProps } from '../types';
-import { isAbsolutePath, statusLetter, WORKTREE_HINT } from './model';
+import { statusLetter, WORKTREE_HINT } from './model';
+import { isAbsolutePath } from '../../../../shared/paths';
 import './worktree.css';
 
 type Worktree = ItemOf<'worktree'>;

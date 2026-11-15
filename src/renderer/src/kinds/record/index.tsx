@@ -4,7 +4,8 @@ import { userConfig } from '../../data/config';
 import { inspect, patchData, select } from '../../store';
 import { openInEditorAction, openPathAction, paren, quoted, skill, toast } from '../common';
 import type { Action, KindModule } from '../types';
-import { dirOf, isAbsolutePath, recordTypeOf } from './model';
+import { recordTypeOf } from './model';
+import { dirOf, isAbsolutePath } from '../../../../shared/paths';
 import { RecordSidebar } from './Sidebar';
 
 const TYPE_LABEL: Record<RecordData['recordType'], string> = { plan: 'Plan', brainstorm: 'Brainstorm', grill: 'Grill', verification: 'Verification' };

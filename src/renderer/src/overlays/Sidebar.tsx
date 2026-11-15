@@ -9,6 +9,7 @@
  */
 import { MaximizeIcon, MinimizeIcon, XmarkIcon } from '@dynatrace/strato-icons';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import { DEFAULT_SIDEBAR_WIDTH } from '../domain';
 import { bubbleElement } from '../canvas/positions';
 import { kindIcon, kindLabel, sidebarOf, useCtx } from '../kinds/registry';
 import type { SidebarProps } from '../kinds/types';
@@ -25,7 +26,7 @@ const CANVAS_MIN = 160;
 const clampW = (w: number) => Math.round(Math.max(MIN_W, Math.min(w, window.innerWidth - CANVAS_MIN)));
 const wideW = () => clampW(Math.max(720, window.innerWidth * 0.62));
 
-let currentW = 360;
+let currentW: number = DEFAULT_SIDEBAR_WIDTH;
 /** Width the open sidebar takes on screen (the canvas keeps bubbles out from under it). */
 export const sidebarWidth = () => currentW;
 

@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { dirname } from 'node:path';
+import { sleep } from '../../shared/util';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Write a file so readers only ever see the old or the new content: write a temp file in

@@ -13,9 +13,10 @@ import { errorText, runTask } from '../../ui/task';
 import { archive, toast } from '../common';
 import type { KindCtx } from '../types';
 import { claudeOps } from '../../data/claude';
-import { appRequest, defaultPrBody, defaultPrTitle, isAbsolutePath, liveInWorktree, prBase, stackCandidates, testRequest, type PrFormValues } from './model';
+import { appRequest, defaultPrBody, defaultPrTitle, liveInWorktree, prBase, stackCandidates, testRequest, type PrFormValues } from './model';
+import { sleep } from '../../../../shared/util';
+import { isAbsolutePath } from '../../../../shared/paths';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Worktree = ItemOf<'worktree'>;
 

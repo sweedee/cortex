@@ -6,11 +6,11 @@
  * a version-n file into a version-(n+1) file, add a fixture + test. Never edit an old step.
  */
 import { z } from 'zod';
-import { ItemSchema, KindSchema, LinkSchema, PrefsSchema, WORKSPACE_VERSION, WorkspaceFileSchema } from './schemas';
+import { DEFAULT_SIDEBAR_WIDTH, ItemSchema, KindSchema, LinkSchema, PrefsSchema, WORKSPACE_VERSION, WorkspaceFileSchema } from './schemas';
 import type { Item, Link, Prefs, Tone, Workspace } from './types';
 import { DEFAULT_USER_CONFIG, RendererConfigPatchSchema, type UserConfigPatch } from '../../../shared/userConfig';
 
-export const DEFAULT_PREFS: Prefs = { colorBy: 'project', sidebarWidth: 360 };
+export const DEFAULT_PREFS: Prefs = { colorBy: 'project', sidebarWidth: DEFAULT_SIDEBAR_WIDTH };
 
 type Raw = Record<string, unknown>;
 type Step = (file: Raw, log: string[]) => Raw;

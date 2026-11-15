@@ -308,13 +308,14 @@ export const ColorBySchema = z.enum(['none', 'project', 'ticket']);
  * Workspace UI state. Machine / user settings (Claude model, effort, permission mode, AI-review comment,
  * refresh interval, notifications, sound) moved to `~/.cortex/config.json` in v4 (`shared/userConfig.ts`).
  */
+export const DEFAULT_SIDEBAR_WIDTH = 360;
 export const PrefsSchema = z.object({
   /** what bubbles are coloured by */
   colorBy: ColorBySchema,
   /** last filter; an outdated one (e.g. unknown kinds) is dropped rather than failing the prefs */
   filter: FilterSchema.optional().catch(undefined),
   /** details sidebar width, px */
-  sidebarWidth: z.number().int().min(280).max(2400).catch(360),
+  sidebarWidth: z.number().int().min(280).max(2400).catch(DEFAULT_SIDEBAR_WIDTH),
 });
 
 export const CameraSchema = z.object({ x: z.number(), y: z.number(), k: z.number().positive() });

@@ -3,20 +3,13 @@ import type { ItemOf } from '../../domain';
 import { addItem, addLink, getState, makeItem, patchData, select, setState } from '../../store';
 import { openForm, str } from '../../ui/form';
 import { toast } from '../common';
+import { slug, uniqueHandle } from '../handles';
 import { deploymentFields, guessStage, stageLabel } from './model';
 
 type Deployment = ItemOf<'deployment'>;
 type Project = ItemOf<'project'>;
 
 const NONE = 'none';
-const slug = (s: string) => s.trim().toLowerCase().replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'app';
-
-function uniqueHandle(base: string) {
-  const taken = new Set(getState().items.map((i) => i.handle.toLowerCase()));
-  if (!taken.has(base)) return base;
-  for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
-}
-
 const hostOf = (url: string) => url.replace(/^https?:\/\//i, '').split(/[/:?#]/)[0] ?? '';
 
 /** Re-point the "deploys" link from the old project to the new one. */
@@ -84,7 +77,7 @@ export async function openDeploymentForm(opts: { deployment?: Deployment; projec
       }
       const item = makeItem({
         kind: 'deployment',
-        handle: uniqueHandle(`${slug(project?.title ?? hostOf(f.url))}-${slug(stageLabel(f))}`),
+        handle: uniqueHandle(`${slug(project?.title ?? hostOf(f.url), 'app')}-${slug(stageLabel(f), 'app')}`),
         title,
         projectId,
         data: { ...f, health: 'unknown' },

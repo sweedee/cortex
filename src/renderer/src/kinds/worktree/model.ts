@@ -3,15 +3,13 @@ import type { GitFileChange } from '../../../../shared/integrations/git';
 import type { AppStartRequest, TestRunRequest } from '../../../../shared/integrations/runners';
 import type { GhPrCreateRequest } from '../../../../shared/ipc';
 import type { Item, ItemOf } from '../../domain';
+import { isAbsolutePath, isInsidePath } from '../../../../shared/paths';
 
 type Worktree = ItemOf<'worktree'>;
 type Project = ItemOf<'project'>;
 type Pr = ItemOf<'pr'>;
 
 export const WORKTREE_HINT = "This worktree has no real checkout on disk (demo data). Create one from a project that has a base checkout (Settings), and it shows git data here.";
-
-/** `C:\…`, `\\server\…` or `/…`: the main process only accepts absolute paths. */
-export const isAbsolutePath = (p: string | undefined): p is string => !!p && /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(p);
 
 /** Single-letter status for the changed-files list (M A D R U ?). */
 export function statusLetter(f: Pick<GitFileChange, 'index' | 'worktree' | 'kind'>): string {
@@ -105,12 +103,8 @@ export const testRequest = (id: string, w: Worktree, command: string): TestRunRe
 
 // ---- processes inside a worktree (stopped before `git worktree remove`) ------------------
 
-const normPath = (p: string) => {
-  const s = p.replace(/\\/g, '/').replace(/\/+$/, '');
-  return /^[a-zA-Z]:/.test(s) ? s.toLowerCase() : s;
-};
 /** `p` is the worktree folder or inside it. */
-export const isInside = (p: string | undefined, dir: string) => !!p && (normPath(p) === normPath(dir) || normPath(p).startsWith(normPath(dir) + '/'));
+export const isInside = (p: string | undefined, dir: string) => !!p && isInsidePath(p, dir);
 
 export interface LiveInWorktree {
   /** agent session ids (`localId`) with a process that may hold the folder */

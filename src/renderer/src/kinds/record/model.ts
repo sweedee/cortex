@@ -3,16 +3,12 @@
  * (which record items to add / update for the files found under `<baseDir>/records`). Unit-tested.
  */
 import type { Item, ItemOf, LinkLabel, NewItem, RecordData } from '../../domain';
+import { baseName, normPath } from '../../../../shared/paths';
+import { ticketKeyOf } from '../../../../shared/util';
 
 type RecordType = RecordData['recordType'];
 
 /** `C:\a\b` and `c:/a/b/` compare equal (case-insensitive: Windows and macOS paths). */
-export const normPath = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-
-export const isAbsolutePath = (p: string | undefined): p is string => !!p && /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(p);
-
-export const dirOf = (p: string) => p.replace(/[\\/][^\\/]*$/, '');
-export const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
 export const RECORD_HINT = 'This record has no file on disk (demo data). Records live in <project base checkout>/records/<ticket-branch>/<name>.md; real ones are discovered automatically.';
 
@@ -48,9 +44,6 @@ export function countSteps(md: string): { done: number; total: number } {
   }
   return { done, total };
 }
-
-const TICKET_KEY = /[A-Z][A-Z0-9]+-\d+/;
-export const ticketKeyOf = (s: string) => TICKET_KEY.exec(s)?.[0];
 
 /** The branch folder of a file relative to the records dir: `feat/CTX-1-x/plan.md` → `feat/CTX-1-x`. */
 export function branchFolder(relName: string): string | undefined {

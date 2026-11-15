@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, ItemOf } from '../../domain';
 import { nextSteps } from './index';
-import { branchFolder, countSteps, normPath, planDiscovery, recordTypeOf, sameBranch } from './model';
+import { branchFolder, countSteps, planDiscovery, recordTypeOf, sameBranch } from './model';
+import { normPath } from '../../../../shared/paths';
 
 const base = { createdAt: 0, updatedAt: 0 };
 const project: ItemOf<'project'> = { ...base, id: 'p', kind: 'project', handle: 'p', title: 'p', data: { repo: 'o/r', defaultBranch: 'main', baseDir: 'C:\\code\\r' } };

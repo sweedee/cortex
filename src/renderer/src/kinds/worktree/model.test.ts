@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Item, ItemOf } from '../../domain';
-import { buildPrRequest, defaultPrBody, defaultPrTitle, isAbsolutePath, isInside, launchDisabled, liveInWorktree, prBase, removeDisabled, stackCandidates, statusLetter, testsDisabled } from './model';
+import { buildPrRequest, defaultPrBody, defaultPrTitle, isInside, launchDisabled, liveInWorktree, prBase, removeDisabled, stackCandidates, statusLetter, testsDisabled } from './model';
+import { isAbsolutePath } from '../../../../shared/paths';
 
 const base = { createdAt: 0, updatedAt: 0 };
 const wt = (over: Partial<ItemOf<'worktree'>['data']> = {}): ItemOf<'worktree'> => ({

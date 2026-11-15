@@ -11,7 +11,8 @@ import { addItem, getState, makeItem, patchData, select } from '../../store';
 import { openForm, str } from '../../ui/form';
 import { toast } from '../common';
 import { openProjectSettings } from './settings';
-import { branchForTicket, defaultWorktreePath, hasBaseDir, SET_BASE_HINT, ticketKeyOf, worktreeAddArgs, worktreeHandle } from './worktreeModel';
+import { ticketKeyOf } from '../../../../shared/util';
+import { branchForTicket, defaultWorktreePath, hasBaseDir, SET_BASE_HINT, worktreeAddArgs, worktreeHandle } from './worktreeModel';
 
 type Project = ItemOf<'project'>;
 type Ticket = ItemOf<'ticket'>;

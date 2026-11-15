@@ -10,16 +10,17 @@ import { gitOps } from '../../data/git';
 import type { ItemOf } from '../../domain';
 import { place } from '../../layout';
 import { native } from '../../native';
-import { addItem, getState, makeItem, patchData, select } from '../../store';
+import { addItem, makeItem, patchData, select } from '../../store';
 import { openForm, str, type FormValues } from '../../ui/form';
+import { baseName } from '../../../../shared/paths';
 import { toast } from '../common';
+import { slug, uniqueHandle } from '../handles';
 import { worktreesDirFor } from './worktreeModel';
 
 type Project = ItemOf<'project'>;
 
 const REPO = /^[\w.-]+\/[\w.-]+$/;
 const sep = (p: string) => (p.includes('\\') && !p.includes('/') ? '\\' : '/');
-const baseName = (p: string) => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
 
 /** What a picked base checkout tells us (only fills fields that are still empty / defaults). */
 export async function detectFromBaseDir(dir: string, v: FormValues): Promise<Partial<FormValues>> {
@@ -40,13 +41,6 @@ export async function detectFromBaseDir(dir: string, v: FormValues): Promise<Par
     /* not a node project, or no fs (browser) */
   }
   return patch;
-}
-
-const slug = (s: string) => s.trim().toLowerCase().replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
-function uniqueHandle(base: string) {
-  const taken = new Set(getState().items.map((i) => i.handle.toLowerCase()));
-  if (!taken.has(base)) return base;
-  for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
 /**
@@ -94,7 +88,7 @@ export async function openProjectSettings(project?: Project, at?: { x: number; y
         toast('Project saved', str(v, 'name'));
         return;
       }
-      const item = makeItem({ kind: 'project', handle: uniqueHandle(slug(str(v, 'name'))), title: str(v, 'name'), data }) as Project;
+      const item = makeItem({ kind: 'project', handle: uniqueHandle(slug(str(v, 'name'), 'project')), title: str(v, 'name'), data }) as Project;
       if (at) place.seed(item.id, at);
       addItem(item);
       select([item.id]);
