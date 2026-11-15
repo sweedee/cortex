@@ -6,6 +6,7 @@ import { isLinkLabel, linkFits } from './links';
 import type { Item, Link } from './types';
 
 const check = (items: Item[], links: Link[], strict: boolean) => {
+  expect(links.length).toBeGreaterThan(0);
   const byId = new Map(items.map((i) => [i.id, i]));
   for (const l of links) {
     const from = byId.get(l.from);
