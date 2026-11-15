@@ -9,9 +9,9 @@
  *
  * `firstRunWorld()` is the empty one; "Reset workspace" uses it too.
  */
-import type { Item, Link, NewItem } from './domain';
+import { DEMO_REPO, type Item, type Link, type NewItem } from './domain';
 
-export const DEMO_REPO = 'unknown/demo';
+export { DEMO_REPO };
 
 export interface World {
   items: Item[];

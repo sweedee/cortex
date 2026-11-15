@@ -1,9 +1,9 @@
 /** Background refresh of a ticket (`KindModule.sync`): `jira view` (status, category, assignee, sprint, points, title). */
 import { queryClient } from '../../data/queryClient';
 import { qk } from '../../data/queryKeys';
-import type { ItemOf } from '../../domain';
+import { DEMO_REPO, type Item, type ItemOf } from '../../domain';
 import { native } from '../../native';
-import { patchData } from '../../store';
+import { itemById, patchData } from '../../store';
 import { changes, ticketPatch } from '../../sync/mapping';
 import { currentItem } from '../common';
 import type { SyncJob } from '../types';
@@ -19,4 +19,8 @@ async function refreshTicket(id: string) {
   if (changes(cur.data, patch) || (title && title !== cur.title)) patchData<'ticket'>(cur, patch, title ? { title } : {});
 }
 
-export const ticketSync = (t: ItemOf<'ticket'>): SyncJob[] => (t.data.key ? [{ id: t.id, group: 'jira', fast: false, run: () => refreshTicket(t.id) }] : []);
+/** Tickets of the demo world (their project is on the demo repo) are static: Jira has no such issue. */
+export const isDemoTicket = (t: ItemOf<'ticket'>, project: Item | undefined) => project?.kind === 'project' && project.data.repo === DEMO_REPO && !!t.projectId;
+
+export const ticketSync = (t: ItemOf<'ticket'>): SyncJob[] =>
+  t.data.key && !isDemoTicket(t, t.projectId ? itemById(t.projectId) : undefined) ? [{ id: t.id, group: 'jira', fast: false, run: () => refreshTicket(t.id) }] : [];

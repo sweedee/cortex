@@ -8,13 +8,15 @@ describe('settings form', () => {
       claude: { model: null, effort: null, permissionMode: 'acceptEdits' },
       github: { aiReviewComment: null },
       refresh: { intervalSec: 90 },
-      ui: { sound: false },
+      ui: { sound: false, theme: 'system', animations: true },
     });
     expect(settingsPatch({ model: 'opus', modelCustom: '', effort: 'high', permissionMode: 'nonsense', aiReviewComment: '/review', refreshSec: '30' })).toMatchObject({
       claude: { model: 'opus', effort: 'high', permissionMode: 'default' },
       github: { aiReviewComment: '/review' },
     });
     expect(settingsPatch({ model: 'opus', modelCustom: 'claude-opus-5-5', refreshSec: '60' }).claude?.model).toBe('claude-opus-5-5');
+    expect(settingsPatch({ refreshSec: '60', theme: 'dark', animations: false }).ui).toEqual({ sound: false, theme: 'dark', animations: false });
+    expect(settingsPatch({ refreshSec: '60', theme: 'neon' }).ui?.theme).toBe('system');
   });
   it('validates the refresh interval', () => {
     expect(validRefresh('60')).toBeUndefined();

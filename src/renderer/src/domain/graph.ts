@@ -52,4 +52,7 @@ export function rootsOf(items: Item[], links: Link[], kind: Kind, levelOf: Level
 export const isRealPath = (p: string | undefined): p is string => !!p && /^([A-Za-z]:[\\/]|\/|\\\\)/.test(p);
 
 /** A GitHub `owner/name` Cortex can reach (demo repos `unknown/…` are not). */
+/** The repo of the demo world (`seed.ts`); its items are static and never synced. */
+export const DEMO_REPO = 'unknown/demo';
+
 export const isRealRepo = (r: string | undefined) => !!r && /^[\w.-]+\/[\w.-]+$/.test(r) && !r.startsWith('unknown/');
