@@ -17,7 +17,9 @@ Cortex is an Electron app built with electron-vite. Three processes, one window.
 │ src/renderer/src/native.ts  ← the only door to native  │
 │ everything else: React UI, store, layout               │
 └────────────────────────────────────────────────────────┘
-src/shared/ipc.ts      contract: channel names, request/response/event types, CortexApi
+src/shared/ipc.ts      contract: invokeChannels / eventChannels maps (declared once), payload types;
+                       CortexApi is derived from them
+src/shared/bridge.ts   builds the api object from the channel keys (preload + browser fallback)
 src/shared/schemas.ts  zod schema per invoke channel (used by main)
 src/shared/integrations/*  tool DTOs and pure mappers both sides may import
 ```
@@ -28,12 +30,14 @@ src/shared/integrations/*  tool DTOs and pure mappers both sides may import
    `src/renderer/src/native.ts`, which also provides a browser fallback (`npm run dev:web`, unit tests):
    exec / proc / fs / integrations reject with a clear error (lists resolve `[]`), the workspace lives in
    localStorage, notifications use the Web Notification API.
-2. **Every invoke channel is declared in `src/shared/ipc.ts` and validated in main** with its schema in
-   `src/shared/schemas.ts` / `integrationSchemas.ts` (a compile-time check keeps schemas and types in sync).
+2. **Every invoke channel is declared once, in `invokeChannels` in `src/shared/ipc.ts`, and validated in
+   main** with its schema in `src/shared/schemas.ts` / `integrationSchemas.ts` (compile-time checks keep the
+   schema map and the channel map identical, `ipcContract.test.ts` checks the bridge too).
    Handlers are registered with `handle()` (`src/main/ipc/handle.ts`), which also rejects callers other
    than the app window.
 3. **The preload only forwards.** It is sandboxed, so it may only import `electron` and the dependency-free
-   `shared/ipc.ts` (types). Never expose `ipcRenderer` itself.
+   `shared/ipc.ts` / `shared/bridge.ts`. Its forwarders are generated from the channel keys
+   (`buildBridge`), so only declared channels are reachable. Never expose `ipcRenderer` itself.
 4. **No shell for programmatic commands.** `exec.run` and the services spawn via `cross-spawn` (resolves
    Windows `.cmd` shims, escapes args) with `shell: false` and an allowlist. Only the user's own command
    lines (a project's start / test command) run through a shell.
@@ -141,25 +145,30 @@ that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#
 
 Events (main → renderer): `proc:output {id, stream, chunk}`, `proc:exit {id, code, signal, error?}`,
 `notify:clicked {itemId?}`, `fs:changed {watchId, dir, event, path}`, `config:changed {config, path, problems}`
-(config.json changed: an update or an edit of the file). Subscribe through `native.*.onX(cb)`,
+(config.json changed: an update or an edit of the file). Subscribe through `native.<group>.on<Event>(cb)`
+(`proc:exit` → `native.proc.onExit`) or `native.on(channel, cb)`,
 which returns an unsubscribe function. Output events are batched (one per process and stream every
 100 ms). The integration channels (`git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*`) are listed
 under [Integrations](#integrations).
 
 ### Adding a channel
 
-1. Add it to `InvokeChannels` (and `CortexApi`) in `src/shared/ipc.ts` (request / response types next to it).
+1. Add `'group:method': call<Request, Response>()` to `invokeChannels` in `src/shared/ipc.ts` (request /
+   response types next to it). `CortexApi` gets `native.group.method(req)` from it, and the preload forwards
+   it, without further edits. Events: `'group:name': event<Payload>()` in `eventChannels` gives
+   `native.group.onName(cb)`.
 2. Add its request schema to `schemas` in `src/shared/schemas.ts` (or `integrationSchemas.ts`); typecheck
-   fails until it matches.
-3. Register a handler with `handle(ctx, 'group:name', fn)` in `src/main/ipc/*` (logic in a service or `lib/`).
-4. Forward it in `src/preload/index.ts` / `integrations.ts` and add it to the fallback in `native.ts`.
+   fails until it exists and matches.
+3. Register a handler with `handle(ctx, 'group:method', fn)` in `src/main/ipc/*` (logic in a service or `lib/`).
+4. Say what it does in the browser in `browserFallbacks()` in `native.ts`: an implementation or
+   `DESKTOP_ONLY` (typecheck fails until you do).
 5. Wrap it in the renderer's `data/<service>.ts`: a query hook for reads, an op that invalidates what it
    changed for writes.
 
-`gh:prEdit` is a small example of all five steps. New groups can be added without touching the existing
-lists: a second `interface InvokeChannels { … }` / `EventChannels` / `CortexApi` block in `ipc.ts`
-(declaration merging), a schema map spread into `schemas`, and a forwarding module spread into the
-preload's `api`.
+`gh:prEdit` is a small example. Calls take one request object (`native.gh.prEdit({repo, number, base})`); a
+channel without a request is `native.app.info()`, one whose fields are all optional may be called without
+one (its schema `.default({})`s). `ipcContract.test.ts` checks that the schema map, the channel map and
+what the bridge exposes are the same set of channels.
 
 ## Renderer
 
@@ -345,8 +354,8 @@ provided in `main.tsx`. Pattern:
 
 - **Keys** only from the factory in `data/queryKeys.ts`: `[integration, resource, ...params]`
   (`qk.gh.pr(repo, n)`), so invalidation can target an integration (`qk.gh.all`), a resource or one entity.
-- **One file of hooks per integration** in `data/` (`data/gh.ts`, `data/git.ts`, …), each hook wrapping a
-  `native.*` call. Hooks take possibly-undefined params and only run in the desktop app with every param
+- **One file of hooks per integration** in `data/` (`data/git.ts`, `data/jira.ts`, …; the code host's in
+  `data/codehost.ts`), each hook wrapping a `native.*` call. Hooks take possibly-undefined params and only run in the desktop app with every param
   set (`ready()` in `data/ops.ts`).
 - **Invalidate after actions**: write ops invalidate what they change.
 - **Poll running things** with `refetchInterval` (a running build, agent or test run).
@@ -358,13 +367,13 @@ provided in `main.tsx`. Pattern:
 ### Data hooks and write ops
 
 Reads are hooks; writes are plain async functions in a `<service>Ops` object (kind actions run outside
-React) that invalidate what they change. In a component, `useOp(ghOps.prMerge)` gives a mutation
+React) that invalidate what they change. In a component, `useOp(codeHost().prMerge)` gives a mutation
 (`m.mutate([repo, n, 'squash'])`, `m.isPending`, `m.error`).
 
 | file | hooks | ops |
 |---|---|---|
 | `data/git.ts` | `useGitStatus(dir)`, `useGitDiff(dir, base?)`, `useGitDiffStat(dir, base?)`, `useGitLog(dir, {range, limit})`, `useCurrentBranch(dir)`, `useRemoteRepo(dir)`, `useWorktrees(repoDir)` | `gitOps.worktreeAdd(repoDir, path, branch, base?, {newBranch})`, `worktreeRemove(repoDir, path, {force})`, `fetch(dir)`, `rebase(dir, onto)`, `rebaseAbort(dir)`, `push(dir, {setUpstream})`, `detect(dir)` → `{repo, branch}` \| null |
-| `data/gh.ts` | `usePr(repo, n)`, `usePrSummary(repo, n)`, `usePrDiff(repo, n)`, `usePrChecks(repo, n)` (polls while pending), `usePrList(repo, filter)`, `useRenovatePrs(repo)`, `useRun(repo, runId)` (polls until completed) | `ghOps.prCreate(req)`, `prMerge(repo, n, method, {deleteBranch})`, `prComment(repo, n, body)`, `requestAiReview(repo, n)` (uses the `aiReviewComment` setting), `prUpdateBranch(repo, n, {rebase})`, `prEdit({repo, number, base?, title?, body?})`, `runRerun(repo, runId, {failedOnly})` |
+| `data/codehost.ts` | `usePr(repo, n, provider?)`, `usePrSummary(repo, n, provider?)`, `usePrDiff(…)`, `usePrChecks(…)` (polls while pending), `usePrList(repo, filter, provider?)`, `useDependencyPrs(repo, provider?)`, `useRun(repo, runId, provider?)` (polls until completed) | `codeHost(provider)` → the `CodeHost` (`shared/codeHost.ts`; GitHub = `data/gh.ts`): `prCreate(req)`, `prMerge(repo, n, method, {deleteBranch})`, `prComment(repo, n, body)`, `requestAiReview(repo, n)` (uses the `aiReviewComment` setting), `prUpdateBranch(repo, n, {rebase})`, `prEdit({repo, number, base?, title?, body?})`, `runRerun(repo, runId, {failedOnly})`, `repoUrl(repo, path?)` / `prUrl` / `runUrl` (config `github.host`) |
 | `data/jira.ts` | `useJiraIssue(key)`, `useJiraIssueSummary(key)`, `useJiraSearch(jql, limit?)`, `loadJiraStatuses(project)` | `jiraOps.transition(key, status)`, `create(req)`, `comment(key, body)`, `edit(req)`; `jiraUrl(key)` = the browse URL (the configured site, e.g. from `acli jira auth status`, else the cached issue's `self`, else the mock's): the one place that builds Jira links |
 | `data/claude.ts` | `useClaudeSessions()`, `useClaudeSession(localId)` (messages, status, usage), `useClaudeTranscript(localId)` (raw events, appended live) | `claudeOps.start(req)`, `send(localId, text)`, `answer(localId, toolUseId, answers)`, `permission(localId, requestId, decision)`, `interrupt`, `stop`, `remove` |
 | `data/apps.ts` | `useApps()`, `useAppLog(id)` (appended live) | `appOps.start(req)`, `stop(id)`, `restart(id)`, `remove(id)` |
@@ -524,7 +533,7 @@ issues, comments + add comment, related canvas items including PRs of the ticket
 
 - **Create PR**: form (title from the ticket summary or branch, body with the ticket key and `jiraUrl` link,
   base branch, draft, *Stack on PR* = open PRs of the project, which replaces the base with that PR's
-  `headBranch`). Submit = `gitOps.push(path, {setUpstream})` then `ghOps.prCreate`; a gh failure after the push
+  `headBranch`). Submit = `gitOps.push(path, {setUpstream})` then `codeHost().prCreate`; a gh failure after the push
   says the branch was pushed. Then a `pr` item (`stackedOn` = parent item id) linked "from branch" to the
   worktree, "implements" to the ticket and "stacked on" to the parent PR. A known PR number is updated instead
   of duplicated.
@@ -561,14 +570,14 @@ issues, comments + add comment, related canvas items including PRs of the ticket
   approved / changes requested / pending) plus a conflict slice (`mergeable` CONFLICTING or
   `mergeStateStatus` DIRTY) and a checks slice. "No checks" counts as green for *mergeable*.
 - **Merge…**: form with method (squash / merge / rebase), "delete branch", warnings for failing / running
-  checks, missing approval, conflicts → `ghOps.prMerge`; the item is marked merged and archived (undo), stacked
+  checks, missing approval, conflicts → `codeHost().prMerge`; the item is marked merged and archived (undo), stacked
   children are handled (below), and a toast offers to remove the PR's worktree.
-- **Rebase**: `ghOps.prUpdateBranch(rebase)`; conflicts (known or reported) → warning + `/rebase @PR` in the
-  chat box. **Request AI review…**: confirm showing the comment → `ghOps.requestAiReview`.
+- **Rebase**: `codeHost().prUpdateBranch(rebase)`; conflicts (known or reported) → warning + `/rebase @PR` in the
+  chat box. **Request AI review…**: confirm showing the comment → `codeHost().requestAiReview`.
 - **Stacked PRs** (`data.stackedOn` + the "stacked on" link): when the parent merged with "delete branch",
   GitHub retargets the children itself and their `baseBranch` is updated locally; otherwise the post-merge
   toast, a primary *Retarget onto <base>* action on the child and a button in its Stack section call
-  `ghOps.prEdit({base})` (`gh pr edit --base`).
+  `codeHost().prEdit({base})` (`gh pr edit --base`).
 - **Sidebar**: *Overview* (state, author, base ← head, mergeable / mergeStateStatus, files, reviews, checks
   from `usePrChecks`, description, last comments, stack, connections; `usePr` results are written back with
   `prPatch`), *Files* (wide diff), *GitHub* (`WebPanel`, `partition="persist:github"`).
@@ -583,7 +592,7 @@ issues, comments + add comment, related canvas items including PRs of the ticket
 `jenkins` (Jenkins-looking URL) and `other` (any other CI reporting through the GitHub checks API; named by its
 host) only have their details page. Each has a display name and a webview partition (`persist:github` /
 `persist:ci`). A new integrated provider adds an id there plus its data hook and rerun op.
-*Re-run…* for Actions: form with "only the failed jobs" → `ghOps.runRerun`, item back to queued; for others
+*Re-run…* for Actions: form with "only the failed jobs" → `codeHost().runRerun`, item back to queued; for others
 the details page opens. The open action (id `open`) is *Open in GitHub Actions* / *Open in Jenkins* / *Open
 details*. Sidebar: state, conclusion, provider, branch, PR, trigger, duration, stage; for Actions runs the jobs
 from `useRun` (polls while running, failed jobs with their steps), written back to the item; a details webview
@@ -650,9 +659,9 @@ Real tools, called from main, never through a shell (except the user's own app /
 | `src/shared/integrations/*.ts` | dependency-free types the renderer may import: tool-shaped DTOs (gh JSON, Jira REST v3, Claude stream-json), pure parsers / mappers (`summarizePr`, `rollupChecks`, `summarizeIssue`, `adfToMarkdown`, `jiraBrowseUrl`, the Claude reducer `applyClaudeEvent`, `parseTestSummary`, `detectLocalUrl`), `DEFAULT_CONFIG` |
 | `src/main/services/*.ts` | `GitService`, `GhService`, `JiraService`, `ClaudeSessions`, `AppRunner` / `TestRunner`; each takes an injectable `Runner` (tests) and throws `CliError` (`"<cmd> <subcommand>: <stderr>"`) |
 | `src/main/ipc/integrations.ts` | the handlers; `src/shared/integrationSchemas.ts` the zod schemas |
-| `src/preload/integrations.ts` | forwarding; `native.ts` has rejecting browser fallbacks |
+| `src/shared/codeHost.ts` | the `CodeHost` interface; the optional `provider` on project / pr / build data picks the implementation (absent = github) |
 
-Renderer: `native.git.status(dir)`, `native.gh.prView(repo, n)`, … and `native.on('claude:state', cb)` (typed,
+Renderer: `native.git.status({dir})`, `codeHost(provider).prView(repo, n)`, … and `native.on('claude:state', cb)` (typed,
 returns unsubscribe; unknown channels throw). Request strings that end up as git / gh arguments (refs,
 branches, remotes, labels) are rejected when they start with `-`, so they can't be read as options.
 

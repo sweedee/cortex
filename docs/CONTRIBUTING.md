@@ -15,14 +15,19 @@ file holds the rules.
 - **Main** (`src/main`) owns every side effect: processes, files, git, gh, Jira, Claude. Logic goes into
   `lib/` or `services/` with an injectable runner so it is testable in node.
 - **Shared** (`src/shared`) is dependency-free: the IPC contract, request schemas, tool DTOs and pure mappers.
-- **Preload** only forwards (sandboxed: `electron` and `shared/ipc.ts` types only).
+- **Preload** only forwards (sandboxed: `electron`, `shared/ipc.ts` and `shared/bridge.ts` only); its
+  forwarders are generated from the channel map, never written by hand.
 - **Renderer** reaches native only through `native.ts`, and integrations through `data/*` (hooks for reads,
   `*Ops` for writes that invalidate their queries). Import direction: `domain` ← `store` ← `kinds/common`,
   `sidebar` ← `kinds/<kind>` ← `kinds/registry` ← UI. Kind modules never import the registry or another kind
   (use `ctx.kind(k)`); kinds may import the pure `sync/mapping.ts` and `sync/checks.ts`. The store gets its kind
   info from `installKindInfo()` (main.tsx), never by importing the registry.
-- A new IPC channel touches shared (type + schema), main (handler), preload, `native.ts` (fallback) and a
-  `data/*` op: follow "Adding a channel" in ARCHITECTURE.md. `gh:prEdit` is a compact example.
+- A new IPC channel is one line in `invokeChannels` (`shared/ipc.ts`), its zod schema, its `handle()` in
+  main, its browser-fallback entry in `native.ts` and usually a `data/*` hook or op. The preload and
+  `CortexApi` follow by themselves; the compiler and `ipcContract.test.ts` flag anything missing. See
+  "Adding a channel" in ARCHITECTURE.md; `gh:prEdit` is a compact example.
+- Code-host calls (PRs, checks, runs, repo links) go through `codeHost(item.data.provider)`
+  (`data/codehost.ts`), not `native.gh` or hard-coded GitHub URLs.
 
 ## Hot spots
 
