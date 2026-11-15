@@ -17,8 +17,7 @@ export type Theme = 'dark' | 'light';
 export const parseThemePref = (v: unknown): ThemePref => (v === 'dark' || v === 'light' || v === 'system' ? v : 'system');
 
 /** The theme a preference ends up as. */
-export const resolveTheme = (pref: ThemePref | undefined, systemDark: boolean): Theme =>
-  pref === 'dark' || pref === 'light' ? pref : systemDark ? 'dark' : 'light';
+export const resolveTheme = (pref: ThemePref | undefined, systemDark: boolean): Theme => (pref === 'dark' || pref === 'light' ? pref : systemDark ? 'dark' : 'light');
 
 const darkQuery = () => (typeof window !== 'undefined' ? window.matchMedia?.('(prefers-color-scheme: dark)') : undefined);
 /** The OS asks for dark (dark-first when unknown). */

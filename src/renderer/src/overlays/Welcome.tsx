@@ -23,7 +23,9 @@ export function Welcome() {
         </Button>
         <Button onClick={loadDemoWorld}>Load demo world</Button>
       </div>
-      <p className="welcome-hint">The demo world is made up and static; nothing in it touches your disk or the network. GitHub needs <code>gh auth login</code>, Jira needs <code>acli jira auth login</code>.</p>
+      <p className="welcome-hint">
+        The demo world is made up and static; nothing in it touches your disk or the network. GitHub needs <code>gh auth login</code>, Jira needs <code>acli jira auth login</code>.
+      </p>
     </div>
   );
 }

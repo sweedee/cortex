@@ -28,7 +28,8 @@ export const agent: KindModule<'agent'> = {
   ring: agentRing,
   waiting: (a) => a.data.status === 'waiting',
   // running subagents show as a chip on the bubble
-  badge: ({ data }) => (data.subagents?.running && data.status === 'running' ? { label: data.subagents.running === 1 ? '1 subagent' : `${data.subagents.running} subagents`, tone: 'running' } : undefined),
+  badge: ({ data }) =>
+    data.subagents?.running && data.status === 'running' ? { label: data.subagents.running === 1 ? '1 subagent' : `${data.subagents.running} subagents`, tone: 'running' } : undefined,
   subtitle: ({ data }) => {
     const since = data.status === 'done' || data.status === 'failed' ? data.endedAt : data.startedAt;
     const when = since ? (data.status === 'done' || data.status === 'failed' ? ` ${mins(Date.now() - since)} ago` : ` ${mins(Date.now() - since)}`) : '';
@@ -36,9 +37,16 @@ export const agent: KindModule<'agent'> = {
     return [data.model?.replace(/^claude-/, ''), PHRASE[data.status] + when, subs].filter(Boolean).join(' · ');
   },
   facts: ({ data }) => [
-    ['Context', data.usage?.contextPct != null ? `${data.usage.contextPct}%${data.usage.contextTokens ? ` (${tokens(data.usage.contextTokens)}${data.usage.contextWindow ? ` of ${tokens(data.usage.contextWindow)}` : ''})` : ''}` : '–'],
+    [
+      'Context',
+      data.usage?.contextPct != null
+        ? `${data.usage.contextPct}%${data.usage.contextTokens ? ` (${tokens(data.usage.contextTokens)}${data.usage.contextWindow ? ` of ${tokens(data.usage.contextWindow)}` : ''})` : ''}`
+        : '–',
+    ],
     ...(data.subagents?.total ? [['Subagents', data.subagents.running ? `${data.subagents.running} running of ${data.subagents.total}` : `${data.subagents.total} done`] as [string, string]] : []),
-    ...(data.effort || (data.permissionMode && data.permissionMode !== 'default') ? [['Mode', [data.effort && `effort ${data.effort}`, data.permissionMode !== 'default' && data.permissionMode].filter(Boolean).join(' · ')] as [string, string]] : []),
+    ...(data.effort || (data.permissionMode && data.permissionMode !== 'default')
+      ? [['Mode', [data.effort && `effort ${data.effort}`, data.permissionMode !== 'default' && data.permissionMode].filter(Boolean).join(' · ')] as [string, string]]
+      : []),
     ['Cost', data.usage?.costUsd != null ? `$${data.usage.costUsd.toFixed(2)}` : '–'],
     ['Turns', data.usage?.turns != null ? String(data.usage.turns) : '–'],
     ...(data.cwd ? [['Directory', data.cwd] as [string, string]] : []),

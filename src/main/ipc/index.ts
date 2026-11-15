@@ -19,7 +19,12 @@ export function registerIpc(ctx: IpcContext) {
   userConfig.ensureFiles();
   userConfig.watch();
   app.on('will-quit', () => userConfig.close());
-  const services = createServices({ appRoot: app.getAppPath(), userData: app.getPath('userData'), isElectron: true, isPackaged: app.isPackaged }, (channel, payload) => ctx.send(channel, payload), process.env, userConfig.config);
+  const services = createServices(
+    { appRoot: app.getAppPath(), userData: app.getPath('userData'), isElectron: true, isPackaged: app.isPackaged },
+    (channel, payload) => ctx.send(channel, payload),
+    process.env,
+    userConfig.config,
+  );
   setLimits(userConfig.config.limits);
   userConfig.onChange((s) => {
     services.setUserConfig(s.config);

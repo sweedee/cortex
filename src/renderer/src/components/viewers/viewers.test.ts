@@ -53,7 +53,10 @@ describe('parseDiffStats', () => {
   it('handles plain (non-git) multi-file diffs and empty input', () => {
     const plain = '--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n--- a/y\n+++ b/y\n@@ -1 +1,2 @@\n a\n+c\n';
     const s = parseDiffStats(plain);
-    expect(s.files.map((f) => [f.path, f.additions, f.deletions])).toEqual([['x', 1, 1], ['y', 1, 0]]);
+    expect(s.files.map((f) => [f.path, f.additions, f.deletions])).toEqual([
+      ['x', 1, 1],
+      ['y', 1, 0],
+    ]);
     expect(parseDiffStats('')).toEqual({ files: [], additions: 0, deletions: 0 });
   });
 

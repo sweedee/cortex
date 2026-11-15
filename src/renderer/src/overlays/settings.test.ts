@@ -29,7 +29,9 @@ describe('settings form', () => {
     expect(UserConfigSchema.parse({ claude: { permissionMode: 'yolo' } }).claude.permissionMode).toBe('default');
   });
   it('shows the config path and its problems', () => {
-    expect(configFileInfo({ path: '/h/.cortex/config.json', problems: ['invalid value for "refresh.intervalSec", using the default'], config: UserConfigSchema.parse({}) })).toMatch(/config\.json · invalid value/);
+    expect(configFileInfo({ path: '/h/.cortex/config.json', problems: ['invalid value for "refresh.intervalSec", using the default'], config: UserConfigSchema.parse({}) })).toMatch(
+      /config\.json · invalid value/,
+    );
     expect(configFileInfo(undefined)).toMatch(/unknown/);
   });
 });

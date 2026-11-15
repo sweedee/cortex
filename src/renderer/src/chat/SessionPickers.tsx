@@ -11,12 +11,36 @@ import { useClaudeCatalog } from '../data/claude';
 import { effortChoices, modelChoiceOf, modelChoices, PERMISSION_CHOICES, permissionChoice, type Choice, type PermissionValue } from './sessionOptions';
 import './sessionPickers.css';
 
-function Picker({ title, icon, value, choices, onChange, disabled, tone, pending }: { title: string; icon: ReactNode; value: string; choices: Choice[]; onChange: (v: string) => void; disabled?: boolean; tone?: string; pending?: boolean }) {
+function Picker({
+  title,
+  icon,
+  value,
+  choices,
+  onChange,
+  disabled,
+  tone,
+  pending,
+}: {
+  title: string;
+  icon: ReactNode;
+  value: string;
+  choices: Choice[];
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  tone?: string;
+  pending?: boolean;
+}) {
   const cur = choices.find((c) => c.value === value) ?? choices[0] ?? { value: '', label: '', short: '' };
   return (
     <Menu>
       <Menu.Trigger>
-        <button type="button" className={`sp-btn ${tone ? `tone-${tone}` : ''} ${value ? 'is-set' : ''}`} disabled={disabled} title={`${title}: ${cur.label}${pending ? ' (applies with the next message)' : ''}`} aria-label={`${title}: ${cur.label}`}>
+        <button
+          type="button"
+          className={`sp-btn ${tone ? `tone-${tone}` : ''} ${value ? 'is-set' : ''}`}
+          disabled={disabled}
+          title={`${title}: ${cur.label}${pending ? ' (applies with the next message)' : ''}`}
+          aria-label={`${title}: ${cur.label}`}
+        >
           {icon}
           <span className="sp-val">{cur.short}</span>
           {pending && <span className="sp-pending" aria-hidden />}
@@ -49,14 +73,42 @@ export interface SessionChoice {
 }
 
 /** The three pickers in a row. `onChange` gets only the changed field (`''` = back to the default). */
-export function SessionPickers({ value, onChange, disabled, pending, label }: { value: SessionChoice; onChange: (patch: { model?: string; effort?: ClaudeEffort | ''; permissionMode?: PermissionValue }) => void; disabled?: boolean; pending?: string[]; label?: string }) {
+export function SessionPickers({
+  value,
+  onChange,
+  disabled,
+  pending,
+  label,
+}: {
+  value: SessionChoice;
+  onChange: (patch: { model?: string; effort?: ClaudeEffort | ''; permissionMode?: PermissionValue }) => void;
+  disabled?: boolean;
+  pending?: string[];
+  label?: string;
+}) {
   const catalog = useClaudeCatalog().data;
   const model = modelChoiceOf(catalog, value.model);
   const mode = permissionChoice(value.permissionMode);
   return (
     <span className="sp-row" role="group" aria-label={label ?? 'Session settings'}>
-      <Picker title="Model" icon={<AIModelIcon />} value={model} choices={modelChoices(catalog, model)} disabled={disabled} pending={pending?.includes('model')} onChange={(v) => onChange({ model: v })} />
-      <Picker title="Effort" icon={<IdeaIcon />} value={value.effort ?? ''} choices={effortChoices(catalog, value.model)} disabled={disabled} pending={pending?.includes('effort')} onChange={(v) => onChange({ effort: v as ClaudeEffort | '' })} />
+      <Picker
+        title="Model"
+        icon={<AIModelIcon />}
+        value={model}
+        choices={modelChoices(catalog, model)}
+        disabled={disabled}
+        pending={pending?.includes('model')}
+        onChange={(v) => onChange({ model: v })}
+      />
+      <Picker
+        title="Effort"
+        icon={<IdeaIcon />}
+        value={value.effort ?? ''}
+        choices={effortChoices(catalog, value.model)}
+        disabled={disabled}
+        pending={pending?.includes('effort')}
+        onChange={(v) => onChange({ effort: v as ClaudeEffort | '' })}
+      />
       <Picker
         title="Permission mode"
         icon={<SecurityIcon />}

@@ -68,8 +68,7 @@ export function ViewerGallery() {
       </section>
       <section>
         <h3>
-          Diff{' '}
-          <button onClick={() => setMode(mode === 'unified' ? 'split' : 'unified')}>{mode}</button>
+          Diff <button onClick={() => setMode(mode === 'unified' ? 'split' : 'unified')}>{mode}</button>
         </h3>
         <DiffViewer diff={DIFF} mode={mode} />
       </section>

@@ -81,8 +81,7 @@ export function mergeArgs(d: Pick<PrData, 'repo' | 'number'>, values: Record<str
 // ---- stack -------------------------------------------------------------------------------
 
 /** Open PRs stacked directly on this one. */
-export const stackChildren = (items: Item[], prId: string): Pr[] =>
-  items.filter((i): i is Pr => i.kind === 'pr' && i.data.stackedOn === prId && i.data.state === 'open' && !i.archived);
+export const stackChildren = (items: Item[], prId: string): Pr[] => items.filter((i): i is Pr => i.kind === 'pr' && i.data.stackedOn === prId && i.data.state === 'open' && !i.archived);
 
 /**
  * After the parent merged: GitHub retargets stacked PRs to the parent's base by itself when the
@@ -90,9 +89,7 @@ export const stackChildren = (items: Item[], prId: string): Pr[] =>
  * retargeted with `gh pr edit --base` (the "Retarget onto …" toast / action).
  */
 export function retargetPlan(parent: PrData, children: Pr[], deletedBranch: boolean) {
-  return children
-    .filter((c) => c.data.baseBranch === parent.headBranch || !c.data.baseBranch)
-    .map((c) => ({ child: c, newBase: parent.baseBranch, automatic: deletedBranch }));
+  return children.filter((c) => c.data.baseBranch === parent.headBranch || !c.data.baseBranch).map((c) => ({ child: c, newBase: parent.baseBranch, automatic: deletedBranch }));
 }
 
 /** The child of a merged parent still targets the parent's head branch (→ "Retarget onto <parent base>"). */
@@ -106,6 +103,10 @@ export function worktreeOf(pr: Pr, linked: ItemOf<'worktree'>[], inProject: Item
 
 /** A comment / review by the AI review bot (config.json `github.aiReviewBot`; gh drops the `[bot]` suffix of app logins). */
 export const isAiReviewer = (login: string | undefined, bot: string) => {
-  const norm = (s: string) => s.toLowerCase().replace(/^app\//, '').replace(/\[bot\]$/, '');
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/^app\//, '')
+      .replace(/\[bot\]$/, '');
   return !!login && !!bot && norm(login) === norm(bot);
 };

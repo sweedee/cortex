@@ -38,7 +38,12 @@ export type DoneResult = { ok: true; via: 'direct' | 'steps' } | { ok: false; er
  * Transition to the done status; when Jira rejects it directly, walk the workflow one step at a time.
  * `transition` is `jiraOps.transition` (injected for tests); `statuses` the project's workflow.
  */
-export async function transitionToDone(key: string, status: string, transition: (key: string, status: string) => Promise<void>, statuses: JiraStatusOption[] = MOCK_STATUS_OPTIONS): Promise<DoneResult> {
+export async function transitionToDone(
+  key: string,
+  status: string,
+  transition: (key: string, status: string) => Promise<void>,
+  statuses: JiraStatusOption[] = MOCK_STATUS_OPTIONS,
+): Promise<DoneResult> {
   const done = doneStatus(statuses);
   try {
     await transition(key, done);

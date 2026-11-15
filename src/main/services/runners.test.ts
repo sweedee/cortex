@@ -25,7 +25,7 @@ function collect() {
     else {
       const s = payload as AppState | TestState;
       states.push(s);
-      for (const w of waiters.slice()) if (w.pred(s)) waiters.splice(waiters.indexOf(w), 1), w.resolve(s);
+      for (const w of waiters.slice()) if (w.pred(s)) (waiters.splice(waiters.indexOf(w), 1), w.resolve(s));
     }
   }) as never;
   const until = <T extends AppState | TestState>(pred: (s: T) => boolean) =>

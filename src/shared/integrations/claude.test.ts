@@ -15,7 +15,12 @@ const ask: ClaudeEvent = {
     id: 'msg_2',
     content: [
       { type: 'text', text: 'One question first.' },
-      { type: 'tool_use', id: 'toolu_q', name: 'AskUserQuestion', input: { questions: [{ question: 'Which store?', header: 'Store', multiSelect: false, options: [{ label: 'Redis', description: 'fast' }, { label: 'Postgres' }] }] } },
+      {
+        type: 'tool_use',
+        id: 'toolu_q',
+        name: 'AskUserQuestion',
+        input: { questions: [{ question: 'Which store?', header: 'Store', multiSelect: false, options: [{ label: 'Redis', description: 'fast' }, { label: 'Postgres' }] }] },
+      },
     ],
     usage,
   },
@@ -31,7 +36,11 @@ describe('claude stream-json reducer', () => {
     ]);
     expect(s).toMatchObject({ sessionId: S, model: 'claude-opus-5-5', status: 'running', lastText: 'Edited.' });
     expect(s.usage).toMatchObject({ inputTokens: 10, outputTokens: 20, cacheReadTokens: 1000, contextTokens: 1060 });
-    const mid = applyClaudeEvent(fold([init, { type: 'assistant', session_id: S, message: { content: [{ type: 'tool_use', id: 't1', name: 'Edit', input: { file_path: 'src/a.ts' } }] } }]), { type: 'system', subtype: 'status', session_id: S });
+    const mid = applyClaudeEvent(fold([init, { type: 'assistant', session_id: S, message: { content: [{ type: 'tool_use', id: 't1', name: 'Edit', input: { file_path: 'src/a.ts' } }] } }]), {
+      type: 'system',
+      subtype: 'status',
+      session_id: S,
+    });
     expect(mid.activity).toBe('Editing src/a.ts');
 
     const done = applyClaudeEvent(s, { type: 'result', subtype: 'success', is_error: false, session_id: S, result: 'All done', total_cost_usd: 0.25, duration_ms: 1200, num_turns: 3 });
@@ -48,7 +57,20 @@ describe('claude stream-json reducer', () => {
     const waiting = fold([init, ask]);
     expect(waiting.status).toBe('waiting');
     expect(waiting.activity).toBe('Has a question for you');
-    expect(waiting.pendingQuestion).toEqual({ toolUseId: 'toolu_q', questions: [{ question: 'Which store?', header: 'Store', multiSelect: false, options: [{ label: 'Redis', description: 'fast' }, { label: 'Postgres', description: undefined }] }] });
+    expect(waiting.pendingQuestion).toEqual({
+      toolUseId: 'toolu_q',
+      questions: [
+        {
+          question: 'Which store?',
+          header: 'Store',
+          multiSelect: false,
+          options: [
+            { label: 'Redis', description: 'fast' },
+            { label: 'Postgres', description: undefined },
+          ],
+        },
+      ],
+    });
     // the CLI's permission request for AskUserQuestion does not add a permission prompt
     const asked = applyClaudeEvent(waiting, { type: 'control_request', request_id: 'r1', request: { subtype: 'can_use_tool', tool_name: 'AskUserQuestion', input: {}, tool_use_id: 'toolu_q' } });
     expect(asked.pendingPermissions).toEqual([]);
@@ -79,7 +101,11 @@ describe('claude stream-json reducer', () => {
   });
 
   it('marks failed turns, nests subagent output, ignores unknown events', () => {
-    const s = fold([init, { type: 'assistant', session_id: S, parent_tool_use_id: 'task1', message: { content: [{ type: 'text', text: 'sub' }] } }, { type: 'rate_limit_event' } as unknown as ClaudeEvent]);
+    const s = fold([
+      init,
+      { type: 'assistant', session_id: S, parent_tool_use_id: 'task1', message: { content: [{ type: 'text', text: 'sub' }] } },
+      { type: 'rate_limit_event' } as unknown as ClaudeEvent,
+    ]);
     expect(s.messages).toMatchObject([{ role: 'assistant', text: 'sub', parent: 'task1' }]);
     expect(s.lastText).toBeUndefined();
     const f = applyClaudeEvent(s, { type: 'result', subtype: 'error_during_execution', is_error: true, session_id: S });
@@ -87,7 +113,14 @@ describe('claude stream-json reducer', () => {
   });
 
   it('replays stored transcripts (user prompts as strings) to done', () => {
-    const s = replayTranscript(base(), [{ type: 'user', session_id: S, message: { role: 'user', content: 'hello' } }, { type: 'assistant', session_id: S, message: { content: [{ type: 'text', text: 'hi' }] } }], false);
+    const s = replayTranscript(
+      base(),
+      [
+        { type: 'user', session_id: S, message: { role: 'user', content: 'hello' } },
+        { type: 'assistant', session_id: S, message: { content: [{ type: 'text', text: 'hi' }] } },
+      ],
+      false,
+    );
     expect(s.messages.map((m) => (m.role === 'tool' ? m.tool : m.text))).toEqual(['hello', 'hi']);
     expect(s.status).toBe('done');
   });

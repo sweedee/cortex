@@ -14,12 +14,20 @@ const absPath = z
   .refine((p) => !p.includes('\0'), 'path must not contain NUL')
   .refine((p) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(p), 'path must be absolute');
 
-const str = (max = 1000) => z.string().min(1).max(max).refine((s) => !s.includes('\0'), 'must not contain NUL');
+const str = (max = 1000) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((s) => !s.includes('\0'), 'must not contain NUL');
 /** refs, branch names, remotes: no leading `-` so they can never be read as an option */
 const ref = str(500).refine((s) => !s.startsWith('-'), 'must not start with "-"');
 const repo = z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'expected owner/name');
 const prNo = z.number().int().positive();
-const text = z.string().max(65_536).refine((s) => !s.includes('\0'), 'must not contain NUL');
+const text = z
+  .string()
+  .max(65_536)
+  .refine((s) => !s.includes('\0'), 'must not contain NUL');
 const env = envSchema;
 const issueKey = z.string().regex(/^[A-Za-z][A-Za-z0-9_]*-\d+$/, 'expected an issue key like CTX-123');
 const localId = str(200);
@@ -72,7 +80,14 @@ export const integrationSchemas = {
   'jira:search': z.object({ jql: str(4000), limit: z.number().int().positive().max(1000).optional() }),
   'jira:view': z.object({ key: issueKey }),
   'jira:transition': z.object({ key: issueKey, status: str(200) }),
-  'jira:create': z.object({ project: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/), type: str(100), summary: str(1000), description: text.optional(), assignee: ref.optional(), parent: issueKey.optional() }),
+  'jira:create': z.object({
+    project: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/),
+    type: str(100),
+    summary: str(1000),
+    description: text.optional(),
+    assignee: ref.optional(),
+    parent: issueKey.optional(),
+  }),
   'jira:comment': z.object({ key: issueKey, body: text.min(1) }),
   'jira:edit': z.object({ key: issueKey, summary: str(1000).optional(), description: text.optional(), assignee: ref.optional(), labels: z.array(ref).optional() }),
   'jira:statuses': z.object({ project: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/, 'expected a project key like CTX') }),
@@ -84,7 +99,10 @@ export const integrationSchemas = {
     model: ref.optional(),
     effort: z.enum(EFFORT_LEVELS).optional(),
     permissionMode: z.enum(['acceptEdits', 'auto', 'bypassPermissions', 'manual', 'dontAsk', 'plan', 'default']).optional(),
-    resume: z.string().regex(/^[\w-]{1,200}$/).optional(),
+    resume: z
+      .string()
+      .regex(/^[\w-]{1,200}$/)
+      .optional(),
     addDirs: z.array(absPath).max(50).optional(),
     appendSystemPrompt: text.optional(),
     localId: localId.optional(),

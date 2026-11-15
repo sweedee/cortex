@@ -45,5 +45,4 @@ export function useReturnFocus(open: boolean, fallback?: () => HTMLElement | nul
 }
 
 /** An IME composition is in progress: Enter confirms the composition, it must not submit. */
-export const isComposing = (e: { nativeEvent?: { isComposing?: boolean }; isComposing?: boolean; keyCode?: number }) =>
-  !!(e.nativeEvent?.isComposing ?? e.isComposing) || e.keyCode === 229;
+export const isComposing = (e: { nativeEvent?: { isComposing?: boolean }; isComposing?: boolean; keyCode?: number }) => !!(e.nativeEvent?.isComposing ?? e.isComposing) || e.keyCode === 229;

@@ -279,11 +279,16 @@ function SubStatusIcon({ status }: { status: SubagentInfo['status'] }) {
 
 /** "Explore · 3 tools · 19k tokens · 4.2s" */
 const subFacts = (s: SubagentInfo) =>
-  [s.type, s.background ? 'background' : '', `${s.toolUses} tool${s.toolUses === 1 ? '' : 's'}`, s.tokens ? `${tokens(s.tokens)} tokens` : '', s.durationMs ? duration(s.durationMs) : ''].filter(Boolean).join(' · ');
+  [s.type, s.background ? 'background' : '', `${s.toolUses} tool${s.toolUses === 1 ? '' : 's'}`, s.tokens ? `${tokens(s.tokens)} tokens` : '', s.durationMs ? duration(s.durationMs) : '']
+    .filter(Boolean)
+    .join(' · ');
 
 /** A Task / Agent call: header with the subagent's status and numbers; open = its prompt, tool calls, text, result. */
 type SubagentRowProps = { row: Extract<Row, { kind: 'subagent' }>; agent: Agent; open: boolean; openSubs: Set<string>; toggleSub: (id: string) => void };
-const SubagentRow = memo(SubagentRowImpl, (a, b) => a.row === b.row && a.open === b.open && a.toggleSub === b.toggleSub && (a.openSubs === b.openSubs || !b.open) && (a.agent === b.agent || !needsAgent(b.row)));
+const SubagentRow = memo(
+  SubagentRowImpl,
+  (a, b) => a.row === b.row && a.open === b.open && a.toggleSub === b.toggleSub && (a.openSubs === b.openSubs || !b.open) && (a.agent === b.agent || !needsAgent(b.row)),
+);
 function SubagentRowImpl({ row, agent, open, openSubs, toggleSub }: SubagentRowProps) {
   const [showPrompt, setShowPrompt] = useState(false);
   const childBlocks = useMemo(() => groupRows(row.children), [row.children]);
@@ -329,7 +334,14 @@ function SubagentStrip({ subagents, onPick }: { subagents: SubagentInfo[]; onPic
         <AgentIcon /> {t.total}
       </span>
       {subagents.map((s) => (
-        <button key={s.toolUseId} type="button" role="listitem" className={`ah-btn ah-subchip is-${s.status}`} onClick={() => onPick(s.toolUseId)} title={`${s.description} — ${s.status}${s.activity ? `: ${s.activity}` : ''}\n${subFacts(s)}`}>
+        <button
+          key={s.toolUseId}
+          type="button"
+          role="listitem"
+          className={`ah-btn ah-subchip is-${s.status}`}
+          onClick={() => onPick(s.toolUseId)}
+          title={`${s.description} — ${s.status}${s.activity ? `: ${s.activity}` : ''}\n${subFacts(s)}`}
+        >
           <SubStatusIcon status={s.status} />
           <span className="ah-ellipsis">{s.description}</span>
         </button>
@@ -439,7 +451,15 @@ export function QuestionCard({ agent, questions }: { agent: Agent; questions: Qu
               {multi && <span className="ah-sub ah-small">select any</span>}
             </div>
             {q.options.map((o) => (
-              <Option key={o.label} multi={multi} checked={c.picked.includes(o.label)} disabled={sent} label={o.label} description={o.description} onClick={() => set(i, toggleChoice(c, o.label, multi))} />
+              <Option
+                key={o.label}
+                multi={multi}
+                checked={c.picked.includes(o.label)}
+                disabled={sent}
+                label={o.label}
+                description={o.description}
+                onClick={() => set(i, toggleChoice(c, o.label, multi))}
+              />
             ))}
             <Option multi={multi} checked={c.other} disabled={sent} label="Other…" onClick={() => set(i, toggleOther(c, multi))} />
             {c.other && (
@@ -572,7 +592,13 @@ function Composer({ agent, real, session }: { agent: Agent; real: boolean; sessi
     }
   };
 
-  const placeholder = !real ? 'Demo agent: no session to talk to' : asking ? 'Answer above, or type your answer here…' : running ? 'Claude is working. Send a message to steer it…' : 'Reply to Claude… / for commands';
+  const placeholder = !real
+    ? 'Demo agent: no session to talk to'
+    : asking
+      ? 'Answer above, or type your answer here…'
+      : running
+        ? 'Claude is working. Send a message to steer it…'
+        : 'Reply to Claude… / for commands';
   return (
     <div className="ah-composer">
       {slash && options.length > 0 && (
@@ -633,7 +659,11 @@ function Composer({ agent, real, session }: { agent: Agent; real: boolean; sessi
           label="This session"
           disabled={!real}
           pending={session?.restartPending}
-          value={{ model: session ? session.modelSetting : agent.data.model, effort: (session?.effort ?? agent.data.effort) as ClaudeEffort | undefined, permissionMode: session?.permissionMode ?? agent.data.permissionMode }}
+          value={{
+            model: session ? session.modelSetting : agent.data.model,
+            effort: (session?.effort ?? agent.data.effort) as ClaudeEffort | undefined,
+            permissionMode: session?.permissionMode ?? agent.data.permissionMode,
+          }}
           onChange={(p) => void configure(p)}
         />
         <span className="ah-composer-buttons">
@@ -652,7 +682,15 @@ function Composer({ agent, real, session }: { agent: Agent; real: boolean; sessi
               </Button.Prefix>
             </Button>
           )}
-          <Button variant="accent" color="primary" size="condensed" disabled={!real || !text.trim() || sending} loading={sending} onClick={() => void send()} aria-label={running ? 'Send (steers the running turn)' : 'Send'}>
+          <Button
+            variant="accent"
+            color="primary"
+            size="condensed"
+            disabled={!real || !text.trim() || sending}
+            loading={sending}
+            onClick={() => void send()}
+            aria-label={running ? 'Send (steers the running turn)' : 'Send'}
+          >
             <Button.Prefix>
               <ArrowUpIcon />
             </Button.Prefix>
@@ -706,7 +744,11 @@ function StatusLine({ agent, session, subagents }: { agent: Agent; session: Clau
           <span className="ah-st-sep" aria-hidden />
           <span
             className={`ah-ctx tone-${tone}`}
-            title={u ? `Context: ${u.contextTokens.toLocaleString()} of ${u.contextWindow.toLocaleString()} tokens${u.windowGuessed ? ' (window assumed until the first turn ends)' : ''}${tone !== 'normal' ? ' — nearly full; Claude Code compacts automatically, or send /compact' : ''}` : 'Context window in use'}
+            title={
+              u
+                ? `Context: ${u.contextTokens.toLocaleString()} of ${u.contextWindow.toLocaleString()} tokens${u.windowGuessed ? ' (window assumed until the first turn ends)' : ''}${tone !== 'normal' ? ' — nearly full; Claude Code compacts automatically, or send /compact' : ''}`
+                : 'Context window in use'
+            }
           >
             <span className="ah-ctx-bar" aria-hidden>
               <span style={{ width: `${Math.min(100, pct)}%` }} />

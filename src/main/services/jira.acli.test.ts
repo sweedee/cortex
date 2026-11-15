@@ -37,7 +37,10 @@ describe('JiraService with real acli output', () => {
     expect(browseUrl(issue)).toBe('');
     expect(jiraBrowseUrl('CTX-6', { issue, site: 'https://sweedee.atlassian.net' })).toBe('https://sweedee.atlassian.net/browse/CTX-6');
     expect(adfToMarkdown(issue.fields.description)).toContain('Steps to reproduce');
-    expect(issue.fields.comment?.comments.map((c) => adfToMarkdown(c.body))).toEqual(['Reproduced on main, also happens with a missing title field.', 'Fix rejects "" but the whitespace case still slips through - CI is red on the PR.']);
+    expect(issue.fields.comment?.comments.map((c) => adfToMarkdown(c.body))).toEqual([
+      'Reproduced on main, also happens with a missing title field.',
+      'Fix rejects "" but the whitespace case still slips through - CI is red on the PR.',
+    ]);
   });
 
   it('searches (array, default fields only: no updated / parent)', async () => {
@@ -78,7 +81,7 @@ describe('JiraService with real acli output', () => {
   });
 
   it('turns a plain ✗ line into an error', async () => {
-    const run: Runner = async () => ({ code: 0, stdout: '✗ Failure: CTX-1 can\'t be transitioned: No allowed transitions found for given status\n', stderr: '', timedOut: false });
+    const run: Runner = async () => ({ code: 0, stdout: "✗ Failure: CTX-1 can't be transitioned: No allowed transitions found for given status\n", stderr: '', timedOut: false });
     const jira = new JiraService({ command: 'acli', prefix: [], env: {} }, { run, cwd: '.' });
     await expect(jira.transition('CTX-1', 'X')).rejects.toThrow("jira transition: CTX-1 can't be transitioned");
   });

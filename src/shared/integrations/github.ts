@@ -83,8 +83,7 @@ export interface GhPrListItem {
   deletions: number;
 }
 
-export const GH_PR_LIST_FIELDS =
-  'number,title,state,isDraft,url,author,headRefName,baseRefName,labels,updatedAt,statusCheckRollup,reviewDecision,additions,deletions';
+export const GH_PR_LIST_FIELDS = 'number,title,state,isDraft,url,author,headRefName,baseRefName,labels,updatedAt,statusCheckRollup,reviewDecision,additions,deletions';
 
 /** `gh pr view <n> --json <GH_PR_FIELDS>` */
 export interface GhPullRequest extends GhPrListItem {

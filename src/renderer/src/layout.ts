@@ -4,16 +4,7 @@
  * useLayoutTick(). Read with `positionOf(id)`.
  */
 import { useEffect, useReducer } from 'react';
-import {
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-  type SimulationLinkDatum,
-  type SimulationNodeDatum,
-} from 'd3-force';
+import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force';
 import type { Item, Link } from './domain';
 import { clearPinned, setPinned } from './store';
 
@@ -87,8 +78,14 @@ const sim = forceSimulation<Node>([])
       .distance((l) => (l.source as Node).r + (l.target as Node).r + linkGap(linkLevel(l)))
       .strength((l) => linkStrength(linkLevel(l))),
   )
-  .force('x', forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.anchor ? 0.2 : 0.04)))
-  .force('y', forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.anchor ? 0.2 : 0.04)));
+  .force(
+    'x',
+    forceX<Node>((n) => clusterCenter(n.cluster).x).strength((n) => (n.anchor ? 0.2 : 0.04)),
+  )
+  .force(
+    'y',
+    forceY<Node>((n) => clusterCenter(n.cluster).y).strength((n) => (n.anchor ? 0.2 : 0.04)),
+  );
 
 // idle until syncLayout gives it nodes (d3 would otherwise start its timer at import)
 sim.stop();
@@ -153,9 +150,7 @@ export function syncLayout(items: Item[], links: Link[], metrics: Metrics) {
   // an item patch (same nodes, same links) changes nothing here: don't re-initialise the forces
   if (!added && !removed && links === lastLinks) return;
   lastLinks = links;
-  const simLinks: SimLink[] = links
-    .filter((l) => nodes.has(l.from) && nodes.has(l.to))
-    .map((l) => ({ id: l.id, source: l.from, target: l.to }));
+  const simLinks: SimLink[] = links.filter((l) => nodes.has(l.from) && nodes.has(l.to)).map((l) => ({ id: l.id, source: l.from, target: l.to }));
   sim.nodes([...nodes.values()]);
   sim.force<ReturnType<typeof forceLink<Node, SimLink>>>('link')!.links(simLinks);
   const alpha = reheatAlpha(added, removed, simLinks.length - lastLinkCount);

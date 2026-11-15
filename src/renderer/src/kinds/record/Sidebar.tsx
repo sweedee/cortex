@@ -112,7 +112,9 @@ function RecordView({ item, ctx }: SidebarProps<'record'>) {
             <ViewIcon size={12} /> live
           </span>
         </div>
-        <div className="rec-md">{file.text.trim() ? <Markdown source={file.text} onLinkClick={(h) => void openUrl(h)} onToggleTask={(i, c) => void toggle(i, c)} /> : <div className="rec-note">The file is empty.</div>}</div>
+        <div className="rec-md">
+          {file.text.trim() ? <Markdown source={file.text} onLinkClick={(h) => void openUrl(h)} onToggleTask={(i, c) => void toggle(i, c)} /> : <div className="rec-note">The file is empty.</div>}
+        </div>
       </>
     );
 

@@ -6,7 +6,8 @@ import {
   editorArgs,
   mergePatch,
   parseUserConfig,
-  RendererConfigPatchSchema, repoUrl,
+  RendererConfigPatchSchema,
+  repoUrl,
   renderBranchTemplate,
   userConfigJsonSchema,
   UserConfigSchema,
@@ -118,7 +119,12 @@ describe('templates', () => {
   });
 
   it('new fields: bad values fall back, valid ones stick, only theme / animations are renderer-patchable', () => {
-    const c = parseUserConfig({ ui: { theme: 'sepia', animations: 'no' }, limits: { execTimeoutSec: -1, rebaseTimeoutSec: 600, outputCapMb: 5 }, refresh: { fastSec: 'x', parallel: 8 }, github: { host: 'https://evil/x' } });
+    const c = parseUserConfig({
+      ui: { theme: 'sepia', animations: 'no' },
+      limits: { execTimeoutSec: -1, rebaseTimeoutSec: 600, outputCapMb: 5 },
+      refresh: { fastSec: 'x', parallel: 8 },
+      github: { host: 'https://evil/x' },
+    });
     expect(c.ui).toMatchObject({ theme: 'system', animations: true });
     expect(c.limits).toEqual({ execTimeoutSec: 120, rebaseTimeoutSec: 600, outputCapMb: 5 });
     expect(c.refresh).toMatchObject({ fastSec: 15, parallel: 8 });

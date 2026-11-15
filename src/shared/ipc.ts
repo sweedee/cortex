@@ -6,7 +6,18 @@
  * sandboxed preload. Runtime validation (zod) of every request lives in `./schemas.ts`, used by main.
  */
 
-import type { ClaudeAnswers, ClaudeCatalog, ClaudeConfigureRequest, ClaudeConfigureResult, ClaudeEvent, ClaudeEventMessage, ClaudePermissionDecision, ClaudeSession, ClaudeSessionSummary, ClaudeStartRequest } from './integrations/claude';
+import type {
+  ClaudeAnswers,
+  ClaudeCatalog,
+  ClaudeConfigureRequest,
+  ClaudeConfigureResult,
+  ClaudeEvent,
+  ClaudeEventMessage,
+  ClaudePermissionDecision,
+  ClaudeSession,
+  ClaudeSessionSummary,
+  ClaudeStartRequest,
+} from './integrations/claude';
 import type { IntegrationConfig } from './integrations/config';
 import type { GitDiffStat, GitLogEntry, GitRebaseResult, GitStatus, GitWorktree } from './integrations/git';
 import type { GhCheck, GhMergeMethod, GhPrListItem, GhPullRequest, GhRun, GhUpdateBranchResult } from './integrations/github';
@@ -228,7 +239,6 @@ export interface JiraEditIssueRequest {
   labels?: string[];
 }
 
-
 // ---- channels -------------------------------------------------------------------------------
 
 /** Type-only marker: the value is a placeholder, the type carries the channel's [request, response]. */
@@ -379,11 +389,7 @@ type GroupOf<K> = K extends `${infer G}:${string}` ? G : never;
 export type ApiGroupName = GroupOf<InvokeChannel | EventChannel>;
 
 /** No request → `()`, an all-optional request → `(req?)`, otherwise `(req)`. */
-export type ApiCall<C extends InvokeChannel> = [Req<C>] extends [void]
-  ? () => Promise<Res<C>>
-  : Partial<Req<C>> extends Req<C>
-    ? (req?: Req<C>) => Promise<Res<C>>
-    : (req: Req<C>) => Promise<Res<C>>;
+export type ApiCall<C extends InvokeChannel> = [Req<C>] extends [void] ? () => Promise<Res<C>> : Partial<Req<C>> extends Req<C> ? (req?: Req<C>) => Promise<Res<C>> : (req: Req<C>) => Promise<Res<C>>;
 export type ApiSubscribe<E extends EventChannel> = (cb: (payload: EventChannels[E]) => void) => Unsubscribe;
 
 /** `native.<group>`: a method per invoke channel `<group>:<method>`, an `on<Event>` per event channel `<group>:<event>`. */

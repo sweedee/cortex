@@ -6,7 +6,17 @@
  * `transcriptBuilder` does the same fold incrementally (only new events) and keeps unchanged rows by
  * identity, so the memoized rows in the sidebar skip re-rendering. Pure, tested in `agent.test.ts`.
  */
-import { applyClaudeEvent, ASK_TOOL, isSubagentTool, newSession, type AskQuestion, type ClaudeEvent, type ClaudeSession, type SessionMessage, type SubagentInfo } from '../../../../shared/integrations/claude';
+import {
+  applyClaudeEvent,
+  ASK_TOOL,
+  isSubagentTool,
+  newSession,
+  type AskQuestion,
+  type ClaudeEvent,
+  type ClaudeSession,
+  type SessionMessage,
+  type SubagentInfo,
+} from '../../../../shared/integrations/claude';
 
 export { contextTone, tokens, usd } from './usage';
 
@@ -78,7 +88,8 @@ export function transcriptBuilder(localId = 'session'): TranscriptBuilder {
   const consume = (e: ClaudeEvent) => {
     if (e.type === 'assistant') {
       for (const b of e.message.content ?? []) {
-        if (b.type === 'thinking' && b.thinking?.trim() && !e.parent_tool_use_id) thinking.push({ before: s.messages.length, row: { kind: 'thinking', id: `${localId}-t${thinking.length}`, at: e.timestamp ?? '', text: b.thinking } });
+        if (b.type === 'thinking' && b.thinking?.trim() && !e.parent_tool_use_id)
+          thinking.push({ before: s.messages.length, row: { kind: 'thinking', id: `${localId}-t${thinking.length}`, at: e.timestamp ?? '', text: b.thinking } });
         else if (b.type === 'tool_use') inputs.set(b.id, b.input ?? {});
       }
     }
@@ -144,7 +155,18 @@ function rowOf(m: SessionMessage, input: Record<string, unknown> | undefined, su
   if (m.role === 'note') return { kind: 'note', id: m.id, at: m.at, text: m.text };
   if (m.role !== 'tool') return m.text.trim() ? { kind: m.role, id: m.id, at: m.at, text: m.text } : null;
   if (m.tool === ASK_TOOL) return { kind: 'question', id: m.id, at: m.at, status: m.status, questions: m.questions ?? [], answers: m.answers, error: m.status === 'error' ? m.detail : undefined };
-  if (sub) return { kind: 'subagent', id: m.id, at: m.at, tool: m.tool, status: m.status, sub, prompt: typeof input?.['prompt'] === 'string' ? input['prompt'] : undefined, result: m.detail, children: children ?? [] };
+  if (sub)
+    return {
+      kind: 'subagent',
+      id: m.id,
+      at: m.at,
+      tool: m.tool,
+      status: m.status,
+      sub,
+      prompt: typeof input?.['prompt'] === 'string' ? input['prompt'] : undefined,
+      result: m.detail,
+      children: children ?? [],
+    };
   return { kind: 'tool', id: m.id, at: m.at, tool: m.tool, summary: m.summary, status: m.status, input, result: m.detail };
 }
 

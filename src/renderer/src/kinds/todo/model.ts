@@ -9,7 +9,12 @@ export const firstLine = (s: string) =>
     ?.replace(/^[#\-*\s[\]x]+/i, '')
     .trim() ?? '';
 
-export const handleOf = (title: string) => `todo/${title.toLowerCase().replace(/[^\w]+/g, '-').slice(0, 24).replace(/^-+|-+$/g, '')}`;
+export const handleOf = (title: string) =>
+  `todo/${title
+    .toLowerCase()
+    .replace(/[^\w]+/g, '-')
+    .slice(0, 24)
+    .replace(/^-+|-+$/g, '')}`;
 
 /** A todo from the quick-add form: title, optional body, optional project. */
 export function todoFromForm(title: string, body: string, project: ItemOf<'project'> | undefined, handleTaken: (h: string) => boolean = () => false): NewItem {

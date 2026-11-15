@@ -32,7 +32,13 @@ describe('parseTestSummary', () => {
     expect(parseTestSummary('============================== 5 passed in 0.10s ==============================')).toMatchObject({ passed: 5, failed: 0 });
   });
   it('go test', () => {
-    expect(parseTestSummary('=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestB\n--- FAIL: TestB (0.01s)\nFAIL\nFAIL\tpkg\t0.02s')).toEqual({ framework: 'go', passed: 1, failed: 1, skipped: 0, total: 2 });
+    expect(parseTestSummary('=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestB\n--- FAIL: TestB (0.01s)\nFAIL\nFAIL\tpkg\t0.02s')).toEqual({
+      framework: 'go',
+      passed: 1,
+      failed: 1,
+      skipped: 0,
+      total: 2,
+    });
     expect(parseTestSummary('ok  \tgithub.com/x/a\t0.012s\nFAIL\tgithub.com/x/b\t0.3s')).toEqual({ framework: 'go', passed: 1, failed: 1, skipped: 0, total: 2 });
   });
   it('mocha and tap / node --test', () => {

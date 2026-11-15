@@ -87,8 +87,7 @@ export type ClaudeEvent = { timestamp?: string } & (
 );
 
 export type ClaudeControlRequest =
-  | { subtype: 'can_use_tool'; tool_name: string; input: Record<string, unknown>; tool_use_id?: string; decision_reason?: string; blocked_path?: string }
-  | { subtype: string; [k: string]: unknown };
+  { subtype: 'can_use_tool'; tool_name: string; input: Record<string, unknown>; tool_use_id?: string; decision_reason?: string; blocked_path?: string } | { subtype: string; [k: string]: unknown };
 
 /** Answers to an AskUserQuestion: question text → option label(s) or free text. */
 export type ClaudeAnswers = Record<string, string | string[]>;
@@ -319,8 +318,7 @@ export function parseAnswers(text: string): Record<string, string> | undefined {
 }
 
 /** Answers in the wire shape AskUserQuestion's `answers` input takes: multi-select joined with ", ". */
-export const flattenAnswers = (a: ClaudeAnswers): Record<string, string> =>
-  Object.fromEntries(Object.entries(a).map(([q, v]) => [q, Array.isArray(v) ? v.join(', ') : v]));
+export const flattenAnswers = (a: ClaudeAnswers): Record<string, string> => Object.fromEntries(Object.entries(a).map(([q, v]) => [q, Array.isArray(v) ? v.join(', ') : v]));
 
 /** The fallback: answers as a plain user message (when the tool could not be answered in-band). */
 export const answersAsText = (a: ClaudeAnswers) =>
@@ -370,7 +368,9 @@ function resultUsage(u: SessionUsage, e: Extract<ClaudeEvent, { type: 'result' }
     };
   }
   const per = e.modelUsage ?? delta ?? {};
-  const windows = Object.values(per).map((m) => m.contextWindow ?? 0).filter((n) => n > 0);
+  const windows = Object.values(per)
+    .map((m) => m.contextWindow ?? 0)
+    .filter((n) => n > 0);
   const contextWindow = (model && per[model]?.contextWindow) || (windows.length ? Math.max(...windows) : undefined) || u.contextWindow;
   return {
     ...u,
@@ -390,7 +390,15 @@ function resultUsage(u: SessionUsage, e: Extract<ClaudeEvent, { type: 'result' }
 export const isSubagentTool = (name: string) => name === 'Task' || name === 'Agent';
 
 const subStatus = (s: unknown): SubagentStatus | undefined =>
-  s === 'completed' || s === 'done' || s === 'success' ? 'done' : s === 'failed' || s === 'error' ? 'failed' : s === 'killed' || s === 'stopped' || s === 'cancelled' ? 'stopped' : s === 'running' ? 'running' : undefined;
+  s === 'completed' || s === 'done' || s === 'success'
+    ? 'done'
+    : s === 'failed' || s === 'error'
+      ? 'failed'
+      : s === 'killed' || s === 'stopped' || s === 'cancelled'
+        ? 'stopped'
+        : s === 'running'
+          ? 'running'
+          : undefined;
 
 function patchSub(list: SubagentInfo[], match: (s: SubagentInfo) => boolean, patch: Partial<SubagentInfo>): SubagentInfo[] {
   const i = list.findIndex(match);
@@ -420,7 +428,19 @@ function applyTaskEvent(subs: SubagentInfo[], e: Record<string, unknown>, at: st
     case 'task_started': {
       if (!subs.some(match)) {
         if (!toolUseId) return subs;
-        return [...subs, { toolUseId, taskId, description: str(e['description']) ?? 'Subagent', type: str(e['subagent_type']), background: e['is_backgrounded'] === true, status: 'running', startedAt: at, toolUses: 0 }];
+        return [
+          ...subs,
+          {
+            toolUseId,
+            taskId,
+            description: str(e['description']) ?? 'Subagent',
+            type: str(e['subagent_type']),
+            background: e['is_backgrounded'] === true,
+            status: 'running',
+            startedAt: at,
+            toolUses: 0,
+          },
+        ];
       }
       return patchSub(subs, match, { taskId, ...(str(e['subagent_type']) ? { type: str(e['subagent_type']) } : {}), ...(e['is_backgrounded'] === true ? { background: true } : {}) });
     }
@@ -509,8 +529,13 @@ export function applyClaudeEvent(session: ClaudeSession, event: ClaudeEvent): Cl
       const e = event as Record<string, unknown>;
       if (event.subtype === 'init') {
         const i = event as { session_id: string; model: string; permissionMode?: string };
-        return { ...base, sessionId: i.session_id ?? session.sessionId, model: i.model ?? session.model, permissionMode: i.permissionMode ?? session.permissionMode, // the CLI re-sends init after a live model switch: that alone does not start a turn
-          status: session.status === 'starting' || session.status === 'done' ? 'running' : session.status };
+        return {
+          ...base,
+          sessionId: i.session_id ?? session.sessionId,
+          model: i.model ?? session.model,
+          permissionMode: i.permissionMode ?? session.permissionMode, // the CLI re-sends init after a live model switch: that alone does not start a turn
+          status: session.status === 'starting' || session.status === 'done' ? 'running' : session.status,
+        };
       }
       // a live permission-mode switch is confirmed with system/status {permissionMode}
       if (event.subtype === 'status') return typeof e['permissionMode'] === 'string' ? { ...base, permissionMode: e['permissionMode'] } : base;
@@ -566,7 +591,16 @@ export function applyClaudeEvent(session: ClaudeSession, event: ClaudeEvent): Cl
           if (isSubagentTool(b.name) && !subagents.some((s) => s.toolUseId === b.id)) {
             subagents = [
               ...subagents,
-              { toolUseId: b.id, ...(parent ? { parent } : {}), description: str(input['description']) ?? summary ?? 'Subagent', type: str(input['subagent_type']), background: input['run_in_background'] === true, status: 'running', startedAt: at, toolUses: 0 },
+              {
+                toolUseId: b.id,
+                ...(parent ? { parent } : {}),
+                description: str(input['description']) ?? summary ?? 'Subagent',
+                type: str(input['subagent_type']),
+                background: input['run_in_background'] === true,
+                status: 'running',
+                startedAt: at,
+                toolUses: 0,
+              },
             ];
           }
           if (parent) {
@@ -608,7 +642,8 @@ export function applyClaudeEvent(session: ClaudeSession, event: ClaudeEvent): Cl
       });
       // a foreground subagent is over once its Task / Agent tool has a result (a background one only launched)
       let subagents = subs;
-      for (const [id, r] of results) subagents = patchSub(subagents, (s) => s.toolUseId === id && s.status === 'running' && !s.background, { status: r.is_error ? 'failed' : 'done', endedAt: at, activity: undefined });
+      for (const [id, r] of results)
+        subagents = patchSub(subagents, (s) => s.toolUseId === id && s.status === 'running' && !s.background, { status: r.is_error ? 'failed' : 'done', endedAt: at, activity: undefined });
       if (texts.length > 0 && !parent && !event.isReplay) messages = [...messages, { id: nextId(), role: 'user', at, text: texts.join('\n') }];
       // the permission prompt for an answered tool is gone too
       const pendingPermissions = session.pendingPermissions.filter((p) => !p.toolUseId || !results.has(p.toolUseId));
@@ -661,7 +696,6 @@ export function applyClaudeEvent(session: ClaudeSession, event: ClaudeEvent): Cl
       return base;
   }
 }
-
 
 /** Replays a transcript. `running` = a process is attached. */
 export function replayTranscript(session: ClaudeSession, events: ClaudeEvent[], running: boolean): ClaudeSession {

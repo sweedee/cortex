@@ -23,7 +23,12 @@ export function modelChoices(catalog: Pick<ClaudeCatalog, 'models'> | undefined,
   const out: Choice[] = [
     { value: '', label: 'CLI default', short: 'default', hint: catalog?.models.find((m) => m.value === 'default')?.description ?? 'Whatever the claude CLI is set to' },
     ...(fromCli.length
-      ? fromCli.map((m) => ({ value: m.value, label: m.displayName ?? m.value, short: m.value.startsWith('claude-') ? modelLabel(m.value) : m.value, hint: [m.description, m.resolvedModel && m.resolvedModel !== m.value ? m.resolvedModel : ''].filter(Boolean).join(' · ') }))
+      ? fromCli.map((m) => ({
+          value: m.value,
+          label: m.displayName ?? m.value,
+          short: m.value.startsWith('claude-') ? modelLabel(m.value) : m.value,
+          hint: [m.description, m.resolvedModel && m.resolvedModel !== m.value ? m.resolvedModel : ''].filter(Boolean).join(' · '),
+        }))
       : MODEL_ALIASES.map((a) => ({ value: a, label: a, short: a, hint: 'latest model of this family' }))),
   ];
   if (current && !out.some((c) => c.value === current || (c.value && catalog?.models.find((m) => m.value === c.value)?.resolvedModel === current)))
@@ -99,8 +104,8 @@ export function slashOptions(query: string, skills: { name: string; desc: string
   const q = query.toLowerCase();
   const seen = new Set<string>();
   const all: SlashOption[] = [];
-  for (const s of skills) if (!seen.has(s.name)) seen.add(s.name), all.push({ name: s.name, desc: s.desc, source: 'cortex' });
-  for (const c of commands) if (!seen.has(c.name)) seen.add(c.name), all.push({ name: c.name, desc: firstSentence(c.description ?? ''), args: c.argumentHint, source: 'cli' });
+  for (const s of skills) if (!seen.has(s.name)) (seen.add(s.name), all.push({ name: s.name, desc: s.desc, source: 'cortex' }));
+  for (const c of commands) if (!seen.has(c.name)) (seen.add(c.name), all.push({ name: c.name, desc: firstSentence(c.description ?? ''), args: c.argumentHint, source: 'cli' }));
   return all
     .filter((o) => o.name.toLowerCase().includes(q))
     .sort((a, b) => Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q)))

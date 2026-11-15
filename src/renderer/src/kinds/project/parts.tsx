@@ -34,7 +34,12 @@ export function Note({ children, tone }: { children: ReactNode; tone?: 'error' }
 /** The state of a query as a short line (loading / error / not available), or null when there is data. */
 export function QueryNote({ q, what, offlineHint }: { q: { isLoading: boolean; isError: boolean; error: unknown; fetchStatus: string; data: unknown }; what: string; offlineHint?: string }) {
   if (q.isLoading) return <Note>Loading {what}…</Note>;
-  if (q.isError) return <Note tone="error">Could not load {what}: {errorText(q.error)}</Note>;
+  if (q.isError)
+    return (
+      <Note tone="error">
+        Could not load {what}: {errorText(q.error)}
+      </Note>
+    );
   if (q.data === undefined && q.fetchStatus === 'idle') return <Note>{offlineHint ?? `${what} needs the desktop app and a configured project.`}</Note>;
   return null;
 }

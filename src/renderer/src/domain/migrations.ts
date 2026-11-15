@@ -158,7 +158,13 @@ function migrateItemV0(o: V0Item, repoOf: (cluster?: string) => string | undefin
           reviewDecision: o.flags?.approved ? 'APPROVED' : /pending/i.test(labels) ? 'REVIEW_REQUIRED' : undefined,
           reviews: reviews ? { approved: reviews[0], requested: reviews[1] } : undefined,
           mergeable: conflicting ? 'CONFLICTING' : o.flags?.mergeable ? 'MERGEABLE' : 'UNKNOWN',
-          checks: /fail/i.test(checks) ? { state: 'failure', failed: int(checks) ?? 1 } : /running|pending/i.test(checks) ? { state: 'pending' } : /pass/i.test(checks) ? { state: 'success' } : undefined,
+          checks: /fail/i.test(checks)
+            ? { state: 'failure', failed: int(checks) ?? 1 }
+            : /running|pending/i.test(checks)
+              ? { state: 'pending' }
+              : /pass/i.test(checks)
+                ? { state: 'success' }
+                : undefined,
           additions: diff ? Number(diff[1]) : undefined,
           deletions: diff ? Number(diff[2]) : undefined,
         },

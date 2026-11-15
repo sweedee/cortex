@@ -93,7 +93,22 @@ describe('Roots', () => {
 
 describe('isExecutablePath', () => {
   it('flags launchers and scripts', () => {
-    for (const p of ['C:\\x\\setup.exe', 'C:\\x\\run.BAT', 'C:\\x\\a.cmd', 'C:\\x\\link.lnk', 'C:\\x\\s.ps1', 'C:\\x\\v.vbs', 'C:\\x\\i.msi', 'C:\\x\\a.js', '/x/Thing.app', '/x/run.sh', '/x/a.command', 'C:\\x\\evil.exe.', 'C:\\x\\evil.exe ', 'C:\\x\\a.txt:hidden.exe']) {
+    for (const p of [
+      'C:\\x\\setup.exe',
+      'C:\\x\\run.BAT',
+      'C:\\x\\a.cmd',
+      'C:\\x\\link.lnk',
+      'C:\\x\\s.ps1',
+      'C:\\x\\v.vbs',
+      'C:\\x\\i.msi',
+      'C:\\x\\a.js',
+      '/x/Thing.app',
+      '/x/run.sh',
+      '/x/a.command',
+      'C:\\x\\evil.exe.',
+      'C:\\x\\evil.exe ',
+      'C:\\x\\a.txt:hidden.exe',
+    ]) {
       expect(isExecutablePath(p), p).toBe(true);
     }
   });

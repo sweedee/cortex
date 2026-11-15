@@ -60,10 +60,11 @@ export function makeCtx(items: Item[], links: Link[]): KindCtx {
           .filter((x): x is Item => !!x),
         kind,
       ),
-    inProject: (projectId, kind) => ofKind(
-      items.filter((i) => i.projectId === projectId && i.id !== projectId),
-      kind,
-    ),
+    inProject: (projectId, kind) =>
+      ofKind(
+        items.filter((i) => i.projectId === projectId && i.id !== projectId),
+        kind,
+      ),
     projectOf: (item) => ctx.getAs(item.projectId, 'project'),
     kind: getKind,
   };

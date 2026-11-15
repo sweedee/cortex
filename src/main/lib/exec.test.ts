@@ -19,7 +19,13 @@ describe('runExec (real child processes, no shell)', () => {
   });
 
   it('feeds stdin and merges env', async () => {
-    const r = await runExec({ cmd: 'node', args: ['-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(s+process.env.CORTEX_T))'], cwd, stdin: 'hi-', env: { CORTEX_T: 'there' } });
+    const r = await runExec({
+      cmd: 'node',
+      args: ['-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(s+process.env.CORTEX_T))'],
+      cwd,
+      stdin: 'hi-',
+      env: { CORTEX_T: 'there' },
+    });
     expect(r.stdout.trim()).toBe('hi-there');
   });
 

@@ -69,7 +69,10 @@ export class JiraService {
 
   private label(args: string[]) {
     // the mock runs as `<electron> <script> jira workitem …`: name it by what it does in errors
-    return `jira ${args.filter((a) => !a.startsWith('-')).slice(0, 2).join(' ')}`.trim();
+    return `jira ${args
+      .filter((a) => !a.startsWith('-'))
+      .slice(0, 2)
+      .join(' ')}`.trim();
   }
 
   private acli(args: string[]) {

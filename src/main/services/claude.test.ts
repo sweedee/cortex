@@ -28,7 +28,7 @@ function manager(store = join(dir, `sessions-${Math.random().toString(36).slice(
       else {
         const s = payload as ClaudeSessionSummary;
         states.push(s);
-        for (const w of waiters.slice()) if (w.pred(s)) waiters.splice(waiters.indexOf(w), 1), w.resolve(s);
+        for (const w of waiters.slice()) if (w.pred(s)) (waiters.splice(waiters.indexOf(w), 1), w.resolve(s));
       }
     }) as never,
   });
@@ -56,14 +56,38 @@ describe('ClaudeSessions (fake claude process)', () => {
     // the flags reached the CLI
     const init = events.find((e) => e.event.type === 'system')!.event as unknown as { argv: string[] };
     expect(init.argv).toEqual(
-      expect.arrayContaining(['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-prompt-tool', 'stdio', '--session-id', idle.sessionId, '--model', 'opus', '--permission-mode', 'acceptEdits', '--add-dir', dir, '--append-system-prompt', 'be brief']),
+      expect.arrayContaining([
+        '-p',
+        '--input-format',
+        'stream-json',
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--permission-prompt-tool',
+        'stdio',
+        '--session-id',
+        idle.sessionId,
+        '--model',
+        'opus',
+        '--permission-mode',
+        'acceptEdits',
+        '--add-dir',
+        dir,
+        '--append-system-prompt',
+        'be brief',
+      ]),
     );
 
     m.send(s.localId, 'again');
     const second = await until((x) => x.status === 'idle' && x.lastText === 'echo: again');
     expect(second.usage.costUsd).toBeCloseTo(0.02);
     expect(second.usage.turns).toBe(2);
-    expect(m.session(s.localId).messages.filter((x) => x.role === 'user').map((x) => (x.role === 'user' ? x.text : ''))).toEqual(['hello there', 'again']);
+    expect(
+      m
+        .session(s.localId)
+        .messages.filter((x) => x.role === 'user')
+        .map((x) => (x.role === 'user' ? x.text : '')),
+    ).toEqual(['hello there', 'again']);
     expect(m.transcript(s.localId).length).toBeGreaterThan(4);
 
     expect(await m.stop(s.localId)).toBe(true);

@@ -43,7 +43,10 @@ describe('claude:state → agent', () => {
     const q = { toolUseId: 'tu1', questions: [{ question: 'Which approach?', header: 'Approach', multiSelect: false, options: [{ label: 'Retry' }, { label: 'Queue' }] }] };
     const m = mapClaudeState(session({ status: 'waiting', pendingQuestion: q }), agent(), 'Implement');
     expect(m.patch.status).toBe('waiting');
-    expect(m.patch.pendingQuestion).toEqual({ toolUseId: 'tu1', questions: [{ question: 'Which approach?', header: 'Approach', multiSelect: false, options: [{ label: 'Retry' }, { label: 'Queue' }] }] });
+    expect(m.patch.pendingQuestion).toEqual({
+      toolUseId: 'tu1',
+      questions: [{ question: 'Which approach?', header: 'Approach', multiSelect: false, options: [{ label: 'Retry' }, { label: 'Queue' }] }],
+    });
     expect(m.notice).toEqual({ tone: 'warning', text: 'Implement asks: Which approach?' });
     expect(mapClaudeState(session({ status: 'waiting', pendingQuestion: q }), agent({ status: 'waiting' }), 'Implement').notice).toBeUndefined();
   });
@@ -88,10 +91,17 @@ describe('app:state / test:state', () => {
     const failed = mapTestState(test({ status: 'failed', summary: { framework: 'vitest', passed: 40, failed: 2, skipped: 1, total: 43 }, finishedAt: 9 }), prevTest);
     expect(failed.patch).toMatchObject({ state: 'failed', summary: { passed: 40, failed: 2, skipped: 1 }, endedAt: 9 });
     expect(failed.notice).toEqual({ tone: 'critical', text: '2 tests failed' });
-    expect(mapTestState(test({ status: 'passed', summary: { framework: 'vitest', passed: 5, failed: 0, skipped: 0, total: 5 } }), prevTest).notice).toEqual({ tone: 'success', text: 'All 5 tests passed' });
+    expect(mapTestState(test({ status: 'passed', summary: { framework: 'vitest', passed: 5, failed: 0, skipped: 0, total: 5 } }), prevTest).notice).toEqual({
+      tone: 'success',
+      text: 'All 5 tests passed',
+    });
     expect(mapTestState(test({ status: 'error', error: 'stopped' }), prevTest)).toMatchObject({ patch: { state: 'stopped' }, notice: undefined });
     // a new run clears the old tail and summary
-    expect(mapTestState(test({}), { ...prevTest, state: 'failed', outputTail: 'old', summary: { passed: 1, failed: 1, skipped: 0 } }).patch).toMatchObject({ state: 'running', summary: undefined, outputTail: undefined });
+    expect(mapTestState(test({}), { ...prevTest, state: 'failed', outputTail: 'old', summary: { passed: 1, failed: 1, skipped: 0 } }).patch).toMatchObject({
+      state: 'running',
+      summary: undefined,
+      outputTail: undefined,
+    });
   });
 
   it('tailOf keeps the end, cut at a line', () => {
@@ -144,9 +154,20 @@ describe('refresher mappings', () => {
     const issue = {
       key: 'CTX-1',
       self: 'https://x/rest/api/3/issue/1',
-      fields: { summary: 'Retry exporter', status: { name: 'In Review', statusCategory: { key: 'indeterminate' } }, issuetype: { name: 'Bug' }, priority: { name: 'High' }, assignee: { displayName: 'Me' }, updated: '', customfield_10016: 3 },
+      fields: {
+        summary: 'Retry exporter',
+        status: { name: 'In Review', statusCategory: { key: 'indeterminate' } },
+        issuetype: { name: 'Bug' },
+        priority: { name: 'High' },
+        assignee: { displayName: 'Me' },
+        updated: '',
+        customfield_10016: 3,
+      },
     } as unknown as JiraIssue;
-    expect(ticketPatch(issue)).toEqual({ title: 'Retry exporter', patch: { status: 'In Review', statusCategory: 'indeterminate', type: 'Bug', priority: 'High', assignee: 'Me', sprint: undefined, points: 3 } });
+    expect(ticketPatch(issue)).toEqual({
+      title: 'Retry exporter',
+      patch: { status: 'In Review', statusCategory: 'indeterminate', type: 'Bug', priority: 'High', assignee: 'Me', sprint: undefined, points: 3 },
+    });
   });
 
   it('git status → worktree stats; unchanged stats are no change', () => {

@@ -36,10 +36,7 @@ const DEFAULT_SETTINGS: Settings = {
   sidebarWidth: DEFAULT_PREFS.sidebarWidth,
 };
 
-export type Dialog =
-  | { type: 'add'; kind: Kind; at: { x: number; y: number } }
-  | { type: 'confirm'; title: string; body: string; confirm: string; danger?: boolean; onConfirm: () => void }
-  | null;
+export type Dialog = { type: 'add'; kind: Kind; at: { x: number; y: number } } | { type: 'confirm'; title: string; body: string; confirm: string; danger?: boolean; onConfirm: () => void } | null;
 
 export const EMPTY_FILTER: Filter = { kinds: [], status: [], projects: [], query: '', unreadOnly: false, showArchived: false };
 
@@ -157,7 +154,7 @@ export function visibleSet(s: State = getState()): Set<string> {
     if (i.archived && !f.showArchived) continue;
     if (f.kinds.length && !f.kinds.includes(i.kind)) continue;
     if (groups.length && !groups.some((g) => g.test(info!.get(i.id)?.ring ?? []))) continue;
-    if (roots && !(f.projects.includes(i.id) || i.projectId && f.projects.includes(i.projectId) || roots.get(i.id)?.some((r) => f.projects.includes(r)))) continue;
+    if (roots && !(f.projects.includes(i.id) || (i.projectId && f.projects.includes(i.projectId)) || roots.get(i.id)?.some((r) => f.projects.includes(r)))) continue;
     if (f.unreadOnly && !(i.notice && !i.notice.read)) continue;
     if (q && !(info!.get(i.id)?.text ?? `${i.handle} ${i.title}`).toLowerCase().includes(q)) continue;
     ids.add(i.id);
@@ -167,8 +164,7 @@ export function visibleSet(s: State = getState()): Set<string> {
 }
 export const useVisible = () => useStore(visibleSet);
 
-export const activeFilterCount = (f: Filter) =>
-  f.kinds.length + f.status.length + f.projects.length + (f.query.trim() ? 1 : 0) + (f.unreadOnly ? 1 : 0) + (f.showArchived ? 1 : 0);
+export const activeFilterCount = (f: Filter) => f.kinds.length + f.status.length + f.projects.length + (f.query.trim() ? 1 : 0) + (f.unreadOnly ? 1 : 0) + (f.showArchived ? 1 : 0);
 
 /** Drop selection / inspection of items that are no longer visible. */
 const prune = (s: State): State => {
@@ -234,8 +230,7 @@ function withSelection(s: State, next: string[], mention: boolean): State {
   return mention ? { ...base, ...autoMention(base, next) } : { ...base, autoIds: [] };
 }
 
-export const select = (ids: string[], additive = false, opts: { mention?: boolean } = {}) =>
-  setState((s) => withSelection(s, additive ? toggleAll(s.selected, ids) : ids, opts.mention ?? true));
+export const select = (ids: string[], additive = false, opts: { mention?: boolean } = {}) => setState((s) => withSelection(s, additive ? toggleAll(s.selected, ids) : ids, opts.mention ?? true));
 
 const toggleAll = (cur: string[], ids: string[]) => {
   const set = new Set(cur);
@@ -342,7 +337,7 @@ export const removeItems = (ids: string[]): RemovedSnapshot => {
   return snapshot;
 };
 
-const reinsert = <T,>(list: T[], entries: { value: T; index: number }[]) => {
+const reinsert = <T>(list: T[], entries: { value: T; index: number }[]) => {
   const out = [...list];
   for (const e of [...entries].sort((a, b) => a.index - b.index)) out.splice(Math.min(e.index, out.length), 0, e.value);
   return out;
@@ -387,19 +382,13 @@ export const setArchived = (ids: string[], archived: boolean) => {
   setState((s) =>
     prune({
       ...s,
-      items: s.items.map((i) =>
-        set.has(i.id) ? ({ ...i, archived: archived || undefined, notice: archived && i.notice ? { ...i.notice, read: true } : i.notice, updatedAt: now } as Item) : i,
-      ),
+      items: s.items.map((i) => (set.has(i.id) ? ({ ...i, archived: archived || undefined, notice: archived && i.notice ? { ...i.notice, read: true } : i.notice, updatedAt: now } as Item) : i)),
     }),
   );
 };
 
 export const addLink = (from: string, to: string, label: LinkLabel) =>
-  setState((s) =>
-    s.links.some((l) => (l.from === from && l.to === to) || (l.from === to && l.to === from))
-      ? s
-      : { ...s, links: [...s.links, { id: newId('l'), from, to, label }] },
-  );
+  setState((s) => (s.links.some((l) => (l.from === from && l.to === to) || (l.from === to && l.to === from)) ? s : { ...s, links: [...s.links, { id: newId('l'), from, to, label }] }));
 
 /** Remember where the user dropped bubbles (persisted; the layout pins them there). */
 export function setPinned(pos: Map<string, { x: number; y: number }>) {

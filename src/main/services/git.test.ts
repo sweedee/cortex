@@ -56,10 +56,7 @@ describe('GitService (real git, temp repo)', () => {
     expect(s.dirty).toBe(true);
     expect(s.rebasing).toBe(false);
     expect(s.files).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: 'a.txt', index: '.', worktree: 'M', kind: 'changed' }),
-        expect.objectContaining({ path: 'new file.txt', kind: 'untracked' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ path: 'a.txt', index: '.', worktree: 'M', kind: 'changed' }), expect.objectContaining({ path: 'new file.txt', kind: 'untracked' })]),
     );
     const stat = await git.diffStat(repo);
     expect(stat).toEqual({ files: [{ path: 'a.txt', additions: 1, deletions: 1 }], additions: 1, deletions: 1 });

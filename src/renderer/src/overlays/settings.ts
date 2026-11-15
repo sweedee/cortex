@@ -19,7 +19,10 @@ import { EFFORT_LEVELS, type ClaudeCatalog } from '../../../shared/integrations/
 import { DEFAULT_USER_CONFIG, type UserConfigPatch, type UserConfigState } from '../../../shared/userConfig';
 import { effortChoices, modelChoices, PERMISSION_CHOICES } from '../chat/sessionOptions';
 
-const PERMISSION_MODES: { value: Settings['permissionMode']; label: string }[] = PERMISSION_CHOICES.map((c) => ({ value: c.value, label: c.value === 'default' ? 'CLI default (no flag)' : `${c.label}: ${c.hint}` }));
+const PERMISSION_MODES: { value: Settings['permissionMode']; label: string }[] = PERMISSION_CHOICES.map((c) => ({
+  value: c.value,
+  label: c.value === 'default' ? 'CLI default (no flag)' : `${c.label}: ${c.hint}`,
+}));
 /** select value for "no flag" (a select can't hold '') */
 const DEFAULT = 'default';
 
@@ -102,12 +105,37 @@ export async function openSettings() {
     },
     fields: [
       { name: 'colorBy', label: 'Bubble colour', type: 'select', options: COLOR_BY, hint: 'What the colour of a bubble stands for on the canvas.' },
-      { name: 'model', label: 'Claude model', type: 'select', options: models, hint: 'claude --model for new sessions (also the model picker under the chat box). A running session changes its model from its own composer.' },
+      {
+        name: 'model',
+        label: 'Claude model',
+        type: 'select',
+        options: models,
+        hint: 'claude --model for new sessions (also the model picker under the chat box). A running session changes its model from its own composer.',
+      },
       { name: 'modelCustom', label: 'Or a full model id', type: 'text', placeholder: 'e.g. claude-opus-5-5', hint: 'Overrides the selection above when filled.' },
       { name: 'effort', label: 'Effort', type: 'select', options: EFFORT_OPTIONS, hint: 'claude --effort for new sessions. Low to xhigh also change live in a running session; max only at start.' },
-      { name: 'permissionMode', label: 'Permission mode', type: 'select', options: PERMISSION_MODES, hint: 'claude --permission-mode for new sessions (changes live in a running session). Tool prompts show up as Allow / Deny on the agent bubble.' },
-      { name: 'aiReviewComment', label: 'AI review comment', type: 'text', placeholder: DEFAULT_USER_CONFIG.github.aiReviewComment, hint: 'Posted on a PR by “Request AI review”. Blank = the default shown.' },
-      { name: 'refreshSec', label: 'Background refresh (seconds)', type: 'text', required: true, validate: validRefresh, hint: 'How often git / GitHub / Jira caches on the bubbles refresh (15 s while checks or builds run).' },
+      {
+        name: 'permissionMode',
+        label: 'Permission mode',
+        type: 'select',
+        options: PERMISSION_MODES,
+        hint: 'claude --permission-mode for new sessions (changes live in a running session). Tool prompts show up as Allow / Deny on the agent bubble.',
+      },
+      {
+        name: 'aiReviewComment',
+        label: 'AI review comment',
+        type: 'text',
+        placeholder: DEFAULT_USER_CONFIG.github.aiReviewComment,
+        hint: 'Posted on a PR by “Request AI review”. Blank = the default shown.',
+      },
+      {
+        name: 'refreshSec',
+        label: 'Background refresh (seconds)',
+        type: 'text',
+        required: true,
+        validate: validRefresh,
+        hint: 'How often git / GitHub / Jira caches on the bubbles refresh (15 s while checks or builds run).',
+      },
       { name: 'desktopNotify', label: 'Desktop notifications when Cortex is in the background', type: 'checkbox' },
       { name: 'soundOn', label: 'Sound for new notices', type: 'checkbox' },
       { name: 'theme', label: 'Theme', type: 'select', options: THEME_OPTIONS },

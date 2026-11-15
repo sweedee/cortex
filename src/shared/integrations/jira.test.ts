@@ -14,7 +14,14 @@ describe('ADF helpers', () => {
       type: 'doc',
       content: [
         { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Title' }] },
-        { type: 'paragraph', content: [{ type: 'text', text: 'bold', marks: [{ type: 'strong' }] }, { type: 'text', text: ' and ' }, { type: 'text', text: 'link', marks: [{ type: 'link', attrs: { href: 'https://x' } }] }] },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'bold', marks: [{ type: 'strong' }] },
+            { type: 'text', text: ' and ' },
+            { type: 'text', text: 'link', marks: [{ type: 'link', attrs: { href: 'https://x' } }] },
+          ],
+        },
         { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'let a = 1' }] },
       ],
     };

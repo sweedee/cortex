@@ -70,7 +70,11 @@ describe('ticket model', () => {
   it('lists issue links', () => {
     const rows = linkRows({
       issuelinks: [
-        { id: '1', type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' }, outwardIssue: { key: 'CTX-2', fields: { summary: 'Other', status: { name: 'To Do', statusCategory: { id: 2, key: 'new', name: 'To Do' } } } } },
+        {
+          id: '1',
+          type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' },
+          outwardIssue: { key: 'CTX-2', fields: { summary: 'Other', status: { name: 'To Do', statusCategory: { id: 2, key: 'new', name: 'To Do' } } } },
+        },
         { type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' }, inwardIssue: { key: 'CTX-3', fields: { summary: 'Third' } } },
       ],
     });

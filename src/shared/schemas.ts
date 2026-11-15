@@ -19,14 +19,22 @@ export const absPath = z
   .refine(isAbsolute, 'path must be absolute');
 
 const env = envSchema;
-const arg = z.string().max(32_768).refine((a) => !a.includes('\0'), 'argument must not contain NUL');
+const arg = z
+  .string()
+  .max(32_768)
+  .refine((a) => !a.includes('\0'), 'argument must not contain NUL');
 
 export const execRunSchema = z.object({
   cmd: z.enum(EXEC_ALLOWLIST),
   args: z.array(arg).max(1000),
   cwd: absPath,
   env,
-  timeoutMs: z.number().int().positive().max(60 * 60 * 1000).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(60 * 60 * 1000)
+    .optional(),
   stdin: z.string().optional(),
 });
 

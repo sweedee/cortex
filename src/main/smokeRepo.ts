@@ -98,7 +98,8 @@ export async function runRepoSmoke(win: BrowserWindow, allowRoot: (dir: string) 
   const steps: Step[] = [];
   const wc = win.webContents;
   /** run `async (d, h) => …` in the page; JSON result */
-  const page = async <T = unknown>(fn: string): Promise<T> => wc.executeJavaScript(`(async () => { const d = window.__cortexDebug; const h = window.__smk; return await (${fn})(d, h); })()`) as Promise<T>;
+  const page = async <T = unknown>(fn: string): Promise<T> =>
+    wc.executeJavaScript(`(async () => { const d = window.__cortexDebug; const h = window.__smk; return await (${fn})(d, h); })()`) as Promise<T>;
   const shot = async (name: string) => {
     await new Promise((r) => setTimeout(r, 700));
     const file = join(shots, `${String(steps.length).padStart(2, '0')}-${name}.png`);
@@ -242,7 +243,10 @@ export async function runRepoSmoke(win: BrowserWindow, allowRoot: (dir: string) 
   await step(`record file records/<branch>/plan.md → record bubble, linked`, async () => {
     const dir = join(repo, 'records', ...branch.split('/'));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'plan.md'), `# Plan: ${branch}\n\n- [x] Reproduce the 503 drop\n- [ ] Cap the delay at maxDelay\n- [ ] Add jitter\n\n\`\`\`mermaid\nflowchart LR\n  Retry --> Cap --> Jitter\n\`\`\`\n`);
+    writeFileSync(
+      join(dir, 'plan.md'),
+      `# Plan: ${branch}\n\n- [x] Reproduce the 503 drop\n- [ ] Cap the delay at maxDelay\n- [ ] Add jitter\n\n\`\`\`mermaid\nflowchart LR\n  Retry --> Cap --> Jitter\n\`\`\`\n`,
+    );
     const rec = await page<{ id: string; title: string; data: { steps?: { done: number; total: number }; recordType: string }; links: string[] }>(`async (d, h) => {
       const r = await h.until(() => h.byKind('record')[0], Boolean, 40000, 'record item');
       d.select([r.id]); d.inspect(r.id);
@@ -382,7 +386,9 @@ export async function runRepoSmoke(win: BrowserWindow, allowRoot: (dir: string) 
     return `nested ${r1.nested.join(', ')}, ${r1.chips} badge(s); configure ${r.badge}; model ${r.model}; note "${r.note}"; slash ${r.slash.join(' ')}; status "${r.status}"`;
   });
   await shot('agent-slash-and-switch');
-  await page(`async (d, h) => { const ta = h.$('.ah-composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, ''); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.blur(); return true; }`).catch(() => false);
+  await page(
+    `async (d, h) => { const ta = h.$('.ah-composer textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, ''); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.blur(); return true; }`,
+  ).catch(() => false);
 
   await step('settings dialog (HUD gear)', async () => {
     const f = await page<{ values: Record<string, unknown> } | undefined>(`async (d, h) => {

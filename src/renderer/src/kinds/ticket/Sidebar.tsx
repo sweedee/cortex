@@ -79,7 +79,9 @@ function Links({ issue, onCanvas }: { issue: JiraIssue; onCanvas: (key: string) 
         const id = onCanvas(r.key);
         return (
           <button key={r.id} className="sidebar-row" title={r.summary} onClick={() => (id ? focusItem(id) : void openUrl(ticketUrl(r.key)))}>
-            <span className="sidebar-row-rel" style={{ width: 84 }}>{r.relation}</span>
+            <span className="sidebar-row-rel" style={{ width: 84 }}>
+              {r.relation}
+            </span>
             <span style={{ flex: 'none', ...mono }}>{r.key}</span>
             <span className="sidebar-row-main">{r.summary}</span>
             {r.status && <ToneChip tone="neutral">{r.status}</ToneChip>}
@@ -178,11 +180,7 @@ function Details(props: SidebarProps<'ticket'>) {
         {q.isError && <Note tone="error">Could not load the issue from Jira ({errorText(q.error)}). Showing the cached values.</Note>}
       </SidebarSection>
       <Fields item={item} issue={issue} />
-      {issue && (
-        <SidebarSection label="Description">
-          {description ? <Markdown source={description} onLinkClick={(h: string) => void openUrl(h)} /> : <Note>No description.</Note>}
-        </SidebarSection>
-      )}
+      {issue && <SidebarSection label="Description">{description ? <Markdown source={description} onLinkClick={(h: string) => void openUrl(h)} /> : <Note>No description.</Note>}</SidebarSection>}
       {issue && <Links issue={issue} onCanvas={onCanvas} />}
       <Comments issue={issue} itemKey={item.data.key} />
       <Related {...props} />
@@ -211,4 +209,3 @@ export function TicketSidebar(props: SidebarProps<'ticket'>) {
     />
   );
 }
-

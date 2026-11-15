@@ -26,10 +26,38 @@ export function demoWorld(now = Date.now()): World {
 
   const items: Item[] = [
     at({ id: 'p-demo', kind: 'project', handle: 'demo', title: 'demo', data: { repo: DEMO_REPO, defaultBranch: 'main', startCommand: 'npm start', testCommand: 'npm test' } }),
-    at({ id: 't-demo1', kind: 'ticket', handle: 'DEMO-1', title: 'Filter todos by status', projectId: 'p-demo', data: { key: 'DEMO-1', status: 'In Progress', statusCategory: 'indeterminate', type: 'Story', priority: 'Medium', assignee: me } }),
-    at({ id: 't-demo2', kind: 'ticket', handle: 'DEMO-2', title: 'Blank title creates an empty todo', projectId: 'p-demo', data: { key: 'DEMO-2', status: 'In Progress', statusCategory: 'indeterminate', type: 'Bug', priority: 'Medium', assignee: me } }),
-    at({ id: 't-demo3', kind: 'ticket', handle: 'DEMO-3', title: 'Due dates for todos', projectId: 'p-demo', data: { key: 'DEMO-3', status: 'Backlog', statusCategory: 'new', type: 'Story', priority: 'Low' } }),
-    at({ id: 'pr-1', kind: 'pr', handle: 'PR-1', title: 'DEMO-1: Filter todos by status', projectId: 'p-demo', data: { ...pr, number: 1, headBranch: 'feature/DEMO-1-filter', baseBranch: 'main', checks: { state: 'success', passed: 3 }, additions: 43, deletions: 4 } }),
+    at({
+      id: 't-demo1',
+      kind: 'ticket',
+      handle: 'DEMO-1',
+      title: 'Filter todos by status',
+      projectId: 'p-demo',
+      data: { key: 'DEMO-1', status: 'In Progress', statusCategory: 'indeterminate', type: 'Story', priority: 'Medium', assignee: me },
+    }),
+    at({
+      id: 't-demo2',
+      kind: 'ticket',
+      handle: 'DEMO-2',
+      title: 'Blank title creates an empty todo',
+      projectId: 'p-demo',
+      data: { key: 'DEMO-2', status: 'In Progress', statusCategory: 'indeterminate', type: 'Bug', priority: 'Medium', assignee: me },
+    }),
+    at({
+      id: 't-demo3',
+      kind: 'ticket',
+      handle: 'DEMO-3',
+      title: 'Due dates for todos',
+      projectId: 'p-demo',
+      data: { key: 'DEMO-3', status: 'Backlog', statusCategory: 'new', type: 'Story', priority: 'Low' },
+    }),
+    at({
+      id: 'pr-1',
+      kind: 'pr',
+      handle: 'PR-1',
+      title: 'DEMO-1: Filter todos by status',
+      projectId: 'p-demo',
+      data: { ...pr, number: 1, headBranch: 'feature/DEMO-1-filter', baseBranch: 'main', checks: { state: 'success', passed: 3 }, additions: 43, deletions: 4 },
+    }),
     at({
       id: 'pr-2',
       kind: 'pr',
@@ -45,7 +73,10 @@ export function demoWorld(now = Date.now()): World {
       handle: 'todo/demo-world',
       title: 'This is a demo world',
       projectId: 'p-demo',
-      data: { body: '# This is a demo world\n\nEverything here is made up and static. Add your own project (right-click the canvas → *Add to canvas* → **Add project…**), then use *Reset workspace* in the settings to clear this.', done: false },
+      data: {
+        body: '# This is a demo world\n\nEverything here is made up and static. Add your own project (right-click the canvas → *Add to canvas* → **Add project…**), then use *Reset workspace* in the settings to clear this.',
+        done: false,
+      },
     }),
   ];
 

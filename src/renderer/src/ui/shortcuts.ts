@@ -5,17 +5,7 @@
 
 export type ShortcutScope = 'canvas' | 'bubble';
 
-export type ShortcutId =
-  | 'chat'
-  | 'fit'
-  | 'remove'
-  | 'selectAll'
-  | 'primary'
-  | 'escape'
-  | 'help'
-  | 'move'
-  | 'open'
-  | 'toggle';
+export type ShortcutId = 'chat' | 'fit' | 'remove' | 'selectAll' | 'primary' | 'escape' | 'help' | 'move' | 'open' | 'toggle';
 
 /** One key: `key` is `KeyboardEvent.key` (letters lower case); `mod` = Ctrl, or ⌘ on macOS. */
 export interface KeyBinding {
@@ -91,6 +81,8 @@ export const shortcutsIn = (scope: ShortcutScope) => SHORTCUTS.filter((s) => s.s
 
 /** The written keys of a shortcut, e.g. "Ctrl+K" for chat (for tooltips). */
 export const shortcutHint = (id: ShortcutId, mac = false) =>
-  SHORTCUTS.find((s) => s.id === id)?.keys.map((b) => keyLabel(b, mac)).join(' / ') ?? '';
+  SHORTCUTS.find((s) => s.id === id)
+    ?.keys.map((b) => keyLabel(b, mac))
+    .join(' / ') ?? '';
 
 export const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);

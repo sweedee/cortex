@@ -13,7 +13,12 @@ import { z } from 'zod';
 import { EFFORT_LEVELS, PERMISSION_MODES } from './integrations/claude';
 import { JIRA_FIELDS } from './integrations/jira';
 
-const text = (max = 1000) => z.string().min(1).max(max).refine((s) => !s.includes('\0'), 'must not contain NUL');
+const text = (max = 1000) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((s) => !s.includes('\0'), 'must not contain NUL');
 /** a program / argument: no NUL, no leading `-` for the program */
 const program = text(4096).refine((s) => !s.startsWith('-'), 'must not start with "-"');
 /** a folder relative to a base checkout: no absolute path, no `..` */
@@ -61,7 +66,11 @@ export const UserConfigSchema = z.object({
       aiReviewBot: text(200).catch('claude[bot]').describe('Login of the bot that answers it'),
       renovate: section(
         {
-          app: z.string().regex(/^[\w.-]+$/, 'expected a GitHub App slug').catch('renovate').describe('Renovate GitHub App slug (gh pr list --app)'),
+          app: z
+            .string()
+            .regex(/^[\w.-]+$/, 'expected a GitHub App slug')
+            .catch('renovate')
+            .describe('Renovate GitHub App slug (gh pr list --app)'),
           label: text(200).catch('renovate').describe('Label Renovate (or Dependabot) PRs carry'),
         },
         'Dependency-update PRs',
@@ -72,7 +81,10 @@ export const UserConfigSchema = z.object({
   jira: section(
     {
       cli: z.enum(['acli', 'mock']).catch('acli').describe('"acli" = the Atlassian CLI on PATH; "mock" = the bundled Jira mock'),
-      site: z.union([z.literal(''), z.url({ protocol: /^https?$/ })]).catch('').describe('Jira site for links (https://acme.atlassian.net); "" = from acli auth status'),
+      site: z
+        .union([z.literal(''), z.url({ protocol: /^https?$/ })])
+        .catch('')
+        .describe('Jira site for links (https://acme.atlassian.net); "" = from acli auth status'),
       fields: section(
         {
           storyPoints: customField.catch(JIRA_FIELDS.storyPoints).describe('Custom field id of story points (acli jira workitem view <KEY> --json --fields "*all")'),
@@ -86,7 +98,10 @@ export const UserConfigSchema = z.object({
   git: section(
     {
       branchTemplate: text(200).catch('{key}-{slug}').describe('Branch name for a ticket: {key} = issue key, {slug} = title slug (e.g. feat/{key}-{slug})'),
-      defaultBranch: text(200).refine((s) => !s.startsWith('-'), 'must not start with "-"').catch('main').describe('Default branch when a project has none'),
+      defaultBranch: text(200)
+        .refine((s) => !s.startsWith('-'), 'must not start with "-"')
+        .catch('main')
+        .describe('Default branch when a project has none'),
       worktreesDir: text(1000).catch('../wt/{repo}').describe('Default worktrees folder of a new project, relative to its base checkout or absolute; {repo} = the checkout folder name'),
     },
     'git',
@@ -140,9 +155,18 @@ export const RendererConfigPatchSchema = z.strictObject({
     })
     .partial()
     .optional(),
-  github: z.strictObject({ aiReviewComment: text(65_536).nullable() }).partial().optional(),
-  refresh: z.strictObject({ intervalSec: int(10, 3600) }).partial().optional(),
-  ui: z.strictObject({ notifications: z.boolean(), sound: z.boolean(), theme: z.enum(['dark', 'light', 'system']), animations: z.boolean() }).partial().optional(),
+  github: z
+    .strictObject({ aiReviewComment: text(65_536).nullable() })
+    .partial()
+    .optional(),
+  refresh: z
+    .strictObject({ intervalSec: int(10, 3600) })
+    .partial()
+    .optional(),
+  ui: z
+    .strictObject({ notifications: z.boolean(), sound: z.boolean(), theme: z.enum(['dark', 'light', 'system']), animations: z.boolean() })
+    .partial()
+    .optional(),
 });
 
 export type UserConfigPatch = z.infer<typeof RendererConfigPatchSchema>;

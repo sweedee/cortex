@@ -136,7 +136,9 @@ export async function removeWorktree(wt: ItemOf<'worktree'>, ctx: KindCtx) {
 
 /** `gh pr edit --base`: point a stacked PR at its merged parent's base branch. */
 export async function retargetPr(child: Pr, base: string) {
-  const ok = await runTask(`Retargeting #${child.data.number} onto ${base}`, codeHost(child.data.provider).prEdit({ repo: child.data.repo, number: child.data.number, base }), { success: `#${child.data.number} now targets ${base}` });
+  const ok = await runTask(`Retargeting #${child.data.number} onto ${base}`, codeHost(child.data.provider).prEdit({ repo: child.data.repo, number: child.data.number, base }), {
+    success: `#${child.data.number} now targets ${base}`,
+  });
   if (ok === undefined) return;
   const cur = itemById(child.id);
   if (cur?.kind === 'pr') patchData<'pr'>(cur, { baseBranch: base });

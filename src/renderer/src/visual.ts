@@ -25,7 +25,10 @@ export function groupColors(items: Item[], links: Link[], by: ColorBy): Map<stri
   const order = new Map(roots.map((r, i) => [r.id, i]));
   rootsOf(items, links, by, levelOf).forEach((rs, id) => {
     // palette order, so a two-colour bubble always splits the same way
-    out.set(id, [...rs].sort((a, b) => order.get(a)! - order.get(b)!).map((r) => color.get(r)!));
+    out.set(
+      id,
+      [...rs].sort((a, b) => order.get(a)! - order.get(b)!).map((r) => color.get(r)!),
+    );
   });
   if (by === 'project') for (const i of items) if (!out.has(i.id) && i.projectId && color.has(i.projectId)) out.set(i.id, [color.get(i.projectId)!]);
   return out;

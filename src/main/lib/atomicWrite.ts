@@ -3,7 +3,6 @@ import { promises as fs } from 'node:fs';
 import { dirname } from 'node:path';
 import { sleep } from '../../shared/util';
 
-
 /**
  * Write a file so readers only ever see the old or the new content: write a temp file in
  * the same directory, fsync it, then rename it over the target. On Windows the rename can

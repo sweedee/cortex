@@ -104,7 +104,7 @@ export const ISSUES = [
     labels: ['alerting', 'customer'],
     points: 2,
     sprint: 'CTX 26.23',
-    description: 'Times in alert e-mails are rendered in UTC but labelled with the recipient\'s offset.',
+    description: "Times in alert e-mails are rendered in UTC but labelled with the recipient's offset.",
     created: '2026-10-25T17:30:00.000+0200',
     updated: '2026-11-11T13:00:00.000+0100',
   },

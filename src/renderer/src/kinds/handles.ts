@@ -2,7 +2,12 @@
 import { getState } from '../store';
 
 /** "My App!" → "my-app"; `fallback` when nothing is left. */
-export const slug = (s: string, fallback: string): string => s.trim().toLowerCase().replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
+export const slug = (s: string, fallback: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || fallback;
 
 /** `base`, or `base-2`, `base-3`, … when that handle is taken. */
 export function uniqueHandle(base: string): string {

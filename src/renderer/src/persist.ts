@@ -38,7 +38,6 @@ export function loadDemoWorld(): void {
   replaceWorld(w.items, w.links, prefsOf(getState()));
 }
 
-
 /** Load the stored workspace into the store (the first-run world when nothing usable is stored). */
 export async function loadWorkspace(): Promise<LoadReport> {
   let raw: unknown;
@@ -114,11 +113,15 @@ let started = false;
 export function startAutosave(): void {
   if (started) return;
   started = true;
-  appStore.subscribe(persisted, () => {
-    dirty = true;
-    clearTimeout(timer);
-    timer = setTimeout(saveNow, SAVE_DELAY);
-  }, { equalityFn: shallow });
+  appStore.subscribe(
+    persisted,
+    () => {
+      dirty = true;
+      clearTimeout(timer);
+      timer = setTimeout(saveNow, SAVE_DELAY);
+    },
+    { equalityFn: shallow },
+  );
   // don't lose the last half second on close / reload
   window.addEventListener('beforeunload', () => {
     if (timer) saveNow();

@@ -40,8 +40,19 @@ export function PrSidebar({ item, ctx }: SidebarProps<'pr'>) {
       initial="overview"
       tabs={[
         { id: 'overview', label: 'Overview', render: () => <Overview pr={item} ctx={ctx} real={real} /> },
-        { id: 'files', label: 'Files', wide: true, badge: item.data.additions != null ? `+${item.data.additions} −${item.data.deletions ?? 0}` : undefined, render: () => (real ? <Files pr={item} /> : <NoRepo pr={item} />) },
-        { id: 'github', label: 'GitHub', wide: true, render: () => (real ? <WebPanel src={prUrl(item.data)} partition="persist:github" onOpenExternal={(u) => void openUrl(u)} /> : <NoRepo pr={item} />) },
+        {
+          id: 'files',
+          label: 'Files',
+          wide: true,
+          badge: item.data.additions != null ? `+${item.data.additions} −${item.data.deletions ?? 0}` : undefined,
+          render: () => (real ? <Files pr={item} /> : <NoRepo pr={item} />),
+        },
+        {
+          id: 'github',
+          label: 'GitHub',
+          wide: true,
+          render: () => (real ? <WebPanel src={prUrl(item.data)} partition="persist:github" onOpenExternal={(u) => void openUrl(u)} /> : <NoRepo pr={item} />),
+        },
       ]}
     />
   );

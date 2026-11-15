@@ -19,7 +19,13 @@ export const refusedEnvKeys = (env: Record<string, string>): string[] => Object.
 
 /** the `env` field of a request: optional, allowlisted keys only, no NUL */
 export const envSchema = z
-  .record(z.string(), z.string().max(32_768).refine((v) => !v.includes('\0'), 'env values must not contain NUL'))
+  .record(
+    z.string(),
+    z
+      .string()
+      .max(32_768)
+      .refine((v) => !v.includes('\0'), 'env values must not contain NUL'),
+  )
   .superRefine((env, ctx) => {
     const bad = refusedEnvKeys(env);
     if (bad.length) ctx.addIssue({ code: 'custom', message: `env: ${bad.join(', ')} may not be set (allowed: ${RENDERER_ENV_KEYS.join(', ')})` });

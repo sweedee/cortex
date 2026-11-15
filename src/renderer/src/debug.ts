@@ -42,4 +42,21 @@ async function showGallery() {
 }
 
 if (import.meta.env.DEV || location.hash === '#smoke')
-  window.__cortexDebug = { getState, itemById, addItem, addLink, sendPrompt, chooseOption, refreshDue, inspect, select, runAction, forms: formDriver, showGallery, openAdd, replaceWorld, resetToDemo, loadDemoWorld };
+  window.__cortexDebug = {
+    getState,
+    itemById,
+    addItem,
+    addLink,
+    sendPrompt,
+    chooseOption,
+    refreshDue,
+    inspect,
+    select,
+    runAction,
+    forms: formDriver,
+    showGallery,
+    openAdd,
+    replaceWorld,
+    resetToDemo,
+    loadDemoWorld,
+  };

@@ -30,11 +30,27 @@ describe('failing test names', () => {
     expect(failingTests(seed.data.outputTail)).toHaveLength(2);
   });
   it('jest', () => {
-    const out = ['FAIL src/a.test.js', '  math', '    ✓ adds (2 ms)', '    ✕ divides (5 ms)', '', '  ● math › divides', '', '    expect(received).toBe(expected)', 'Tests:       1 failed, 1 passed, 2 total'].join('\n');
+    const out = [
+      'FAIL src/a.test.js',
+      '  math',
+      '    ✓ adds (2 ms)',
+      '    ✕ divides (5 ms)',
+      '',
+      '  ● math › divides',
+      '',
+      '    expect(received).toBe(expected)',
+      'Tests:       1 failed, 1 passed, 2 total',
+    ].join('\n');
     expect(failingTests(out)).toEqual(['math › divides']);
   });
   it('pytest', () => {
-    const out = ['tests/test_a.py .F.', '=========================== short test summary info ============================', 'FAILED tests/test_a.py::test_div - ZeroDivisionError: division by zero', 'ERROR tests/test_b.py::test_db', '===== 1 failed, 2 passed, 1 error in 0.12s ====='].join('\n');
+    const out = [
+      'tests/test_a.py .F.',
+      '=========================== short test summary info ============================',
+      'FAILED tests/test_a.py::test_div - ZeroDivisionError: division by zero',
+      'ERROR tests/test_b.py::test_db',
+      '===== 1 failed, 2 passed, 1 error in 0.12s =====',
+    ].join('\n');
     expect(failingTests(out)).toEqual(['tests/test_a.py::test_div', 'tests/test_b.py::test_db']);
   });
   it('go test', () => {
@@ -68,7 +84,10 @@ describe('test run actions', () => {
   });
   it('live sync on an item created by the worktree kind (procId = item id) drives the ring', () => {
     const t = withData({ state: 'running', procId: seed.id, summary: undefined });
-    const m = mapTestState({ id: seed.id, cwd: '/x', command: 'npm test', status: 'failed', startedAt: 1, finishedAt: 2, summary: { framework: 'vitest', passed: 3, failed: 1, skipped: 0, total: 4 } }, t.data);
+    const m = mapTestState(
+      { id: seed.id, cwd: '/x', command: 'npm test', status: 'failed', startedAt: 1, finishedAt: 2, summary: { framework: 'vitest', passed: 3, failed: 1, skipped: 0, total: 4 } },
+      t.data,
+    );
     const next = withData({ ...t.data, ...m.patch });
     expect(testrunRing(next).map((s) => s.tone)).toEqual(['critical', 'success']);
     expect(m.notice?.tone).toBe('critical');

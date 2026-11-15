@@ -68,7 +68,13 @@ export function parseJson<T>(text: string, what: string, schema?: z.ZodType<unkn
   }
   if (schema) {
     const r = schema.safeParse(v);
-    if (!r.success) throw new ParseError(`${what}: unexpected output (${r.error.issues.slice(0, 3).map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join('; ')})`);
+    if (!r.success)
+      throw new ParseError(
+        `${what}: unexpected output (${r.error.issues
+          .slice(0, 3)
+          .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+          .join('; ')})`,
+      );
   }
   return v as T;
 }

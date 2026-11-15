@@ -158,7 +158,13 @@ export class ClaudeSessions {
         if (s.model && s.contextWindow) this.windows.set(s.model, s.contextWindow);
         this.entries.set(s.localId, {
           session,
-          req: { cwd: s.cwd, title: s.title, model: s.modelSetting ?? s.model, effort: s.effort as ClaudeStartRequest['effort'], permissionMode: s.permissionMode as ClaudeStartRequest['permissionMode'] },
+          req: {
+            cwd: s.cwd,
+            title: s.title,
+            model: s.modelSetting ?? s.model,
+            effort: s.effort as ClaudeStartRequest['effort'],
+            permissionMode: s.permissionMode as ClaudeStartRequest['permissionMode'],
+          },
           events: [],
           asks: new Map(),
           controls: new Map(),
@@ -340,7 +346,15 @@ export class ClaudeSessions {
     if (s.status === 'running' && e.child === undefined) s = { ...s, status: 'done' };
     e.session = s;
     // our own acks: nothing visible changed
-    if (ev.type === 'control_response' && prev.status === s.status && prev.model === s.model && prev.permissionMode === s.permissionMode && prev.activity === s.activity && prev.cliVersion === s.cliVersion) return;
+    if (
+      ev.type === 'control_response' &&
+      prev.status === s.status &&
+      prev.model === s.model &&
+      prev.permissionMode === s.permissionMode &&
+      prev.activity === s.activity &&
+      prev.cliVersion === s.cliVersion
+    )
+      return;
     this.emitState(e);
     if (ev.type === 'result' || (ev.type === 'system' && 'subtype' in ev && ev.subtype === 'init')) this.persist();
   }
@@ -374,11 +388,25 @@ export class ClaudeSessions {
     const existing = this.entries.get(localId);
     if (existing?.child) throw new Error(`Claude session "${localId}" is already running`);
     const title = req.title ?? (req.prompt ? (req.prompt.split('\n')[0] ?? '').slice(0, 80) : 'Claude session');
-    const session = newSession({ localId, cwd: req.cwd, title, sessionId: req.resume ?? existing?.session.sessionId, model: req.model, effort: req.effort, permissionMode: req.permissionMode ?? this.opts.defaultPermissionMode });
+    const session = newSession({
+      localId,
+      cwd: req.cwd,
+      title,
+      sessionId: req.resume ?? existing?.session.sessionId,
+      model: req.model,
+      effort: req.effort,
+      permissionMode: req.permissionMode ?? this.opts.defaultPermissionMode,
+    });
     const e: Entry = existing ?? { session, req, events: [], asks: new Map(), controls: new Map(), stderr: new LogTail(16 * 1024), interrupting: false, stopping: false };
     if (existing) {
       e.req = { ...existing.req, ...req };
-      e.session = { ...existing.session, title: req.title ?? existing.session.title, model: req.model ?? existing.session.model, effort: req.effort ?? existing.session.effort, sessionId: req.resume ?? existing.session.sessionId };
+      e.session = {
+        ...existing.session,
+        title: req.title ?? existing.session.title,
+        model: req.model ?? existing.session.model,
+        effort: req.effort ?? existing.session.effort,
+        sessionId: req.resume ?? existing.session.sessionId,
+      };
     }
     e.session = { ...e.session, modelSetting: e.req.model };
     this.entries.set(localId, e);
@@ -402,7 +430,10 @@ export class ClaudeSessions {
     }
     // a typed message while a question is open: deny the question so Claude reads the message instead
     for (const [toolUseId, ask] of e.asks) {
-      this.write(e, { type: 'control_response', response: { subtype: 'success', request_id: ask.requestId, response: { behavior: 'deny', message: 'The user replied in the chat instead of answering.' } } });
+      this.write(e, {
+        type: 'control_response',
+        response: { subtype: 'success', request_id: ask.requestId, response: { behavior: 'deny', message: 'The user replied in the chat instead of answering.' } },
+      });
       e.asks.delete(toolUseId);
     }
     this.sendUser(e, text);
@@ -557,7 +588,7 @@ export class ClaudeSessions {
     if (!child) return Promise.resolve(false);
     e.stopping = true;
     return new Promise((resolve) => {
-      const timer = setTimeout(() => killTree(child.pid), 2000) // killTree itself escalates to SIGKILL on POSIX;
+      const timer = setTimeout(() => killTree(child.pid), 2000); // killTree itself escalates to SIGKILL on POSIX;
       child.once('close', () => {
         clearTimeout(timer);
         resolve(true);
@@ -589,7 +620,15 @@ export class ClaudeSessions {
   /** the full session (with messages) rebuilt from the transcript */
   session(localId: string): ClaudeSession {
     const e = this.get(localId);
-    const base = newSession({ localId, cwd: e.session.cwd, title: e.session.title, sessionId: e.session.sessionId, model: e.session.model, permissionMode: e.session.permissionMode, at: e.session.createdAt });
+    const base = newSession({
+      localId,
+      cwd: e.session.cwd,
+      title: e.session.title,
+      sessionId: e.session.sessionId,
+      model: e.session.model,
+      permissionMode: e.session.permissionMode,
+      at: e.session.createdAt,
+    });
     if (e.events.length > 0) return e.session.messages.length ? e.session : replayTranscript(base, e.events, !!e.child);
     return { ...replayTranscript(base, this.transcript(localId), false), usage: e.session.usage };
   }

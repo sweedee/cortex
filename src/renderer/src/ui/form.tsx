@@ -137,7 +137,10 @@ function FormDialog({ form }: { form: OpenForm }) {
     setTried(true);
     const errs = validateForm(spec.fields, latest.current);
     setErrors(errs);
-    if (Object.keys(errs).length) return Object.entries(errs).map(([k, v]) => `${k}: ${v}`).join('; ');
+    if (Object.keys(errs).length)
+      return Object.entries(errs)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('; ');
     busyRef.current = true;
     setBusy(true);
     setFailure(null);

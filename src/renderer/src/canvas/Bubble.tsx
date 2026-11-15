@@ -118,11 +118,7 @@ export const Bubble = memo(function Bubble({ item, view, selected, lit, dimmed, 
       <div className="bubble-float">
         <div className="bubble-disc" style={fill ? { background: fill } : undefined}>
           <span className="bubble-icon">{mod.icon(iconSize(r))}</span>
-          {mod.titleInside ? (
-            <span className="bubble-short bubble-short-project">{item.title}</span>
-          ) : (
-            view.short && <span className={`bubble-short ${r <= 28 ? 'is-small' : ''}`}>{view.short}</span>
-          )}
+          {mod.titleInside ? <span className="bubble-short bubble-short-project">{item.title}</span> : view.short && <span className={`bubble-short ${r <= 28 ? 'is-small' : ''}`}>{view.short}</span>}
         </div>
         <Ring r={r} segments={view.ring} />
         {view.badge && (

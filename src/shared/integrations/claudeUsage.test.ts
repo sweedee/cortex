@@ -15,7 +15,14 @@ const say = (id: string, usage: ReturnType<typeof u>, content: unknown[] = [{ ty
 describe('usage', () => {
   it('sums each API message once, keeps the latest main-thread call as the context', () => {
     const s = fold([init, say('m1', u(5, 10, 1000, 200)), say('m1', u(5, 10, 1000, 200)), say('m2', u(3, 7, 1200, 50))]);
-    expect(s.usage).toMatchObject({ inputTokens: 8, outputTokens: 17, cacheReadTokens: 2200, cacheWriteTokens: 250, contextTokens: 1253, last: { input: 3, cacheRead: 1200, cacheWrite: 50, output: 7 } });
+    expect(s.usage).toMatchObject({
+      inputTokens: 8,
+      outputTokens: 17,
+      cacheReadTokens: 2200,
+      cacheWriteTokens: 250,
+      contextTokens: 1253,
+      last: { input: 3, cacheRead: 1200, cacheWrite: 50, output: 7 },
+    });
   });
 
   it('subagent calls count in the totals but not in the context', () => {
@@ -36,7 +43,17 @@ describe('usage', () => {
       model_usage_since_last_result: { 'claude-opus-5-5': { inputTokens: 9, outputTokens: 30, cacheReadInputTokens: 5000, cacheCreationInputTokens: 300, contextWindow: 1_000_000 } },
       modelUsage: { 'claude-opus-5-5': { inputTokens: 9, outputTokens: 30, cacheReadInputTokens: 5000, cacheCreationInputTokens: 300, contextWindow: 1_000_000 } },
     });
-    expect(r.usage).toMatchObject({ inputTokens: 9, outputTokens: 30, cacheReadTokens: 5000, cacheWriteTokens: 300, contextWindow: 1_000_000, costUsd: 0.5, turns: 1, durationMs: 4000, turnBase: undefined });
+    expect(r.usage).toMatchObject({
+      inputTokens: 9,
+      outputTokens: 30,
+      cacheReadTokens: 5000,
+      cacheWriteTokens: 300,
+      contextWindow: 1_000_000,
+      costUsd: 0.5,
+      turns: 1,
+      durationMs: 4000,
+      turnBase: undefined,
+    });
     // the next turn starts from there
     const t2 = applyClaudeEvent(r, say('m2', u(1, 2, 3, 4)));
     expect(t2.usage).toMatchObject({ inputTokens: 10, turnBase: { inputTokens: 9, outputTokens: 30, cacheReadTokens: 5000, cacheWriteTokens: 300 } });
@@ -64,7 +81,16 @@ describe('subagents', () => {
       ['toolu_g', 'toolu_task'],
     ]);
     expect(s.activity).toBe('Map the code › Searching for TODO');
-    const p = applyClaudeEvent(s, { type: 'system', subtype: 'task_progress', session_id: S, task_id: 'a1', tool_use_id: 'toolu_task', description: 'Reading a.ts', usage: { total_tokens: 1234, tool_uses: 3, duration_ms: 900 }, last_tool_name: 'Read' });
+    const p = applyClaudeEvent(s, {
+      type: 'system',
+      subtype: 'task_progress',
+      session_id: S,
+      task_id: 'a1',
+      tool_use_id: 'toolu_task',
+      description: 'Reading a.ts',
+      usage: { total_tokens: 1234, tool_uses: 3, duration_ms: 900 },
+      last_tool_name: 'Read',
+    });
     expect(p.subagents[0]).toMatchObject({ toolUses: 3, tokens: 1234, durationMs: 900, lastTool: 'Read', activity: 'Reading a.ts' });
     const done = (
       [
@@ -98,7 +124,18 @@ describe('control responses and notes', () => {
   it('initialize → commands / models (session only, not the summary); set_model / set_permission_mode → the session', () => {
     const s = fold([
       init,
-      { type: 'control_response', response: { subtype: 'success', request_id: 'init-1', response: { commands: [{ name: 'review', description: 'Review', argumentHint: '<pr>' }, { bad: 1 }], models: [{ value: 'opus', displayName: 'Opus', supportedEffortLevels: ['low', 'max'] }], claude_code_version: '2.1.325' } } },
+      {
+        type: 'control_response',
+        response: {
+          subtype: 'success',
+          request_id: 'init-1',
+          response: {
+            commands: [{ name: 'review', description: 'Review', argumentHint: '<pr>' }, { bad: 1 }],
+            models: [{ value: 'opus', displayName: 'Opus', supportedEffortLevels: ['low', 'max'] }],
+            claude_code_version: '2.1.325',
+          },
+        },
+      },
       { type: 'control_response', response: { subtype: 'success', request_id: 'sm-1', response: { model: 'claude-sonnet-5-5' } } },
       { type: 'control_response', response: { subtype: 'success', request_id: 'pm-1', response: { mode: 'plan' } } },
     ]);
@@ -132,7 +169,9 @@ describe('a real Claude Code 2.1.325 session (haiku, one subagent, then a live m
   it('turn 1: subagent, usage, window, cost', () => {
     const s = events.slice(0, firstResult + 1).reduce(applyClaudeEvent, base());
     expect(s).toMatchObject({ model: 'claude-haiku-5-5', permissionMode: 'auto', status: 'idle', lastText: 'one.txt\ntwo.txt' });
-    expect(s.subagents).toMatchObject([{ toolUseId: 'toolu_01GYgYGRSRjsVTdgZiasP1VK', taskId: 'a6ebe04f2dbc096b6', description: 'List files', type: 'general-purpose', status: 'done', toolUses: 2, tokens: 22339 }]);
+    expect(s.subagents).toMatchObject([
+      { toolUseId: 'toolu_01GYgYGRSRjsVTdgZiasP1VK', taskId: 'a6ebe04f2dbc096b6', description: 'List files', type: 'general-purpose', status: 'done', toolUses: 2, tokens: 22339 },
+    ]);
     const nested = s.messages.filter((m) => m.parent === 'toolu_01GYgYGRSRjsVTdgZiasP1VK');
     expect(nested.map((m) => (m.role === 'tool' ? m.tool : m.role))).toEqual(['Glob', 'SubagentHandback']);
     expect(nested[0]).toMatchObject({ status: 'ok', detail: 'one.txt\ntwo.txt' });

@@ -112,12 +112,7 @@ export function InlineActions({
         const isOpen = open?.id === r.id;
         return (
           <div key={r.id} className="rel-wrap" onMouseEnter={(e) => openRow(r.id, e.currentTarget)} onMouseLeave={closeSoon}>
-            <button
-              className={`rel-row ${isOpen ? 'is-open' : ''}`}
-              onClick={() => select([r.id])}
-              onFocus={(e) => openRow(r.id, e.currentTarget)}
-              title={`Select ${r.title}`}
-            >
+            <button className={`rel-row ${isOpen ? 'is-open' : ''}`} onClick={() => select([r.id])} onFocus={(e) => openRow(r.id, e.currentTarget)} title={`Select ${r.title}`}>
               {flip && <ChevronLeftSmallIcon />}
               <span className="rel-row-icon" style={{ ['--accent' as string]: accentOf(colors, r.id) }}>
                 {kindIcon(r.kind, 12)}

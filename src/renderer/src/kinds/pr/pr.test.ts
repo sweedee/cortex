@@ -60,8 +60,20 @@ describe('pr actions', () => {
     expect(action(real(seed('pr-469')), 'rebase')).toMatchObject({ type: 'direct' });
   });
   it('a child of a merged parent gets "Retarget onto <base>" (primary)', () => {
-    const parent = makeItem({ id: 'pr-parent', kind: 'pr', handle: 'PR-1', title: 'parent', data: { repo: 'octo/repo', number: 1, headBranch: 'feat/a', baseBranch: 'main', state: 'merged', isDraft: false } }) as ItemOf<'pr'>;
-    const child = makeItem({ id: 'pr-child', kind: 'pr', handle: 'PR-2', title: 'child', data: { repo: 'octo/repo', number: 2, headBranch: 'feat/b', baseBranch: 'feat/a', state: 'open', isDraft: false, stackedOn: 'pr-parent' } }) as ItemOf<'pr'>;
+    const parent = makeItem({
+      id: 'pr-parent',
+      kind: 'pr',
+      handle: 'PR-1',
+      title: 'parent',
+      data: { repo: 'octo/repo', number: 1, headBranch: 'feat/a', baseBranch: 'main', state: 'merged', isDraft: false },
+    }) as ItemOf<'pr'>;
+    const child = makeItem({
+      id: 'pr-child',
+      kind: 'pr',
+      handle: 'PR-2',
+      title: 'child',
+      data: { repo: 'octo/repo', number: 2, headBranch: 'feat/b', baseBranch: 'feat/a', state: 'open', isDraft: false, stackedOn: 'pr-parent' },
+    }) as ItemOf<'pr'>;
     const c = makeCtx([parent, child], []);
     const acts = prKind.actions([child], c);
     expect(acts[0]).toMatchObject({ id: 'retarget', label: 'Retarget onto main', primary: true });
@@ -131,12 +143,29 @@ describe('builds from checks', () => {
     completedAt: '2026-11-14T10:02:05Z',
     ...o,
   });
-  const pr = makeItem({ kind: 'pr', handle: 'PR-9', title: 'x', projectId: 'p-ingest', data: { repo: 'o/r', number: 9, headBranch: 'feat/x', baseBranch: 'main', state: 'open', isDraft: false } }) as ItemOf<'pr'>;
+  const pr = makeItem({
+    kind: 'pr',
+    handle: 'PR-9',
+    title: 'x',
+    projectId: 'p-ingest',
+    data: { repo: 'o/r', number: 9, headBranch: 'feat/x', baseBranch: 'main', state: 'open', isDraft: false },
+  }) as ItemOf<'pr'>;
 
   it('maps a check to build data', () => {
     expect(runIdFromUrl('https://github.com/o/r/actions/runs/123/job/456')).toBe('123');
     expect(runIdFromUrl('https://ci.example/job/x/12')).toBeUndefined();
-    expect(checkToBuild(check({}), pr.data)).toMatchObject({ repo: 'o/r', name: 'test', runId: '123', state: 'completed', conclusion: 'success', prNumber: 9, branch: 'feat/x', stage: 'CI', trigger: 'pull_request', durationSec: 125 });
+    expect(checkToBuild(check({}), pr.data)).toMatchObject({
+      repo: 'o/r',
+      name: 'test',
+      runId: '123',
+      state: 'completed',
+      conclusion: 'success',
+      prNumber: 9,
+      branch: 'feat/x',
+      stage: 'CI',
+      trigger: 'pull_request',
+      durationSec: 125,
+    });
     expect(checkToBuild(check({ bucket: 'pending', state: 'IN_PROGRESS', completedAt: '' }), pr.data)).toMatchObject({ state: 'in_progress' });
     expect(checkToBuild(check({ bucket: 'pending', state: 'QUEUED' }), pr.data).state).toBe('queued');
     expect(checkToBuild(check({ bucket: 'fail', state: 'FAILURE', link: 'https://jenkins.example/job/x/3/' }), pr.data)).toMatchObject({ conclusion: 'failure' });
@@ -146,7 +175,12 @@ describe('builds from checks', () => {
   it('creates missing builds and updates existing ones (deduped by repo + name + PR)', () => {
     const existing = makeItem({ kind: 'build', handle: 'b', title: 'b', data: { repo: 'o/r', name: 'lint', url: '', state: 'in_progress', prNumber: 9, branch: 'feat/x', stage: 'mine' } });
     const other = makeItem({ kind: 'build', handle: 'c', title: 'c', data: { repo: 'o/r', name: 'test', url: '', state: 'completed', prNumber: 8, branch: 'x' } });
-    const plan = planBuildSync([pr, existing, other], pr, [check({ name: 'lint', bucket: 'fail', state: 'FAILURE' }), check({ name: 'test' }), check({ name: 'test' }), check({ name: 'triage', bucket: 'skipping', state: 'SKIPPED' })]);
+    const plan = planBuildSync([pr, existing, other], pr, [
+      check({ name: 'lint', bucket: 'fail', state: 'FAILURE' }),
+      check({ name: 'test' }),
+      check({ name: 'test' }),
+      check({ name: 'triage', bucket: 'skipping', state: 'SKIPPED' }),
+    ]);
     expect(plan.updates).toHaveLength(1);
     expect(plan.updates[0]?.id).toBe(existing.id);
     expect(plan.updates[0]?.patch).toMatchObject({ state: 'completed', conclusion: 'failure' });

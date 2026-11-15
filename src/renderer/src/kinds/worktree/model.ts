@@ -9,7 +9,7 @@ type Worktree = ItemOf<'worktree'>;
 type Project = ItemOf<'project'>;
 type Pr = ItemOf<'pr'>;
 
-export const WORKTREE_HINT = "This worktree has no real checkout on disk (demo data). Create one from a project that has a base checkout (Settings), and it shows git data here.";
+export const WORKTREE_HINT = 'This worktree has no real checkout on disk (demo data). Create one from a project that has a base checkout (Settings), and it shows git data here.';
 
 /** Single-letter status for the changed-files list (M A D R U ?). */
 export function statusLetter(f: Pick<GitFileChange, 'index' | 'worktree' | 'kind'>): string {

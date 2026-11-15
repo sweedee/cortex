@@ -23,8 +23,7 @@ export const METRICS = {
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
 /** The CSS custom properties for `METRICS`, e.g. `--hover-card-width: 280px`. */
-export const metricVars = (): Record<string, string> =>
-  Object.fromEntries(Object.entries(METRICS).map(([k, v]) => [`--${kebab(k)}`, `${v}px`]));
+export const metricVars = (): Record<string, string> => Object.fromEntries(Object.entries(METRICS).map(([k, v]) => [`--${kebab(k)}`, `${v}px`]));
 
 export function applyMetricVars(root: HTMLElement = document.documentElement) {
   for (const [k, v] of Object.entries(metricVars())) root.style.setProperty(k, v);

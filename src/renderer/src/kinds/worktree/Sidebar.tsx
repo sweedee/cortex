@@ -123,7 +123,8 @@ function Stats({ item, ctx }: SidebarProps<'worktree'>) {
           <div className="wt-totals subdued">
             {stat.data ? (
               <>
-                vs {w.data.baseBranch}: {stat.data.files.length} file{stat.data.files.length === 1 ? '' : 's'} <span className="add">+{stat.data.additions}</span> <span className="del">-{stat.data.deletions}</span>
+                vs {w.data.baseBranch}: {stat.data.files.length} file{stat.data.files.length === 1 ? '' : 's'} <span className="add">+{stat.data.additions}</span>{' '}
+                <span className="del">-{stat.data.deletions}</span>
               </>
             ) : stat.error ? (
               errorText(stat.error)

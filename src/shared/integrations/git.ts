@@ -182,8 +182,7 @@ export function parseLog(out: string): GitLogEntry[] {
  */
 export function parseRemoteRepo(url: string, host?: string): string | null {
   const u = url.trim();
-  const m =
-    /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u) ?? /^(?:[^@]+@)?([^:/]+):([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u);
+  const m = /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u) ?? /^(?:[^@]+@)?([^:/]+):([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(u);
   if (!m) return null;
   // `host` (config github.host): a remote on another host is not a repo of this GitHub
   if (host && (m[1] ?? '').toLowerCase() !== (host.split(':')[0] ?? '').toLowerCase()) return null;

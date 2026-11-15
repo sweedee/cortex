@@ -9,9 +9,25 @@ import { must } from '../../testing/must';
 
 describe('status bar numbers', () => {
   it('context meter, cache hit rates, window guess', () => {
-    const v = usageView({ ...NO_USAGE, contextTokens: 170_000, inputTokens: 10, cacheReadTokens: 900, cacheWriteTokens: 90, outputTokens: 50, last: { input: 2, cacheRead: 160_000, cacheWrite: 9_998, output: 5 }, turns: 2, durationMs: 65_000 });
+    const v = usageView({
+      ...NO_USAGE,
+      contextTokens: 170_000,
+      inputTokens: 10,
+      cacheReadTokens: 900,
+      cacheWriteTokens: 90,
+      outputTokens: 50,
+      last: { input: 2, cacheRead: 160_000, cacheWrite: 9_998, output: 5 },
+      turns: 2,
+      durationMs: 65_000,
+    });
     expect(v).toMatchObject({ contextWindow: 200_000, windowGuessed: true, contextPct: 85, tone: 'warning', lastHitPct: 94, totalHitPct: 90, durationMs: 65_000 });
-    expect(usageView({ ...NO_USAGE, contextTokens: 170_000, contextWindow: 1_000_000 })).toMatchObject({ contextPct: 17, tone: 'normal', windowGuessed: false, lastHitPct: undefined, totalHitPct: undefined });
+    expect(usageView({ ...NO_USAGE, contextTokens: 170_000, contextWindow: 1_000_000 })).toMatchObject({
+      contextPct: 17,
+      tone: 'normal',
+      windowGuessed: false,
+      lastHitPct: undefined,
+      totalHitPct: undefined,
+    });
     expect(usageView({ ...NO_USAGE, contextTokens: 199_000 }).tone).toBe('critical');
   });
 
@@ -49,7 +65,20 @@ describe('transcript with a subagent (real Claude Code session)', () => {
   it('the canvas item gets the context, window and subagent tally', () => {
     const { subagents } = buildTranscript(events);
     const { patch } = mapClaudeState(
-      { localId: 'x', cwd: '/tmp', title: 't', status: 'idle', pendingPermissions: [], subagents, running: true, createdAt: '', updatedAt: '', effort: 'high', permissionMode: 'plan', usage: { ...NO_USAGE, contextTokens: 50_000, contextWindow: 1_000_000 } },
+      {
+        localId: 'x',
+        cwd: '/tmp',
+        title: 't',
+        status: 'idle',
+        pendingPermissions: [],
+        subagents,
+        running: true,
+        createdAt: '',
+        updatedAt: '',
+        effort: 'high',
+        permissionMode: 'plan',
+        usage: { ...NO_USAGE, contextTokens: 50_000, contextWindow: 1_000_000 },
+      },
       { cwd: '/tmp', status: 'running' },
       't',
     );

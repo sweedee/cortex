@@ -34,18 +34,28 @@ describe('kind registry', () => {
   });
 
   it('the seed has at least one item of every kind', () => {
-    for (const k of KINDS) expect(SEED_ITEMS.some((i) => i.kind === k), k).toBe(true);
+    for (const k of KINDS)
+      expect(
+        SEED_ITEMS.some((i) => i.kind === k),
+        k,
+      ).toBe(true);
   });
 
   it('derives a view and actions for every seed item', () => {
     for (const it of SEED_ITEMS) {
       const v = viewOf(it, ctx);
       expect(v.ring.length, it.id).toBeGreaterThan(0);
-      expect(v.ring.every((s) => s.label && (s.weight ?? 1) > 0), it.id).toBe(true);
+      expect(
+        v.ring.every((s) => s.label && (s.weight ?? 1) > 0),
+        it.id,
+      ).toBe(true);
       const actions = actionsForItem(it, ctx);
       expect(actions.length, it.id).toBeGreaterThan(0);
       expect(new Set(actions.map((a) => a.id)).size, `${it.id}: unique action ids`).toBe(actions.length);
-      expect(actions.some((a) => a.id === 'archive'), it.id).toBe(true);
+      expect(
+        actions.some((a) => a.id === 'archive'),
+        it.id,
+      ).toBe(true);
     }
   });
 

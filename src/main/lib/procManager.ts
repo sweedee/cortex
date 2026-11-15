@@ -28,9 +28,7 @@ export class ProcManager {
     const opts = { cwd: req.cwd, env: { ...process.env, ...req.env }, stdio: ['ignore', 'pipe', 'pipe'] as ('ignore' | 'pipe')[], ...treeSpawnOptions };
     // shell mode: the user's own configured command line, e.g. "npm run dev". We build the
     // line ourselves (Node's shell:true + args concatenates unquoted and is deprecated).
-    const child = req.shell
-      ? nodeSpawn([req.cmd, ...req.args.map(shellQuote)].join(' '), { ...opts, shell: true })
-      : spawn(req.cmd, req.args, { ...opts, shell: false });
+    const child = req.shell ? nodeSpawn([req.cmd, ...req.args.map(shellQuote)].join(' '), { ...opts, shell: true }) : spawn(req.cmd, req.args, { ...opts, shell: false });
     const info: ProcInfo = { id: req.id, pid: child.pid, cmd: req.cmd, args: req.args, cwd: req.cwd, startedAt: Date.now() };
     this.procs.set(req.id, { info, child });
 

@@ -95,7 +95,10 @@ export class WorkspaceFile {
     const stem = basename(this.file).replace(/\.json$/, '');
     try {
       await fs.rename(this.file, join(dir, `${stem}.corrupt-${Date.now()}.json`));
-      const old = (await fs.readdir(dir)).filter((n) => n.startsWith(`${stem}.corrupt-`)).sort().reverse();
+      const old = (await fs.readdir(dir))
+        .filter((n) => n.startsWith(`${stem}.corrupt-`))
+        .sort()
+        .reverse();
       for (const n of old.slice(CORRUPT_KEPT)) await fs.rm(join(dir, n), { force: true });
     } catch (err) {
       log.warn(`[workspace] could not set aside ${this.file}: ${(err as Error).message}`);

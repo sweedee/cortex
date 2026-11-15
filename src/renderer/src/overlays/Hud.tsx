@@ -31,18 +31,7 @@ import { STATUS_GROUPS, type Item } from '../domain';
 import { ArchiveIcon } from '../kinds/icons';
 import { KINDS, kindIcon, kindLabel, useViews } from '../kinds/registry';
 import { agoShort, TONE_COLOR } from '../tones';
-import {
-  activeFilterCount,
-  clearNotices,
-  markRead,
-  resetFilter,
-  select,
-  setArchived,
-  setFilter,
-  toggleKind,
-  useStore,
-  useVisible,
-} from '../store';
+import { activeFilterCount, clearNotices, markRead, resetFilter, select, setArchived, setFilter, toggleKind, useStore, useVisible } from '../store';
 import { ThemeSync } from '../theme';
 import { useReturnFocus } from '../ui/focus';
 import { shortcutHint } from '../ui/shortcuts';

@@ -29,12 +29,10 @@ export function jiraUrl(key: string): string {
  * for 10 minutes; [] when Jira is unreachable (callers fall back to the mock's workflow).
  */
 export function loadJiraStatuses(project: string): Promise<JiraStatusOption[]> {
-  return queryClient
-    .fetchQuery({ queryKey: qk.jira.statuses(project), queryFn: () => native.jira.statuses({ project }), staleTime: 10 * 60_000 })
-    .catch((e: unknown) => {
-      console.warn('[jira] statuses', project, e);
-      return [];
-    });
+  return queryClient.fetchQuery({ queryKey: qk.jira.statuses(project), queryFn: () => native.jira.statuses({ project }), staleTime: 10 * 60_000 }).catch((e: unknown) => {
+    console.warn('[jira] statuses', project, e);
+    return [];
+  });
 }
 
 /** Writes. Each invalidates the issue and every search. */

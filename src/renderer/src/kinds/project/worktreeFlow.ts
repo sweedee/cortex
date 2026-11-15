@@ -19,8 +19,7 @@ type Ticket = ItemOf<'ticket'>;
 
 const NO_TICKET = 'none';
 
-export const ticketsOf = (projectId: string): Ticket[] =>
-  getState().items.filter((i): i is Ticket => i.kind === 'ticket' && i.projectId === projectId && !i.archived);
+export const ticketsOf = (projectId: string): Ticket[] => getState().items.filter((i): i is Ticket => i.kind === 'ticket' && i.projectId === projectId && !i.archived);
 
 /** The ticket matching a branch name (by Jira key), among a project's tickets. */
 export const ticketForBranch = (projectId: string, branch: string): Ticket | undefined => {

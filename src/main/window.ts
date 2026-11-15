@@ -20,9 +20,7 @@ function loadState(): { width: number; height: number; x?: number; y?: number; m
   try {
     const { bounds: b, maximized } = JSON.parse(readFileSync(stateFile(), 'utf8')) as WindowState;
     if (![b.x, b.y, b.width, b.height].every(Number.isFinite)) return null;
-    const visible = screen
-      .getAllDisplays()
-      .some(({ workArea: d }) => b.x + 100 < d.x + d.width && b.x + b.width - 100 > d.x && b.y >= d.y - 20 && b.y + 40 < d.y + d.height);
+    const visible = screen.getAllDisplays().some(({ workArea: d }) => b.x + 100 < d.x + d.width && b.x + b.width - 100 > d.x && b.y >= d.y - 20 && b.y + 40 < d.y + d.height);
     return visible ? { ...b, maximized } : { width: b.width, height: b.height, maximized };
   } catch {
     return null;
@@ -120,7 +118,14 @@ export function createMainWindow(): BrowserWindow {
     log.error(`[renderer] gone: ${d.reason} (${d.exitCode})`);
     if (d.reason === 'clean-exit' || win.isDestroyed()) return;
     void dialog
-      .showMessageBox(win, { type: 'error', message: 'The Cortex window crashed.', detail: `Reason: ${d.reason}. Your workspace is saved; reload to continue.`, buttons: ['Reload', 'Quit'], defaultId: 0, cancelId: 1 })
+      .showMessageBox(win, {
+        type: 'error',
+        message: 'The Cortex window crashed.',
+        detail: `Reason: ${d.reason}. Your workspace is saved; reload to continue.`,
+        buttons: ['Reload', 'Quit'],
+        defaultId: 0,
+        cancelId: 1,
+      })
       .then(({ response }) => (response === 0 && !win.isDestroyed() ? win.reload() : app.quit()));
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url) => log.error(`[renderer] failed to load ${url}: ${desc} (${code})`));

@@ -16,9 +16,12 @@ export interface Mapped<D> {
   notice?: NoticeSpec;
 }
 
-
 const firstLine = (s: string | undefined, max = 90) => {
-  const l = s?.trim().split(/\r?\n/).find((x) => x.trim())?.trim();
+  const l = s
+    ?.trim()
+    .split(/\r?\n/)
+    .find((x) => x.trim())
+    ?.trim();
   return l ? (l.length > max ? l.slice(0, max - 1) + '…' : l) : undefined;
 };
 
@@ -53,7 +56,10 @@ export function mapClaudeState(s: ClaudeSessionSummary, prev: AgentData, title: 
     cwd: s.cwd || prev.cwd,
     lastActivity: s.activity ?? (ended ? (firstLine(s.lastText) ?? prev.lastActivity) : prev.lastActivity),
     pendingQuestion: s.pendingQuestion
-      ? { toolUseId: s.pendingQuestion.toolUseId, questions: s.pendingQuestion.questions.map((q) => ({ question: q.question, header: q.header || undefined, options: q.options, multiSelect: q.multiSelect })) }
+      ? {
+          toolUseId: s.pendingQuestion.toolUseId,
+          questions: s.pendingQuestion.questions.map((q) => ({ question: q.question, header: q.header || undefined, options: q.options, multiSelect: q.multiSelect })),
+        }
       : undefined,
     pendingPermissions: s.pendingPermissions.length ? s.pendingPermissions.map((p) => ({ requestId: p.requestId, toolName: p.toolName, summary: firstLine(toolSummary(p.input), 120) })) : undefined,
     error: status === 'failed' ? (s.error ?? 'failed') : undefined,
@@ -75,9 +81,7 @@ export function mapClaudeState(s: ClaudeSessionSummary, prev: AgentData, title: 
   if (status === 'waiting' && prev.status !== 'waiting') {
     const q = s.pendingQuestion?.questions[0];
     const perm = s.pendingPermissions[0];
-    notice = q
-      ? { text: `${title} asks: ${firstLine(q.question, 80)}`, tone: 'warning' }
-      : { text: `${title} needs permission${perm ? ` to use ${perm.toolName}` : ''}`, tone: 'warning' };
+    notice = q ? { text: `${title} asks: ${firstLine(q.question, 80)}`, tone: 'warning' } : { text: `${title} needs permission${perm ? ` to use ${perm.toolName}` : ''}`, tone: 'warning' };
   } else if (status === 'failed' && prev.status !== 'failed') {
     notice = { text: `${title} failed${s.error ? `: ${firstLine(s.error, 80)}` : ''}`, tone: 'critical' };
   } else if (status === 'done' && (prev.status === 'running' || prev.status === 'waiting')) {
@@ -97,9 +101,7 @@ export function mapAppState(s: AppState, prev: AppData): Mapped<AppData> {
   const url = s.url ?? prev.url;
   const patch: Partial<AppData> = { state, url, port: portOf(url) ?? prev.port, procId: s.id, cwd: s.cwd || prev.cwd };
   const notice: NoticeSpec | undefined =
-    state === 'crashed' && prev.state !== 'crashed'
-      ? { text: `Crashed${s.code != null ? ` (exit code ${s.code})` : ''}${s.error ? `: ${firstLine(s.error, 80)}` : ''}`, tone: 'critical' }
-      : undefined;
+    state === 'crashed' && prev.state !== 'crashed' ? { text: `Crashed${s.code != null ? ` (exit code ${s.code})` : ''}${s.error ? `: ${firstLine(s.error, 80)}` : ''}`, tone: 'critical' } : undefined;
   return { patch, notice };
 }
 
@@ -137,7 +139,8 @@ export function tailOf(text: string, max = 8000): string {
 
 /** What startup reconciliation does with an item main does not know (or no longer runs). */
 export const STALE = {
-  agent: (d: AgentData): Partial<AgentData> | null => (d.status === 'running' || d.status === 'waiting' ? { status: 'idle', pendingQuestion: undefined, pendingPermissions: undefined, lastActivity: 'Stopped (app restarted)' } : null),
+  agent: (d: AgentData): Partial<AgentData> | null =>
+    d.status === 'running' || d.status === 'waiting' ? { status: 'idle', pendingQuestion: undefined, pendingPermissions: undefined, lastActivity: 'Stopped (app restarted)' } : null,
   app: (d: AppData): Partial<AppData> | null => (d.state === 'running' || d.state === 'starting' ? { state: 'stopped' } : null),
   testrun: (d: TestRunData): Partial<TestRunData> | null => (d.state === 'running' ? { state: 'stopped' } : null),
 };

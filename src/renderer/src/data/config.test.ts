@@ -14,11 +14,18 @@ describe('config mirror', () => {
     expect(configPatchOf(base, base)).toBeUndefined();
     expect(configPatchOf(base, { ...base, model: 'opus', soundOn: false })).toEqual({ claude: { model: 'opus' }, ui: { sound: false } });
     expect(configPatchOf({ ...base, model: 'opus', effort: 'high' }, base)).toEqual({ claude: { model: null, effort: null } });
-    expect(configPatchOf(base, { ...base, refreshSec: 30, aiReviewComment: '/r', permissionMode: 'plan' })).toEqual({ claude: { permissionMode: 'plan' }, github: { aiReviewComment: '/r' }, refresh: { intervalSec: 30 } });
+    expect(configPatchOf(base, { ...base, refreshSec: 30, aiReviewComment: '/r', permissionMode: 'plan' })).toEqual({
+      claude: { permissionMode: 'plan' },
+      github: { aiReviewComment: '/r' },
+      refresh: { intervalSec: 30 },
+    });
   });
 
   it('coalesces patches without losing nulls', () => {
-    expect(combinePatches({ claude: { model: null }, ui: { sound: true } }, { claude: { effort: 'low' }, ui: { sound: false } })).toEqual({ claude: { model: null, effort: 'low' }, ui: { sound: false } });
+    expect(combinePatches({ claude: { model: null }, ui: { sound: true } }, { claude: { effort: 'low' }, ui: { sound: false } })).toEqual({
+      claude: { model: null, effort: 'low' },
+      ui: { sound: false },
+    });
   });
 
   it('reads the defaults before config.json is loaded', () => {

@@ -15,11 +15,7 @@ export interface IpcContext {
  * Register a typed, validated invoke handler. Only the app window's main frame may call: webviews
  * (GitHub, Jira, running apps) never get a preload, and this check makes sure of it.
  */
-export function handle<C extends InvokeChannel>(
-  ctx: IpcContext,
-  channel: C,
-  fn: (req: Req<C>, e: IpcMainInvokeEvent) => Res<C> | Promise<Res<C>>,
-): void {
+export function handle<C extends InvokeChannel>(ctx: IpcContext, channel: C, fn: (req: Req<C>, e: IpcMainInvokeEvent) => Res<C> | Promise<Res<C>>): void {
   ipcMain.handle(channel, async (e, raw: unknown) => {
     const win = ctx.getWindow();
     // the app window's own top-level page: no webview guest, no (future) iframe inside the app

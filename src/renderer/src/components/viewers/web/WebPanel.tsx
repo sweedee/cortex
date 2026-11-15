@@ -68,7 +68,18 @@ export function WebPanel(props: WebPanelProps) {
   return <WebPanelInner key={`${props.partition ?? ''}|${props.src}|${retry}`} {...props} onRetry={() => setRetry((n) => n + 1)} />;
 }
 
-function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = true, viewport: viewportProp = 'desktop', viewportSwitcher, colorSchemeToggle, className, onRetry }: WebPanelProps & { onRetry: () => void }) {
+function WebPanelInner({
+  src,
+  partition,
+  onNavigate,
+  onOpenExternal,
+  toolbar = true,
+  viewport: viewportProp = 'desktop',
+  viewportSwitcher,
+  colorSchemeToggle,
+  className,
+  onRetry,
+}: WebPanelProps & { onRetry: () => void }) {
   const ref = useRef<WebviewEl | null>(null);
   const [url, setUrl] = useState(src);
   const [loading, setLoading] = useState(true);
@@ -155,7 +166,6 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
 
   const width = VIEWPORT_WIDTH[viewport];
 
-
   return (
     <div className={`cxv-web${className ? ` ${className}` : ''}`}>
       {toolbar && (
@@ -191,7 +201,12 @@ function WebPanelInner({ src, partition, onNavigate, onOpenExternal, toolbar = t
             ))}
           {emulate && (
             <Tooltip text={`Previewing in ${scheme} mode${schemePick ? '' : ' (follows the app)'}. Switch to ${scheme === 'dark' ? 'light' : 'dark'}.`}>
-              <Button size="condensed" variant={schemePick ? 'emphasized' : 'default'} aria-label={`Preview color scheme: ${scheme}`} onClick={() => setSchemePick(scheme === 'dark' ? 'light' : 'dark')}>
+              <Button
+                size="condensed"
+                variant={schemePick ? 'emphasized' : 'default'}
+                aria-label={`Preview color scheme: ${scheme}`}
+                onClick={() => setSchemePick(scheme === 'dark' ? 'light' : 'dark')}
+              >
                 <Button.Prefix>{scheme === 'dark' ? <DarkmodeIcon /> : <LightmodeIcon />}</Button.Prefix>
               </Button>
             </Tooltip>

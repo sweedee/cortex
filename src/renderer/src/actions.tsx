@@ -22,7 +22,17 @@ export { actionsForItem } from './kinds/registry';
 
 /** Actions that act on a whole multi-selection. */
 function multiActions(items: Item[]): Action[] {
-  const out: Action[] = [skill('ask', 'Ask about these', '', { icon: <ChatIcon />, primary: true, run: (xs) => insertSkill(null, xs.map((x) => x.id)) })];
+  const out: Action[] = [
+    skill('ask', 'Ask about these', '', {
+      icon: <ChatIcon />,
+      primary: true,
+      run: (xs) =>
+        insertSkill(
+          null,
+          xs.map((x) => x.id),
+        ),
+    }),
+  ];
   // the kinds' own multi-select actions, in kind order
   for (const k of KINDS) {
     const mine = items.filter((i) => i.kind === k);
@@ -68,7 +78,15 @@ async function askCwd(): Promise<{ cwd: string; project?: ItemOf<'project'> } | 
     submitLabel: 'Start agent',
     fields: [
       ...(projects.length
-        ? [{ name: 'project', label: 'Project', type: 'radio' as const, options: [...projects.map((p) => ({ value: p.id, label: p.title, hint: p.data.baseDir })), { value: '', label: 'Another folder' }], default: projects[0]?.id ?? '' }]
+        ? [
+            {
+              name: 'project',
+              label: 'Project',
+              type: 'radio' as const,
+              options: [...projects.map((p) => ({ value: p.id, label: p.title, hint: p.data.baseDir })), { value: '', label: 'Another folder' }],
+              default: projects[0]?.id ?? '',
+            },
+          ]
         : []),
       { name: 'dir', label: 'Folder', type: 'directory', when: (v) => !projects.length || !v.project, required: true, validate: (v) => (isRealPath(String(v)) ? undefined : 'Use an absolute path') },
     ],
@@ -96,7 +114,11 @@ export async function sendPrompt(text: string, mentioned: string[]): Promise<str
   // a follow-up to one agent session
   const target = agentTarget(items);
   if (target) {
-    const prompt = buildPrompt(text, items.filter((i) => i.id !== target.id), ctx);
+    const prompt = buildPrompt(
+      text,
+      items.filter((i) => i.id !== target.id),
+      ctx,
+    );
     try {
       patchData<'agent'>(target, { status: 'running', lastActivity: 'Sending your message', endedAt: undefined }, { notice: undefined });
       await claudeOps.send(target.data.localId!, prompt);
@@ -129,7 +151,17 @@ export async function sendPrompt(text: string, mentioned: string[]): Promise<str
       handle: agentHandle(sk, subject, (h) => taken.has(h.toLowerCase())),
       title,
       projectId: project?.id,
-      data: { cwd: where.cwd, localId: id, model, effort, ...(permissionMode !== 'default' ? { permissionMode } : {}), status: 'running', skill: sk, lastActivity: 'Starting Claude Code', startedAt: Date.now() },
+      data: {
+        cwd: where.cwd,
+        localId: id,
+        model,
+        effort,
+        ...(permissionMode !== 'default' ? { permissionMode } : {}),
+        status: 'running',
+        skill: sk,
+        lastActivity: 'Starting Claude Code',
+        startedAt: Date.now(),
+      },
     },
     links,
   ) as ItemOf<'agent'>;

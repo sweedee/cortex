@@ -17,7 +17,6 @@ import { appRequest, defaultPrBody, defaultPrTitle, liveInWorktree, prBase, stac
 import { sleep } from '../../../../shared/util';
 import { isAbsolutePath } from '../../../../shared/paths';
 
-
 type Worktree = ItemOf<'worktree'>;
 
 const ticketOf = (w: Worktree, ctx: KindCtx) =>
@@ -77,7 +76,17 @@ export async function createPr(w: Worktree, ctx: KindCtx) {
           handle: `PR-${number}`,
           title: form.title.trim(),
           projectId: project.id,
-          data: { repo: project.data.repo, number, headBranch: w.data.branch, baseBranch: base, state: 'open', isDraft: form.draft, reviewDecision: 'REVIEW_REQUIRED', checks: { state: 'pending' }, stackedOn: parent?.id },
+          data: {
+            repo: project.data.repo,
+            number,
+            headBranch: w.data.branch,
+            baseBranch: base,
+            state: 'open',
+            isDraft: form.draft,
+            reviewDecision: 'REVIEW_REQUIRED',
+            checks: { state: 'pending' },
+            stackedOn: parent?.id,
+          },
         });
         place.seed(item.id, place.near(w.id));
         addItem(
@@ -160,7 +169,17 @@ export async function runTests(w: Worktree, ctx: KindCtx) {
     place.seed(item.id, place.near(w.id));
     addItem(item, [{ from: item.id, to: w.id, label: 'tests' }]);
   }
-  patchData<'testrun'>(item.id, { command, cwd: w.data.path, procId: item.id, state: 'running', summary: undefined, outputTail: undefined, startedAt: Date.now(), endedAt: undefined, worktreeId: w.id });
+  patchData<'testrun'>(item.id, {
+    command,
+    cwd: w.data.path,
+    procId: item.id,
+    state: 'running',
+    summary: undefined,
+    outputTail: undefined,
+    startedAt: Date.now(),
+    endedAt: undefined,
+    worktreeId: w.id,
+  });
   const state = await runTask(`Running ${command}`, testOps.run(testRequest(item.id, w, command)), { quiet: true });
   if (!state) {
     if (existing) patchData<'testrun'>(item.id, { state: 'stopped' });

@@ -11,9 +11,31 @@ export const chimeFor = (tone: Tone): Chime => (tone === 'critical' ? 'failure' 
 
 /** [frequency Hz, start s, duration s] per note */
 const NOTES: Record<Chime, { wave: OscillatorType; notes: [number, number, number][]; gain: number }> = {
-  attention: { wave: 'sine', gain: 0.16, notes: [[659.25, 0, 0.22], [987.77, 0.12, 0.34]] }, // E5 → B5
-  failure: { wave: 'triangle', gain: 0.2, notes: [[392, 0, 0.26], [277.18, 0.16, 0.42]] }, // G4 → C#4
-  success: { wave: 'sine', gain: 0.14, notes: [[523.25, 0, 0.2], [659.25, 0.09, 0.2], [783.99, 0.18, 0.36]] }, // C5 E5 G5
+  attention: {
+    wave: 'sine',
+    gain: 0.16,
+    notes: [
+      [659.25, 0, 0.22],
+      [987.77, 0.12, 0.34],
+    ],
+  }, // E5 → B5
+  failure: {
+    wave: 'triangle',
+    gain: 0.2,
+    notes: [
+      [392, 0, 0.26],
+      [277.18, 0.16, 0.42],
+    ],
+  }, // G4 → C#4
+  success: {
+    wave: 'sine',
+    gain: 0.14,
+    notes: [
+      [523.25, 0, 0.2],
+      [659.25, 0.09, 0.2],
+      [783.99, 0.18, 0.36],
+    ],
+  }, // C5 E5 G5
 };
 
 let ctx: AudioContext | null = null;

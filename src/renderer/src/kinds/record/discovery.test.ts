@@ -35,8 +35,17 @@ describe('record discovery', () => {
     const ticket = addItem(makeItem({ kind: 'ticket', handle: 'CTX-9', title: 'T', data: { key: 'CTX-9', status: 'Open', statusCategory: 'new', type: 'Story', branch: 'feat/CTX-9-x' } }));
     expect(await scanProject(project as never)).toBe(2);
     const records = () => getState().items.filter((i) => i.kind === 'record');
-    expect(records().map((r) => r.handle).sort()).toEqual(['grill.md', 'plan.md']);
-    expect(getState().links.filter((l) => l.to === ticket.id).map((l) => l.label).sort()).toEqual(['grill for', 'plan for']);
+    expect(
+      records()
+        .map((r) => r.handle)
+        .sort(),
+    ).toEqual(['grill.md', 'plan.md']);
+    expect(
+      getState()
+        .links.filter((l) => l.to === ticket.id)
+        .map((l) => l.label)
+        .sort(),
+    ).toEqual(['grill for', 'plan for']);
 
     // second scan: no duplicates; a changed file updates the step count
     files['C:\\code\\r\\records\\feat\\CTX-9-x\\plan.md'] = '- [x] one\n- [x] two';

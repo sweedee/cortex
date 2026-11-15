@@ -24,7 +24,15 @@ const wt: ItemOf<'worktree'> = {
   projectId: 'p',
   data: { path: 'C:/wt/cortex/retry', branch: 'feat/CTX-4821-retry', baseBranch: 'main', ticketKey: 'CTX-4821' },
 };
-const pr: ItemOf<'pr'> = { ...base, id: 'pr', kind: 'pr', handle: 'PR-12', title: 'Retry', projectId: 'p', data: { repo: 'sweedee/cortex', number: 12, headBranch: 'feat/x', baseBranch: 'main', state: 'open', isDraft: false } };
+const pr: ItemOf<'pr'> = {
+  ...base,
+  id: 'pr',
+  kind: 'pr',
+  handle: 'PR-12',
+  title: 'Retry',
+  projectId: 'p',
+  data: { repo: 'sweedee/cortex', number: 12, headBranch: 'feat/x', baseBranch: 'main', state: 'open', isDraft: false },
+};
 const agent: ItemOf<'agent'> = { ...base, id: 'a', kind: 'agent', handle: 'agent/impl', title: 'Implement', projectId: 'p', data: { cwd: 'C:/wt/cortex/retry', status: 'done', localId: 'a' } };
 const demoAgent: ItemOf<'agent'> = { ...agent, id: 'a2', handle: 'agent/demo', data: { cwd: '~/x', status: 'running' } };
 

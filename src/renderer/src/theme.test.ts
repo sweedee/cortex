@@ -18,7 +18,13 @@ describe('theme', () => {
   });
 
   it('every configured preference resolves, and a bad config value follows the OS', () => {
-    for (const [pref, dark, want] of [['dark', false, 'dark'], ['light', true, 'light'], ['system', true, 'dark'], ['bogus', false, 'light']] as const) expect(resolveTheme(parseThemePref(pref), dark)).toBe(want);
+    for (const [pref, dark, want] of [
+      ['dark', false, 'dark'],
+      ['light', true, 'light'],
+      ['system', true, 'dark'],
+      ['bogus', false, 'light'],
+    ] as const)
+      expect(resolveTheme(parseThemePref(pref), dark)).toBe(want);
   });
 
   it('animations off sets a class on the document element', () => {

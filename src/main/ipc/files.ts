@@ -22,10 +22,13 @@ export function registerFiles(ctx: IpcContext, roots: Roots) {
   app.on('before-quit', (e) => {
     if (flushed || !workspace.busy) return;
     e.preventDefault();
-    void workspace.flush().catch((err) => log.error('[workspace] flush on quit failed', err)).finally(() => {
-      flushed = true;
-      app.quit();
-    });
+    void workspace
+      .flush()
+      .catch((err) => log.error('[workspace] flush on quit failed', err))
+      .finally(() => {
+        flushed = true;
+        app.quit();
+      });
   });
 
   // only inside the registered roots (lib/pathPolicy.ts)

@@ -37,7 +37,16 @@ function Setup({ item }: { item: Project }) {
         </Button>
       }
     >
-      <ValueRow label="Repo" actions={real && <IconBtn label={`Open on ${codeHost(d.provider).label}`} onClick={() => void openUrl(codeHost(d.provider).repoUrl(d.repo))}><ExternalLinkIcon /></IconBtn>}>
+      <ValueRow
+        label="Repo"
+        actions={
+          real && (
+            <IconBtn label={`Open on ${codeHost(d.provider).label}`} onClick={() => void openUrl(codeHost(d.provider).repoUrl(d.repo))}>
+              <ExternalLinkIcon />
+            </IconBtn>
+          )
+        }
+      >
         {real ? (
           <a href={codeHost(d.provider).repoUrl(d.repo)} onClick={(e) => (e.preventDefault(), void openUrl(codeHost(d.provider).repoUrl(d.repo)))} style={{ color: 'var(--tone-primary)' }}>
             {d.repo}
@@ -51,25 +60,48 @@ function Setup({ item }: { item: Project }) {
         actions={
           d.baseDir && (
             <>
-              <IconBtn label="Open folder" onClick={() => void openPath(d.baseDir!)} disabled={!baseOk}><FolderOpenIcon /></IconBtn>
-              <IconBtn label="Open in editor" onClick={() => void openInEditor(d.baseDir!)} disabled={!baseOk}><CodeIcon /></IconBtn>
+              <IconBtn label="Open folder" onClick={() => void openPath(d.baseDir!)} disabled={!baseOk}>
+                <FolderOpenIcon />
+              </IconBtn>
+              <IconBtn label="Open in editor" onClick={() => void openInEditor(d.baseDir!)} disabled={!baseOk}>
+                <CodeIcon />
+              </IconBtn>
             </>
           )
         }
       >
-        <span style={mono} title={d.baseDir}>{d.baseDir ?? <span style={{ color: 'var(--ink-faint)' }}>not set</span>}</span>
+        <span style={mono} title={d.baseDir}>
+          {d.baseDir ?? <span style={{ color: 'var(--ink-faint)' }}>not set</span>}
+        </span>
       </ValueRow>
-      <ValueRow label="Worktrees" actions={d.worktreesDir && <IconBtn label="Open worktrees folder" onClick={() => void openPath(d.worktreesDir!)} disabled={!hasBaseDir({ baseDir: d.worktreesDir })}><FolderOpenIcon /></IconBtn>}>
-        <span style={mono} title={d.worktreesDir}>{d.worktreesDir ?? <span style={{ color: 'var(--ink-faint)' }}>not set</span>}</span>
+      <ValueRow
+        label="Worktrees"
+        actions={
+          d.worktreesDir && (
+            <IconBtn label="Open worktrees folder" onClick={() => void openPath(d.worktreesDir!)} disabled={!hasBaseDir({ baseDir: d.worktreesDir })}>
+              <FolderOpenIcon />
+            </IconBtn>
+          )
+        }
+      >
+        <span style={mono} title={d.worktreesDir}>
+          {d.worktreesDir ?? <span style={{ color: 'var(--ink-faint)' }}>not set</span>}
+        </span>
       </ValueRow>
       <ValueRow label="Default branch">
         <span style={mono}>{d.defaultBranch}</span>
       </ValueRow>
       <ValueRow label="Start command">
-        <InlineText key={d.startCommand ?? ""} label="Start command" value={d.startCommand ?? ''} placeholder="npm run dev" onCommit={(v) => patchData<'project'>(item, { startCommand: v || undefined })} />
+        <InlineText
+          key={d.startCommand ?? ''}
+          label="Start command"
+          value={d.startCommand ?? ''}
+          placeholder="npm run dev"
+          onCommit={(v) => patchData<'project'>(item, { startCommand: v || undefined })}
+        />
       </ValueRow>
       <ValueRow label="Test command">
-        <InlineText key={d.testCommand ?? ""} label="Test command" value={d.testCommand ?? ''} placeholder="npm test" onCommit={(v) => patchData<'project'>(item, { testCommand: v || undefined })} />
+        <InlineText key={d.testCommand ?? ''} label="Test command" value={d.testCommand ?? ''} placeholder="npm test" onCommit={(v) => patchData<'project'>(item, { testCommand: v || undefined })} />
       </ValueRow>
       {!baseOk && <Note>{SET_BASE_HINT}</Note>}
     </SidebarSection>
@@ -142,7 +174,13 @@ function Worktrees({ item, ctx }: SidebarProps<'project'>) {
   const baseOk = hasBaseDir(item.data);
   const disk = useWorktrees(baseOk ? item.data.baseDir : undefined);
   const onCanvas = ctx.inProject(item.id, 'worktree').filter((w) => !w.archived);
-  const untracked = disk.data ? untrackedWorktrees(disk.data, item.data.baseDir, onCanvas.map((w) => w.data.path)) : [];
+  const untracked = disk.data
+    ? untrackedWorktrees(
+        disk.data,
+        item.data.baseDir,
+        onCanvas.map((w) => w.data.path),
+      )
+    : [];
   const wtMod = ctx.kind('worktree');
   return (
     <SidebarSection
@@ -167,8 +205,12 @@ function Worktrees({ item, ctx }: SidebarProps<'project'>) {
       ))}
       {untracked.map((w) => (
         <div key={w.path} className="sidebar-row" style={{ cursor: 'default' }} title={w.path}>
-          <span className="sidebar-row-icon" style={{ opacity: 0.6 }}>{wtMod.icon(13)}</span>
-          <span className="sidebar-row-main" style={{ color: 'var(--ink-subdued)' }}>{w.branch ?? w.path}</span>
+          <span className="sidebar-row-icon" style={{ opacity: 0.6 }}>
+            {wtMod.icon(13)}
+          </span>
+          <span className="sidebar-row-main" style={{ color: 'var(--ink-subdued)' }}>
+            {w.branch ?? w.path}
+          </span>
           <span className="sidebar-row-rel">on disk</span>
           <Button
             size="condensed"

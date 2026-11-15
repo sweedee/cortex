@@ -12,17 +12,7 @@ import { openShortcuts } from '../overlays/Shortcuts';
 import { sidebarWidth } from '../overlays/Sidebar';
 import { kindIcon, levelOf, radiusOf, useViews } from '../kinds/registry';
 import type { Metrics } from '../layout';
-import {
-  bounds,
-  camera,
-  dragBy,
-  dragEnd,
-  dragStart,
-  positionOf,
-  syncLayout,
-  unpinAll,
-  warmUp,
-} from '../layout';
+import { bounds, camera, dragBy, dragEnd, dragStart, positionOf, syncLayout, unpinAll, warmUp } from '../layout';
 import { resetToDemo } from '../persist';
 import { actionsForItem, actionsForSelection, KINDS_ADDABLE, openAdd, PASTE_KIND, relatedItems, removeSelected } from '../actions';
 import { removeWithUndo } from '../kinds/common';
@@ -466,7 +456,10 @@ export function Canvas() {
   );
   const selIds = useMemo(() => sel.items.map((i) => i.id), [sel]);
   const related = useMemo(
-    () => relatedItems(selIds).filter((i) => !hiddenSet.has(i.id)).slice(0, MAX_RELATED),
+    () =>
+      relatedItems(selIds)
+        .filter((i) => !hiddenSet.has(i.id))
+        .slice(0, MAX_RELATED),
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [selIds, hiddenSet, items, links],
   );
@@ -508,7 +501,12 @@ export function Canvas() {
     [menu, selected, items, links],
   );
   const menuRelated = useMemo(
-    () => (menuSel ? relatedItems(menuSel.items.map((i) => i.id)).filter((i) => !hiddenSet.has(i.id)).slice(0, 8) : []),
+    () =>
+      menuSel
+        ? relatedItems(menuSel.items.map((i) => i.id))
+            .filter((i) => !hiddenSet.has(i.id))
+            .slice(0, 8)
+        : [],
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [menuSel, hiddenSet, items, links],
   );
@@ -534,7 +532,13 @@ export function Canvas() {
       }}
     >
       <Backdrop cam={cam} />
-      <div ref={world} className="world" role="group" aria-label="Canvas: Tab to the bubbles, arrow keys between them, ? for all shortcuts" style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}>
+      <div
+        ref={world}
+        className="world"
+        role="group"
+        aria-label="Canvas: Tab to the bubbles, arrow keys between them, ? for all shortcuts"
+        style={{ transform: `translate(${cx}px, ${cy}px) scale(${k})` }}
+      >
         <Links links={links} views={views} active={activeLinks} hidden={hiddenSet} />
         {items.map((it) => {
           if (hiddenSet.has(it.id)) return null;
@@ -562,17 +566,7 @@ export function Canvas() {
 
       {hoverItem && hoverAt && <HoverCard elRef={hoverRef} item={hoverItem} x={hoverAt.x} y={hoverAt.y} flip={!!hoverAt.flip} />}
       {actionsAt && (
-        <InlineActions
-          key={selected.join(',')}
-          elRef={actionsRef}
-          actions={sel.actions}
-          items={sel.items}
-          related={related}
-          colors={colors}
-          x={actionsAt.x}
-          y={actionsAt.y}
-          flip={!!actionsAt.flip}
-        />
+        <InlineActions key={selected.join(',')} elRef={actionsRef} actions={sel.actions} items={sel.items} related={related} colors={colors} x={actionsAt.x} y={actionsAt.y} flip={!!actionsAt.flip} />
       )}
 
       {marquee && (
@@ -638,13 +632,28 @@ export function Canvas() {
                   </Menu.Group>
                 )}
                 <Menu.Group>
-                  <Menu.Item onSelect={() => insertSkill(null, menuSel.items.map((i) => i.id))}>
+                  <Menu.Item
+                    onSelect={() =>
+                      insertSkill(
+                        null,
+                        menuSel.items.map((i) => i.id),
+                      )
+                    }
+                  >
                     <Menu.Prefix>
                       <ChatIcon />
                     </Menu.Prefix>
                     Mention in chat
                   </Menu.Item>
-                  <Menu.Item onSelect={() => fitTo(menuSel.items.map((i) => i.id), true, 1.05)}>
+                  <Menu.Item
+                    onSelect={() =>
+                      fitTo(
+                        menuSel.items.map((i) => i.id),
+                        true,
+                        1.05,
+                      )
+                    }
+                  >
                     <Menu.Prefix>
                       <ZoomToFitIcon />
                     </Menu.Prefix>
@@ -722,4 +731,3 @@ export function Canvas() {
     </div>
   );
 }
-

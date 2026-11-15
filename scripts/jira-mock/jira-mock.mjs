@@ -56,7 +56,14 @@ const WORKFLOW = {
   Blocked: ['To Do', 'In Progress'],
   Done: ['To Do'],
 };
-const TYPES = { Epic: { id: '10000', hierarchyLevel: 1 }, Story: { id: '10001' }, Task: { id: '10002' }, Bug: { id: '10004' }, Spike: { id: '10005' }, Subtask: { id: '10006', subtask: true, hierarchyLevel: -1 } };
+const TYPES = {
+  Epic: { id: '10000', hierarchyLevel: 1 },
+  Story: { id: '10001' },
+  Task: { id: '10002' },
+  Bug: { id: '10004' },
+  Spike: { id: '10005' },
+  Subtask: { id: '10006', subtask: true, hierarchyLevel: -1 },
+};
 const PRIORITIES = { Highest: '1', High: '2', Medium: '3', Low: '4', Lowest: '5' };
 const LINK_TYPES = { Blocks: { id: '10000', inward: 'is blocked by', outward: 'blocks' }, Relates: { id: '10003', inward: 'relates to', outward: 'relates to' } };
 
@@ -66,7 +73,9 @@ const findCI = (names, value) => names.find((n) => n.toLowerCase() === String(va
 
 function textToAdf(text) {
   const content = [];
-  for (const para of String(text).replace(/\r\n/g, '\n').split(/\n{2,}/)) {
+  for (const para of String(text)
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)) {
     const lines = para.split('\n').filter((l) => l.trim() !== '');
     if (lines.length === 0) continue;
     if (lines.every((l) => /^\s*[-*] /.test(l))) {
@@ -151,7 +160,17 @@ function saveDb(file, db) {
 
 const userJson = (db, accountId) => {
   const u = db.users.find((x) => x.accountId === accountId);
-  return u ? { self: `${SITE}/rest/api/3/user?accountId=${u.accountId}`, accountId: u.accountId, emailAddress: u.emailAddress, displayName: u.displayName, active: true, timeZone: 'Europe/Vienna', accountType: 'atlassian' } : null;
+  return u
+    ? {
+        self: `${SITE}/rest/api/3/user?accountId=${u.accountId}`,
+        accountId: u.accountId,
+        emailAddress: u.emailAddress,
+        displayName: u.displayName,
+        active: true,
+        timeZone: 'Europe/Vienna',
+        accountType: 'atlassian',
+      }
+    : null;
 };
 const statusJson = (name) => {
   const st = STATUSES[name];
@@ -165,7 +184,14 @@ const typeJson = (name) => {
 const issueSelf = (i) => `${SITE}/rest/api/3/issue/${i.id}`;
 const refJson = (db, key) => {
   const o = db.issues.find((x) => x.key === key);
-  return o ? { id: o.id, key: o.key, self: issueSelf(o), fields: { summary: o.summary, status: statusJson(o.status), priority: { name: o.priority, id: PRIORITIES[o.priority] }, issuetype: typeJson(o.type) } } : null;
+  return o
+    ? {
+        id: o.id,
+        key: o.key,
+        self: issueSelf(o),
+        fields: { summary: o.summary, status: statusJson(o.status), priority: { name: o.priority, id: PRIORITIES[o.priority] }, issuetype: typeJson(o.type) },
+      }
+    : null;
 };
 
 function issueJson(db, i, fieldsFilter) {
@@ -193,7 +219,16 @@ function issueJson(db, i, fieldsFilter) {
       return [{ id: String(40000 + Number(i.id) * 10 + n), self: `${SITE}/rest/api/3/issueLink/${40000 + n}`, type, ...(l.outward ? { outwardIssue: other } : { inwardIssue: other }) }];
     }),
     comment: {
-      comments: i.comments.map((c) => ({ self: `${issueSelf(i)}/comment/${c.id}`, id: c.id, author: userJson(db, c.author), updateAuthor: userJson(db, c.author), body: c.body, created: c.created, updated: c.created, jsdPublic: true })),
+      comments: i.comments.map((c) => ({
+        self: `${issueSelf(i)}/comment/${c.id}`,
+        id: c.id,
+        author: userJson(db, c.author),
+        updateAuthor: userJson(db, c.author),
+        body: c.body,
+        created: c.created,
+        updated: c.created,
+        jsdPublic: true,
+      })),
       self: `${issueSelf(i)}/comment`,
       maxResults: i.comments.length,
       total: i.comments.length,
@@ -252,7 +287,10 @@ function parseValue(raw) {
 }
 
 function compileJql(db, jql) {
-  const where = jql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').replace(/^\s*ORDER\s+BY\s+[\s\S]*$/i, '').trim();
+  const where = jql
+    .replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '')
+    .replace(/^\s*ORDER\s+BY\s+[\s\S]*$/i, '')
+    .trim();
   if (!where) return () => true;
   if (/\s+OR\s+/i.test(where)) throw new CliError('Error: JQL with OR is not supported by jira-mock (only AND).');
   const clauses = splitTop(where, /^AND\s+/i).map((c) => {
@@ -319,7 +357,9 @@ function compileJql(db, jql) {
           return !values.some(one);
         case '~':
         case '!~': {
-          const hit = String(Array.isArray(actual) ? actual.join(' ') : (actual ?? '')).toLowerCase().includes(values[0].toLowerCase());
+          const hit = String(Array.isArray(actual) ? actual.join(' ') : (actual ?? ''))
+            .toLowerCase()
+            .includes(values[0].toLowerCase());
           return op === '~' ? hit : !hit;
         }
         default:
@@ -365,7 +405,13 @@ Commands:
 Environment: JIRA_MOCK_DB (data file), JIRA_MOCK_SITE (URL base)`;
 
 const out = (s) => process.stdout.write(s.endsWith('\n') ? s : s + '\n');
-const fieldList = (f) => (typeof f === 'string' ? f.split(',').map((x) => x.trim()).filter(Boolean) : undefined);
+const fieldList = (f) =>
+  typeof f === 'string'
+    ? f
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean)
+    : undefined;
 
 function getIssue(db, key) {
   const i = db.issues.find((x) => x.key.toLowerCase() === String(key).toLowerCase());
@@ -407,9 +453,19 @@ function run(argv) {
       if (!flags.jql) throw usage('Error: --jql is required');
       const match = compileJql(db, flags.jql);
       const limit = flags.limit ? Number(flags.limit) : 50;
-      const found = db.issues.filter(match).sort((a, b) => b.updated.localeCompare(a.updated)).slice(0, limit);
-      if (flags.count) return out(String(found.length)), 0;
-      if (flags.json) out(JSON.stringify(found.map((i) => issueJson(db, i, fieldList(flags.fields))), null, 2));
+      const found = db.issues
+        .filter(match)
+        .sort((a, b) => b.updated.localeCompare(a.updated))
+        .slice(0, limit);
+      if (flags.count) return (out(String(found.length)), 0);
+      if (flags.json)
+        out(
+          JSON.stringify(
+            found.map((i) => issueJson(db, i, fieldList(flags.fields))),
+            null,
+            2,
+          ),
+        );
       else out(found.map((i) => `${i.key}\t${i.type}\t${i.status}\t${i.summary}`).join('\n') || 'No work items found.');
       return 0;
     }
@@ -423,7 +479,9 @@ function run(argv) {
     }
     case 'transition': {
       if (!flags.key || !flags.status) throw usage('Error: --key and --status are required');
-      const keys = String(flags.key).split(',').map((k) => k.trim());
+      const keys = String(flags.key)
+        .split(',')
+        .map((k) => k.trim());
       const target = findCI(Object.keys(STATUSES), flags.status);
       for (const key of keys) {
         const i = getIssue(db, key);
@@ -435,7 +493,13 @@ function run(argv) {
         touch(i);
       }
       saveDb(file, db);
-      if (flags.json) out(bulk(keys.map((k) => k.toUpperCase()), (k) => `Work item ${k} has been successfully transitioned to ${target}`));
+      if (flags.json)
+        out(
+          bulk(
+            keys.map((k) => k.toUpperCase()),
+            (k) => `Work item ${k} has been successfully transitioned to ${target}`,
+          ),
+        );
       else for (const k of keys) out(`✓ Work item ${k.toUpperCase()} transitioned to ${target}`);
       return 0;
     }

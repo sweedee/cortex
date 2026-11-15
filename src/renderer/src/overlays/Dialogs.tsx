@@ -121,23 +121,23 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
           ))}
         </Flex>
         <div ref={field}>
-        <FormField>
-          <Label>{meta.multiline ? 'Text' : 'Reference'}</Label>
-          {meta.multiline ? (
-            <TextArea rows={3} value={value} onChange={setValue} placeholder={meta.hint} />
-          ) : (
-            <TextInput
-              value={value}
-              onChange={(v: string) => {
-                setValue(v);
-                const g = detect(v.trim());
-                if (g && g !== kind) setKind(g);
-              }}
-              placeholder={meta.hint}
-              onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && !isComposing(e) && submit()}
-            />
-          )}
-        </FormField>
+          <FormField>
+            <Label>{meta.multiline ? 'Text' : 'Reference'}</Label>
+            {meta.multiline ? (
+              <TextArea rows={3} value={value} onChange={setValue} placeholder={meta.hint} />
+            ) : (
+              <TextInput
+                value={value}
+                onChange={(v: string) => {
+                  setValue(v);
+                  const g = detect(v.trim());
+                  if (g && g !== kind) setKind(g);
+                }}
+                placeholder={meta.hint}
+                onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && !isComposing(e) && submit()}
+              />
+            )}
+          </FormField>
         </div>
         {guessed && guessed === kind && value && (
           <Text textStyle="small" className="subdued">
@@ -149,7 +149,13 @@ function AddDialog({ kind: initial, at }: { kind: Kind; at: { x: number; y: numb
             <Label>Link to project</Label>
             <Flex gap={6} flexWrap="wrap">
               {projects.map((p) => (
-                <Button key={p.id} size="condensed" variant={p.id === project ? 'emphasized' : 'default'} color={p.id === project ? 'primary' : 'neutral'} onClick={() => setProject(p.id === project ? null : p.id)}>
+                <Button
+                  key={p.id}
+                  size="condensed"
+                  variant={p.id === project ? 'emphasized' : 'default'}
+                  color={p.id === project ? 'primary' : 'neutral'}
+                  onClick={() => setProject(p.id === project ? null : p.id)}
+                >
                   {p.title}
                 </Button>
               ))}

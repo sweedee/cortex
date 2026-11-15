@@ -154,8 +154,7 @@ const DiffViewerImpl = memo(function DiffViewerImpl({ diff, mode = 'unified', la
     <div className={`cxv-diff${className ? ` ${className}` : ''}`}>
       <div className="cxv-diff-summary">
         <div className="cxv-diff-summary-head">
-          {files.length} file{files.length === 1 ? '' : 's'} changed{' '}
-          <span className="cxv-diff-add-n">+{stats.additions}</span> <span className="cxv-diff-del-n">−{stats.deletions}</span>
+          {files.length} file{files.length === 1 ? '' : 's'} changed <span className="cxv-diff-add-n">+{stats.additions}</span> <span className="cxv-diff-del-n">−{stats.deletions}</span>
           {files.length > 1 && (
             <>
               <button type="button" className="cxv-link-btn" onClick={() => setToggled(Object.fromEntries(files.map((_, i) => [i, false])))}>
@@ -169,7 +168,15 @@ const DiffViewerImpl = memo(function DiffViewerImpl({ diff, mode = 'unified', la
         </div>
         {files.length > 1 &&
           files.map((f, i) => (
-            <a key={i} className="cxv-diff-summary-row" href={`#cxv-diff-${i}`} onClick={(e) => { e.preventDefault(); document.getElementById(`cxv-diff-${i}`)?.scrollIntoView({ block: 'start' }); }}>
+            <a
+              key={i}
+              className="cxv-diff-summary-row"
+              href={`#cxv-diff-${i}`}
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById(`cxv-diff-${i}`)?.scrollIntoView({ block: 'start' });
+              }}
+            >
               <span className={`cxv-diff-status cxv-diff-status-${fileStatus(f)}`}>{STATUS_LABEL[fileStatus(f)]}</span>
               <span className="cxv-diff-name">{fileName(f)}</span>
               <span className="cxv-diff-counts">

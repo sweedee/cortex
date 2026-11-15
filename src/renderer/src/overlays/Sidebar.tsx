@@ -84,13 +84,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className={`sidebar ${drag != null ? 'is-resizing' : ''}`}
-      key={item.id}
-      style={{ width }}
-      onPointerDown={(e) => e.stopPropagation()}
-      aria-label={`${kindLabel(item.kind)} details`}
-    >
+    <aside className={`sidebar ${drag != null ? 'is-resizing' : ''}`} key={item.id} style={{ width }} onPointerDown={(e) => e.stopPropagation()} aria-label={`${kindLabel(item.kind)} details`}>
       <div className="sidebar-resize" onPointerDown={startDrag} onDoubleClick={() => setWide((w) => !w)} title="Drag to resize · double-click to expand" />
       <header className="sidebar-head">
         <span className="sidebar-kind">

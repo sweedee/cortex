@@ -50,22 +50,10 @@ function Checkbox({ type, checked }: ComponentProps<'input'>) {
   const t = useContext(TaskCtx);
   if (type !== 'checkbox') return <input type={type} disabled />;
   const interactive = !!t?.toggle && t.index >= 0;
-  return (
-    <input
-      type="checkbox"
-      checked={!!checked}
-      disabled={!interactive}
-      onChange={(e) => t?.toggle?.(t.index, e.target.checked)}
-    />
-  );
+  return <input type="checkbox" checked={!!checked} disabled={!interactive} onChange={(e) => t?.toggle?.(t.index, e.target.checked)} />;
 }
 
-function buildComponents(
-  segLine: number,
-  taskLines: number[],
-  onLinkClick: MarkdownProps['onLinkClick'],
-  onToggleTask: MarkdownProps['onToggleTask'],
-): Components {
+function buildComponents(segLine: number, taskLines: number[], onLinkClick: MarkdownProps['onLinkClick'], onToggleTask: MarkdownProps['onToggleTask']): Components {
   return {
     a: ({ href, children }) => (
       <a
@@ -105,11 +93,7 @@ function Segmented({ source, onLinkClick, onToggleTask }: MarkdownProps) {
         s.kind === 'mermaid' ? (
           <Mermaid key={i} source={s.text} />
         ) : (
-          <ReactMarkdown
-            key={i}
-            remarkPlugins={[remarkGfm]}
-            components={buildComponents(s.line, taskLines, onLinkClick, onToggleTask)}
-          >
+          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={buildComponents(s.line, taskLines, onLinkClick, onToggleTask)}>
             {s.text}
           </ReactMarkdown>
         ),

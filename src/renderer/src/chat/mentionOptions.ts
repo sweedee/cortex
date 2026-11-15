@@ -21,9 +21,7 @@ export function mentionOptions(index: MentionEntry[], query: string, visible: Se
   const matches = index.filter((e) => (visible.has(e.item.id) || !e.item.archived) && (e.handle.includes(q) || e.title.includes(q)));
   matches.sort(
     (a, b) =>
-      Number(visible.has(b.item.id)) - Number(visible.has(a.item.id)) ||
-      Number(sel.has(b.item.id)) - Number(sel.has(a.item.id)) ||
-      Number(b.handle.startsWith(q)) - Number(a.handle.startsWith(q)),
+      Number(visible.has(b.item.id)) - Number(visible.has(a.item.id)) || Number(sel.has(b.item.id)) - Number(sel.has(a.item.id)) || Number(b.handle.startsWith(q)) - Number(a.handle.startsWith(q)),
   );
   return {
     options: matches.slice(0, limit).map((e) => e.item),

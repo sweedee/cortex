@@ -170,7 +170,7 @@ export function ChatBox() {
 
   // the @-query's matches light up on the canvas, the keyboard-active one strongest
   const hits = popup?.type === 'mention' ? popup.hits : null;
-  const activeId = popup?.type === 'mention' ? popup.options[active]?.id ?? null : null;
+  const activeId = popup?.type === 'mention' ? (popup.options[active]?.id ?? null) : null;
   useEffect(() => {
     setSearch(hits ? { ids: hits, active: activeId } : null);
   }, [hits, activeId]);
@@ -228,9 +228,7 @@ export function ChatBox() {
     if (mirror.current && ta.current) mirror.current.scrollTop = ta.current.scrollTop;
   };
 
-  const placeholder = selected.length
-    ? 'Ask about the selection, or pick an action above…'
-    : 'Ask Cortex anything — @ to mention a bubble, / for a skill, # for its actions';
+  const placeholder = selected.length ? 'Ask about the selection, or pick an action above…' : 'Ask Cortex anything — @ to mention a bubble, / for a skill, # for its actions';
   // the border takes the colours of what the message is about
   const ctxColors = [...new Set(mentioned.flatMap((m) => colors.get(m.id) ?? [NEUTRAL_ACCENT]))];
 
@@ -257,15 +255,18 @@ export function ChatBox() {
         </div>
       )}
 
-      <div
-        className={`chatbox ${popup ? 'has-popup' : ''} ${ctxColors.length ? 'has-context' : ''}`}
-        style={ctxColors.length ? { ['--ctx-border' as string]: stripes(ctxColors) } : undefined}
-      >
+      <div className={`chatbox ${popup ? 'has-popup' : ''} ${ctxColors.length ? 'has-context' : ''}`} style={ctxColors.length ? { ['--ctx-border' as string]: stripes(ctxColors) } : undefined}>
         {mentioned.length > 0 && (
           <div className="chat-context">
             <span className="chat-context-label">Context</span>
             {mentioned.map((m) => (
-              <button key={m.id} className="ctx-chip" style={{ ['--accent' as string]: stripes(colors.get(m.id) ?? [NEUTRAL_ACCENT], 180) }} onClick={() => camera.focus([m.id])} title={`${kindLabel(m.kind)} · ${m.title}`}>
+              <button
+                key={m.id}
+                className="ctx-chip"
+                style={{ ['--accent' as string]: stripes(colors.get(m.id) ?? [NEUTRAL_ACCENT], 180) }}
+                onClick={() => camera.focus([m.id])}
+                title={`${kindLabel(m.kind)} · ${m.title}`}
+              >
                 {kindIcon(m.kind, 12)}
                 <span>{m.title}</span>
               </button>
@@ -369,37 +370,37 @@ export function ChatBox() {
                   </div>
                 ))
               : popup.type === 'mention'
-              ? popup.options.map((o, i) => (
-                  <div
-                    key={o.id}
-                    role="option"
-                    aria-selected={i === active}
-                    className={`chat-option ${i === active ? 'is-active' : ''}`}
-                    onMouseDown={(e) => (e.preventDefault(), accept(i))}
-                    onMouseEnter={() => setActive(i)}
-                    style={{ ['--accent' as string]: accentOf(colors, o.id) }}
-                  >
-                    <span className="chat-option-icon">{kindIcon(o.kind, 14)}</span>
-                    <span className="chat-option-main">@{o.handle}</span>
-                    <span className="chat-option-sub">{o.title}</span>
-                  </div>
-                ))
-              : (popup.options as SlashOption[]).map((o, i) => (
-                  <div
-                    key={o.name}
-                    role="option"
-                    aria-selected={i === active}
-                    className={`chat-option ${i === active ? 'is-active' : ''}`}
-                    onMouseDown={(e) => (e.preventDefault(), accept(i))}
-                    onMouseEnter={() => setActive(i)}
-                  >
-                    <span className="chat-option-icon">{o.source === 'cortex' ? skillIcon(o.name) : <TerminalIcon />}</span>
-                    <span className="chat-option-main">/{o.name}</span>
-                    <span className="chat-option-sub" title={o.desc}>
-                      {o.args ? `${o.args} · ${o.desc}` : o.desc}
-                    </span>
-                  </div>
-                ))}
+                ? popup.options.map((o, i) => (
+                    <div
+                      key={o.id}
+                      role="option"
+                      aria-selected={i === active}
+                      className={`chat-option ${i === active ? 'is-active' : ''}`}
+                      onMouseDown={(e) => (e.preventDefault(), accept(i))}
+                      onMouseEnter={() => setActive(i)}
+                      style={{ ['--accent' as string]: accentOf(colors, o.id) }}
+                    >
+                      <span className="chat-option-icon">{kindIcon(o.kind, 14)}</span>
+                      <span className="chat-option-main">@{o.handle}</span>
+                      <span className="chat-option-sub">{o.title}</span>
+                    </div>
+                  ))
+                : (popup.options as SlashOption[]).map((o, i) => (
+                    <div
+                      key={o.name}
+                      role="option"
+                      aria-selected={i === active}
+                      className={`chat-option ${i === active ? 'is-active' : ''}`}
+                      onMouseDown={(e) => (e.preventDefault(), accept(i))}
+                      onMouseEnter={() => setActive(i)}
+                    >
+                      <span className="chat-option-icon">{o.source === 'cortex' ? skillIcon(o.name) : <TerminalIcon />}</span>
+                      <span className="chat-option-main">/{o.name}</span>
+                      <span className="chat-option-sub" title={o.desc}>
+                        {o.args ? `${o.args} · ${o.desc}` : o.desc}
+                      </span>
+                    </div>
+                  ))}
           </div>
         )}
       </div>

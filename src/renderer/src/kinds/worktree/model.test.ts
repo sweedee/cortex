@@ -66,7 +66,8 @@ describe('worktree model', () => {
 
 describe('processes in a worktree', () => {
   it('finds agent sessions, running apps and test runs inside the folder (case / slash insensitive on Windows)', () => {
-    const mk = (kind: string, data: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({ id: kind + Math.random(), kind, handle: 'h', title: 't', createdAt: 0, updatedAt: 0, data, ...extra }) as unknown as Item;
+    const mk = (kind: string, data: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      ({ id: kind + Math.random(), kind, handle: 'h', title: 't', createdAt: 0, updatedAt: 0, data, ...extra }) as unknown as Item;
     const dir = String.raw`C:\wt\x`;
     const items = [
       mk('agent', { localId: 'a1', cwd: 'c:/WT/x', status: 'done' }),

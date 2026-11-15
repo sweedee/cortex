@@ -15,10 +15,17 @@ describe('agent transcript rows', () => {
   const events: ClaudeEvent[] = [
     ev({ type: 'system', subtype: 'init', model: 'claude-x' }),
     user('fix the bug'),
-    asst([{ type: 'thinking', thinking: 'Let me look at the dispatcher.' }, { type: 'text', text: 'Looking.' }, { type: 'tool_use', id: 'tu1', name: 'Read', input: { file_path: '/a.ts' } }]),
+    asst([
+      { type: 'thinking', thinking: 'Let me look at the dispatcher.' },
+      { type: 'text', text: 'Looking.' },
+      { type: 'tool_use', id: 'tu1', name: 'Read', input: { file_path: '/a.ts' } },
+    ]),
     user([{ type: 'tool_result', tool_use_id: 'tu1', content: 'line 1\nline 2' }]),
     asst([{ type: 'tool_use', id: 'tu2', name: 'Edit', input: { file_path: '/a.ts', old_string: 'a', new_string: 'b' } }], 'm2'),
-    asst([{ type: 'tool_use', id: 'ask1', name: 'AskUserQuestion', input: { questions: [{ question: 'Which?', header: 'Pick', multiSelect: true, options: [{ label: 'A' }, { label: 'B' }] }] } }], 'm3'),
+    asst(
+      [{ type: 'tool_use', id: 'ask1', name: 'AskUserQuestion', input: { questions: [{ question: 'Which?', header: 'Pick', multiSelect: true, options: [{ label: 'A' }, { label: 'B' }] }] } }],
+      'm3',
+    ),
   ];
 
   it('keeps messages, thinking (in order), tool inputs / results and the open question', () => {
@@ -60,16 +67,32 @@ describe('incremental transcript', () => {
     delta('Let '),
     delta('me '),
     delta('look.'),
-    asst([{ type: 'thinking', thinking: 'Delegate it.' }, { type: 'text', text: 'Let me look.' }, { type: 'tool_use', id: 'task1', name: 'Task', input: { description: 'Explore', prompt: 'find the router', subagent_type: 'Explore' } }]),
+    asst([
+      { type: 'thinking', thinking: 'Delegate it.' },
+      { type: 'text', text: 'Let me look.' },
+      { type: 'tool_use', id: 'task1', name: 'Task', input: { description: 'Explore', prompt: 'find the router', subagent_type: 'Explore' } },
+    ]),
     ev({ type: 'system', subtype: 'task_started', task_id: 'a1', tool_use_id: 'task1', description: 'Explore', subagent_type: 'Explore' }),
-    sub([{ type: 'text', text: 'Searching.' }, { type: 'tool_use', id: 'g1', name: 'Grep', input: { pattern: 'router' } }], 's1'),
+    sub(
+      [
+        { type: 'text', text: 'Searching.' },
+        { type: 'tool_use', id: 'g1', name: 'Grep', input: { pattern: 'router' } },
+      ],
+      's1',
+    ),
     subUser([{ type: 'tool_result', tool_use_id: 'g1', content: 'src/router.ts' }]),
     sub([{ type: 'tool_use', id: 'task2', name: 'Agent', input: { description: 'Nested', prompt: 'deeper' } }], 's2'),
     ev({ type: 'system', subtype: 'task_progress', task_id: 'a1', tool_use_id: 'task1', description: 'reading', usage: { tool_uses: 2, total_tokens: 900 } }),
     user([{ type: 'tool_result', tool_use_id: 'task1', content: 'It is in src/router.ts' }]),
     delta('Found '),
     delta('it.'),
-    asst([{ type: 'tool_use', id: 'r1', name: 'Read', input: { file_path: '/src/router.ts' } }, { type: 'tool_use', id: 'r2', name: 'Bash', input: { command: 'ls' } }], 'm2'),
+    asst(
+      [
+        { type: 'tool_use', id: 'r1', name: 'Read', input: { file_path: '/src/router.ts' } },
+        { type: 'tool_use', id: 'r2', name: 'Bash', input: { command: 'ls' } },
+      ],
+      'm2',
+    ),
     user([{ type: 'tool_result', tool_use_id: 'r1', content: 'export …' }]),
     asst([{ type: 'text', text: 'Done.' }], 'm3'),
     ev({ type: 'result', subtype: 'success', is_error: false, result: 'Done.', duration_ms: 10 }),
@@ -84,8 +107,17 @@ describe('incremental transcript', () => {
       expect(c.update(stream)).toEqual(buildTranscript(stream, 'x'));
     }
     const rows = buildRows(stream, 'x');
-    expect(rows.map((r) => r.kind)).toEqual(['user', 'assistant', 'thinking', 'subagent', 'assistant', 'tool', 'tool', 'assistant']) // the streamed draft is already there when thinking arrives;
-    expect(rows[3]).toMatchObject({ kind: 'subagent', prompt: 'find the router', result: 'It is in src/router.ts', children: [{ kind: 'assistant', text: 'Searching.' }, { kind: 'tool', tool: 'Grep', status: 'ok' }, { kind: 'subagent', tool: 'Agent', prompt: 'deeper' }] });
+    expect(rows.map((r) => r.kind)).toEqual(['user', 'assistant', 'thinking', 'subagent', 'assistant', 'tool', 'tool', 'assistant']); // the streamed draft is already there when thinking arrives;
+    expect(rows[3]).toMatchObject({
+      kind: 'subagent',
+      prompt: 'find the router',
+      result: 'It is in src/router.ts',
+      children: [
+        { kind: 'assistant', text: 'Searching.' },
+        { kind: 'tool', tool: 'Grep', status: 'ok' },
+        { kind: 'subagent', tool: 'Agent', prompt: 'deeper' },
+      ],
+    });
   });
 
   it('keeps unchanged rows (and the result when nothing changed) by identity', () => {

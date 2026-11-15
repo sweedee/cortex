@@ -5,7 +5,7 @@ export type Stage = DeploymentData['stage'];
 
 export const STAGES: Stage[] = ['dev', 'staging', 'prod', 'custom'];
 
-export const stageLabel = (d: Pick<DeploymentData, 'stage' | 'stageLabel'>) => (d.stage === 'custom' ? (d.stageLabel?.trim() || 'custom') : d.stage);
+export const stageLabel = (d: Pick<DeploymentData, 'stage' | 'stageLabel'>) => (d.stage === 'custom' ? d.stageLabel?.trim() || 'custom' : d.stage);
 
 /** prod stands out (critical), dev stays neutral. */
 export const STAGE_TONE: Record<Stage, Tone> = { dev: 'neutral', staging: 'primary', prod: 'critical', custom: 'pending' };

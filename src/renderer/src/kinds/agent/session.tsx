@@ -51,10 +51,7 @@ export function answerFields(questions: Question[]): FormFieldSpec[] {
     const title = q.header ? `${q.header}: ${q.question}` : q.question;
     const other: FormFieldSpec = { name: `${fieldName(qi)}other`, label: questions.length > 1 ? 'Or your own answer' : 'Or type an answer', type: 'text', placeholder: 'Optional' };
     if (q.multiSelect)
-      return [
-        ...q.options.map((o, oi): FormFieldSpec => ({ name: fieldName(qi, oi), label: oi === 0 ? `${title} — ${o.label}` : o.label, type: 'checkbox', hint: o.description })),
-        other,
-      ];
+      return [...q.options.map((o, oi): FormFieldSpec => ({ name: fieldName(qi, oi), label: oi === 0 ? `${title} — ${o.label}` : o.label, type: 'checkbox', hint: o.description })), other];
     return [{ name: fieldName(qi), label: title, type: 'radio', options: q.options.map((o) => ({ value: o.label, label: o.label, hint: o.description })) }, other];
   });
 }

@@ -26,7 +26,10 @@ export const pr: KindModule<'pr'> = {
     const stacked = ctx.getAs(data.stackedOn, 'pr');
     return [
       ['Reviews', data.reviews ? `${data.reviews.approved} / ${data.reviews.requested}${data.reviewDecision === 'APPROVED' ? ' approved' : ''}` : '–'],
-      ['Checks', data.checks ? (data.checks.state === 'failure' ? `${data.checks.failed ?? 1} failed` : data.checks.state === 'pending' ? 'running' : data.checks.state === 'success' ? 'passed' : 'none') : '–'],
+      [
+        'Checks',
+        data.checks ? (data.checks.state === 'failure' ? `${data.checks.failed ?? 1} failed` : data.checks.state === 'pending' ? 'running' : data.checks.state === 'success' ? 'passed' : 'none') : '–',
+      ],
       ['Diff', data.additions != null ? `+${data.additions} −${data.deletions ?? 0}` : '–'],
       ...(data.headBranch ? [['Branch', data.headBranch] as [string, string]] : []),
       ...(stacked ? [['Stacked on', stacked.handle] as [string, string]] : []),
@@ -110,9 +113,17 @@ export const pr: KindModule<'pr'> = {
         kind: 'pr',
         handle: `PR-${num}`,
         title: `Pull request #${num}`,
-        data: { repo, number: num, headBranch: '', baseBranch: proj?.data.defaultBranch ?? userConfig().git.defaultBranch, state: 'open', isDraft: false, reviewDecision: 'REVIEW_REQUIRED', checks: { state: 'pending' } },
+        data: {
+          repo,
+          number: num,
+          headBranch: '',
+          baseBranch: proj?.data.defaultBranch ?? userConfig().git.defaultBranch,
+          state: 'open',
+          isDraft: false,
+          reviewDecision: 'REVIEW_REQUIRED',
+          checks: { state: 'pending' },
+        },
       };
     },
   },
 };
-

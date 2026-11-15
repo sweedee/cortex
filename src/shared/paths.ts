@@ -14,7 +14,11 @@ export function isAbsolutePath(p: string | undefined): boolean {
 export const sepOf = (p: string): '/' | '\\' => (p.includes('\\') && !p.includes('/') ? '\\' : '/');
 
 /** Last segment, ignoring trailing slashes: `C:\code\app\` → `app`. */
-export const baseName = (p: string): string => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? '';
+export const baseName = (p: string): string =>
+  p
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .pop() ?? '';
 
 /** Everything before the last segment (no trailing slash): `a/b/c.md` → `a/b`. */
 export const dirOf = (p: string): string => p.replace(/[\\/][^\\/]*$/, '');
