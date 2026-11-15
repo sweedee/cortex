@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: typecheck, lint, test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    env:
+      # Electron's postinstall downloads a binary (~100 MB). typecheck, lint and vitest do not run
+      # Electron (no test imports the 'electron' module), so skip it.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Plain `npm ci` crashes on the npm version bundled with Node ("reading 'edgesOut'"),
+      # so the install goes through the pinned npm 11 (see README).
+      - name: Install dependencies
+        run: npx npm@11.21.2 ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test

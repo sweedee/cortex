@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "description": "Cortex: a single-canvas developer command center (Electron)",
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
