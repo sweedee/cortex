@@ -36,7 +36,7 @@ npm run dev:web      # renderer only in a browser (native calls use the fallback
 After `npm ci` in a fresh clone or worktree, run `node node_modules/electron/install.js` if Electron
 complains that it failed to install.
 
-Cortex keeps its files in `~/.cortex` (workspace, window state, Claude session list, Jira mock data);
+Cortex keeps its files in `~/.cortex` (config, workspace, window state, Claude session list, Jira mock data);
 `CORTEX_USER_DATA=<dir>` runs with a separate profile. Chromium's caches and the logins of the embedded GitHub /
 Jira pages stay in Electron's own folder (Windows `%APPDATA%\cortex`), not in `~/.cortex`. On the first start
 after the move, an existing `workspace.json` (and its siblings) is copied over from that old folder once.
@@ -57,18 +57,50 @@ Without that checkout the canvas starts empty with a welcome todo. To work on yo
    **Create ticket** / **Review Renovate PRs** hand the work to Claude.
 3. On a worktree: **Launch app**, **Run tests**, **Create PR…** (pushes, then `gh pr create`; stacked PRs
    supported), **Remove worktree…**. Plan / brainstorm / grill files in `<base checkout>/records/<branch>/`
-   show up as record bubbles by themselves.
+   show up as record bubbles by themselves (the folder is config.json `records.dir`).
 4. Type in the chat box, `@mention` a worktree (or ticket, PR, …) and send: an agent bubble appears and
    runs Claude Code in that worktree. Its questions and permission prompts become actions on the bubble
    and cards in its sidebar.
 
-The **gear** (top right) opens the global settings: Claude model and permission mode for new sessions,
-the AI-review comment, the refresh interval, notifications, and where the workspace file lives. Right-click
-the canvas → *Reset workspace to demo data* to start over (demo world or empty, as on the first run).
+The **gear** (top right) opens the global settings: Claude model, effort and permission mode for new
+sessions, the AI-review comment, the refresh interval, notifications and sound. They are saved in
+`~/.cortex/config.json` (see [Configuration](#configuration)). Right-click the canvas → *Reset workspace to
+demo data* to start over (demo world or empty, as on the first run; the settings stay).
 
-The workspace (bubbles, links, preferences) is saved to `~/.cortex/workspace.json` (previous version in
-`.bak`; versioned and migrated on load). A workspace that still holds the old fake demo
+The workspace (bubbles, links, bubble colour, filter, sidebar width) is saved to `~/.cortex/workspace.json`
+(previous version in `.bak`; versioned and migrated on load). A workspace that still holds the old fake demo
 (`ctx-observability/*` repos) is replaced by the first-run world.
+
+## Configuration
+
+`~/.cortex/config.json` holds the machine / user settings. The first start writes a starter file with only a
+`$schema` reference to `config.schema.json` next to it (completion and descriptions in VS Code); add what you
+need. Edits apply while Cortex runs (`claude.bin` and `jira.cli` after a restart). A bad value falls back to its
+default (Settings → *Config file* lists them); a file that is not valid JSON is ignored until it is fixed.
+
+```jsonc
+{
+  "$schema": "./config.schema.json",
+  "editor":  { "command": "cursor", "args": ["{path}"] },                 // "Open in editor"; default VS Code's code
+  "claude":  { "bin": "claude", "model": null, "effort": null, "permissionMode": "default", "contextWindow": 200000 },
+  "github":  { "aiReviewComment": "@claude review", "aiReviewBot": "claude[bot]",
+               "renovate": { "app": "renovate", "label": "renovate" } },
+  "jira":    { "cli": "acli", "site": "", "fields": { "storyPoints": "customfield_10016", "sprint": "customfield_10020" } },
+  "git":     { "branchTemplate": "{key}-{slug}", "defaultBranch": "main", "worktreesDir": "../wt/{repo}" },
+  "records": { "dir": "records" },                                        // inside each base checkout
+  "refresh": { "intervalSec": 60 },
+  "ui":      { "notifications": false, "sound": true }
+}
+```
+
+- **Jira custom fields differ per site**: find yours with `acli jira workitem view <KEY> --json --fields "*all"`.
+- `git.branchTemplate`: `{key}` = the issue key, `{slug}` = the title slug, e.g. `feat/{key}-{slug}`.
+  `git.worktreesDir`: the default worktrees folder of a new project, relative to its base checkout or absolute.
+- `editor.*` and `claude.bin` name programs Cortex runs, so the app itself never writes them: they are set in the
+  file only.
+
+The `CORTEX_*` environment variables (`CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_CLAUDE_BIN`, …) are
+development / test overrides on top of config.json; an installed app ignores them (except `CORTEX_USER_DATA`).
 
 ## Jira: acli or the mock
 
@@ -80,8 +112,9 @@ decides which moves are allowed. Settings → Jira shows the CLI, the site and a
 
 The **mock** (`scripts/jira-mock`) has the same commands, prints the same JSON and keeps its data in
 `~/.cortex/jira-mock.json`, seeded with made-up CTX-48xx tickets and a To Do → In Progress → In Review → Done
-workflow. It is used when `acli` is not on `PATH`, with `CORTEX_JIRA_CLI=mock`, and in smoke runs (they never
-touch a real Jira unless started with `CORTEX_JIRA_CLI=acli`). `CORTEX_JIRA_SITE=<url>` overrides the site.
+workflow. It is used when `acli` is not on `PATH`, with `"jira": { "cli": "mock" }` in config.json (or `CORTEX_JIRA_CLI=mock`
+in development), and in smoke runs (they never touch a real Jira unless started with `CORTEX_JIRA_CLI=acli`).
+`jira.site` in config.json (`CORTEX_JIRA_SITE=<url>` in development) overrides the site.
 
 ## CI
 

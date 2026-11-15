@@ -81,8 +81,20 @@ any program". What main enforces:
 - **Claude permission modes** `bypassPermissions` / `dontAsk` from the renderer (`claude:start`,
   `claude:configure`) need a native confirmation in main, once per mode per run (`lib/modeGate.ts`).
 - **Dev overrides are ignored in a packaged build** (`lib/devEnv.ts`, applied to `process.env` first thing):
-  `CORTEX_CLAUDE_BIN`, `CORTEX_JIRA_MOCK_SCRIPT`, `CORTEX_SMOKE*`, `ELECTRON_RENDERER_URL`, `JIRA_MOCK_*`. The
-  smoke harness is only imported when the app is not packaged.
+  `CORTEX_CLAUDE_BIN`, `CORTEX_JIRA_MOCK_SCRIPT`, `CORTEX_SMOKE*`, `ELECTRON_RENDERER_URL`, `JIRA_MOCK_*`, and the
+  config.json overrides `CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`.
+  Only `CORTEX_USER_DATA` stays. The smoke harness is only imported when the app is not packaged.
+- **config.json names programs main runs** (`editor.command` / `editor.args` for `shell:openInEditor`,
+  `claude.bin`), so those keys are **file-only**: the file belongs to the user, the renderer can't set them.
+  `config:update` validates its patch with a strict schema (`RendererConfigPatchSchema`, `shared/userConfig.ts`)
+  that only has the gear-dialog keys (Claude model / effort / permission mode, AI-review comment, refresh
+  interval, notifications, sound); anything else (`editor`, `claude.bin`, Jira, git, records) is rejected.
+  `fs:writeText` refuses `<userData>/config.json` and `config.schema.json` although `~/.cortex` is a root. The
+  editor runs without a shell (cross-spawn, `shell: false`), the program may not start with `-`, and the path
+  (inside the roots) is substituted for `{path}` as one argument. A default permission mode from the file is
+  only what the renderer sends with `claude:start`, so `bypassPermissions` / `dontAsk` still need the native
+  confirmation. This is defense in depth: a renderer that can run shell commands (below) could also edit the
+  file through them.
 
 What it does *not* stop: `apps:start` / `tests:run` / `proc:start` run a command line through the shell (the
 user's own start / test commands need one), so a compromised renderer can still run commands in a project
@@ -113,7 +125,7 @@ that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#
 | `dialog:pickFile` | `{title?, defaultPath?, filters?}` → `string \| null` | |
 | `shell:openExternal` | `{url}` | http(s) only |
 | `shell:openPath` | `{path}` → `{ok, error?}` | folder / file in the OS; inside the roots, never an executable |
-| `shell:openInEditor` | `{path}` → `{ok, error?}` | `code <path>`, falls back to `openPath`; inside the roots |
+| `shell:openInEditor` | `{path}` → `{ok, error?}` | config.json `editor` (default `code <path>`; `{path}` in `args`), no shell; falls back to `openPath`; inside the roots |
 | `webview:setColorScheme` | `{webContentsId, scheme: "light" or "dark" or null}` | CDP `Emulation.setEmulatedMedia` (`prefers-color-scheme`) on an embedded webview guest only; used by the preview light / dark toggle (`WebPanel` `colorSchemeToggle`: app + deployment previews; default = the app theme) |
 | `notify:desktop` | `{title, body, tag?, itemId?}` | Electron `Notification`; click focuses the window and sends `notify:clicked` |
 | `workspace:load` | → `unknown \| null` | `<userData>/workspace.json`, falls back to `.bak` |
@@ -124,9 +136,12 @@ that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#
 | `fs:list` | `{dir, options?: {glob?}}` → `FsEntry[]` | `*`, `?`, `**`, `{a,b}`; skips `node_modules` / `.git` when recursing |
 | `fs:watch` / `fs:unwatch` | `{dir}` → `watchId` / `{watchId}` | recursive `fs.watch`, events via `fs:changed`; all watches close on reload |
 | `app:info` | → `{platform, userData, home, version, electron}` | |
+| `config:get` | → `{config, path, problems}` | `<userData>/config.json`, every field resolved (see [Configuration](#configuration)) |
+| `config:update` | `{patch, ifUnset?}` → `{config, path, problems}` | only the gear-dialog keys (strict schema; `editor`, `claude.bin`, … are file-only); `null` removes a key; `ifUnset` only fills keys the file doesn't set; refused while the file is invalid JSON |
 
 Events (main → renderer): `proc:output {id, stream, chunk}`, `proc:exit {id, code, signal, error?}`,
-`notify:clicked {itemId?}`, `fs:changed {watchId, dir, event, path}`. Subscribe through `native.*.onX(cb)`,
+`notify:clicked {itemId?}`, `fs:changed {watchId, dir, event, path}`, `config:changed {config, path, problems}`
+(config.json changed: an update or an edit of the file). Subscribe through `native.*.onX(cb)`,
 which returns an unsubscribe function. Output events are batched (one per process and stream every
 100 ms). The integration channels (`git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*`) are listed
 under [Integrations](#integrations).
@@ -194,7 +209,7 @@ layout cluster), `archived?`, `notice? {text, tone, at, read?}`, `createdAt`, `u
 | project | `repo` (owner/name), `baseDir?`, `worktreesDir?`, `defaultBranch`, `startCommand?`, `testCommand?`, `stats? {mainChecks, openPrs, renovatePrs}` |
 | ticket | `key`, `status` (Jira name), `statusCategory` (new / indeterminate / done), `type`, `priority?`, `assignee?`, `sprint?`, `points?`, `branch?` |
 | worktree | `path`, `branch`, `baseBranch`, `ticketKey?`, `git? {ahead, behind, dirty, changedFiles, checkedAt?}` |
-| record | `recordType` (plan / brainstorm / grill / verification), `path` (`<baseDir>/records/<ticket-branch>/<name>.md`), `ticketBranch?`, `ticketKey?`, `status` (draft / approved / done), `steps? {done, total}`, `author?` |
+| record | `recordType` (plan / brainstorm / grill / verification), `path` (`<baseDir>/<records.dir>/<ticket-branch>/<name>.md`), `ticketBranch?`, `ticketKey?`, `status` (draft / approved / done), `steps? {done, total}`, `author?` |
 | pr | `repo`, `number`, `headBranch`, `baseBranch`, `state` (open / closed / merged), `isDraft`, `author?`, `reviewDecision?`, `reviews? {approved, requested}`, `mergeable?`, `mergeStateStatus?` (GitHub's; `DIRTY` = conflicts), `checks? {state, passed?, failed?, pending?}`, `additions?`, `deletions?`, `stackedOn?` (PR item id) |
 | agent | `sessionId?`, `localId?` (session in main; unset = demo), `cwd`, `model?`, `status` (running / waiting / idle / done / failed), `skill?`, `pendingQuestion? {toolUseId, questions[{question, header?, options[{label, description?}], multiSelect?}]}`, `pendingPermissions? [{requestId, toolName, summary?}]`, `error?`, `lastActivity?`, `startedAt?`, `endedAt?`, `usage? {contextPct, costUsd, turns}` |
 | app | `command`, `cwd`, `url?`, `port?`, `procId?`, `state` (starting / running / stopped / crashed), `worktreeId?` |
@@ -253,9 +268,12 @@ get *Unarchive* + view / external actions only).
 zustand (`create` + `subscribeWithSelector`) in `store.ts`; components read with `useStore(selector)`
 (selectors must return stable values: cache derived ones, like `visibleSet`, `viewsOf` and `ctxOf` do).
 Everything else uses the exported functions. Positions stay in `layout.ts`; only dropped positions are
-written to the items (`pos`) on drag end. Settings: `settings` (`model`, `permissionMode`,
-`aiReviewComment`, `refreshSec`, `sidebarWidth`) + `setSettings(patch)`; `desktopNotify` / `soundOn` have
-their own setters.
+written to the items (`pos`) on drag end. Settings: `settings` (`model`, `effort`,
+`permissionMode`, `aiReviewComment`, `refreshSec`, `sidebarWidth`) + `setSettings(patch)`; `desktopNotify` /
+`soundOn` have their own setters. All of them but `sidebarWidth` **mirror config.json** (`data/config.ts`,
+`startConfigSync`): `config:changed` → store, store changes (chat box pickers, HUD toggles) → `config:update`
+(coalesced, 300 ms). Pure helpers and actions read the rest of the config with `userConfig()` (defaults until
+it is loaded).
 
 ### Workspace file and migrations
 
@@ -263,17 +281,12 @@ their own setters.
 
 ```jsonc
 {
-  "version": 3,
+  "version": 4,
   "items": [ /* Item */ ],
   "links": [ { "id": "l1", "from": "t-4821", "to": "p-ingest", "label": "in project" } ],
-  "prefs": {
-    "desktopNotify": false, "soundOn": true, "colorBy": "project", "filter": { /* Filter */ },
-    // a bad value falls back to its default
-    "model": "claude-…",            // optional; unset = the Claude CLI's default
-    "permissionMode": "default",    // claude --permission-mode for new sessions ("default" = no flag)
-    "aiReviewComment": "@claude review", // optional; unset = main's config
-    "refreshSec": 60,               // background refresher cadence
-    "sidebarWidth": 360             // details sidebar width (drag its left edge)
+  "prefs": {                         // UI state only; the user settings are in config.json since v4
+    "colorBy": "project", "filter": { /* Filter */ },
+    "sidebarWidth": 360              // details sidebar width (drag its left edge); a bad value falls back
   },
   "camera": { "x": 0, "y": 0, "k": 1 }   // optional, reserved
 }
@@ -299,8 +312,11 @@ Versions: v0 had display-only items (`status`, `facts`, `subtitle`, `flags`, `cl
 prefs in localStorage; v0 → v1 parses those strings into typed `data`, `plan` → `record`, `cluster` →
 `projectId`, `notice.ago` → `notice.at`, and carries the localStorage prefs over. v1 → v2 adds the settings
 prefs with their defaults; agent data gains the optional `localId`, `pendingPermissions` and `error`. v2 → v3: `filter.hiddenKinds`
-becomes `filter.kinds` (kinds to show; empty = all; "hid build" becomes "everything except build").
-Fixtures: `domain/fixtures/workspace-v0.json`, `workspace-v1.json`.
+becomes `filter.kinds` (kinds to show; empty = all; "hid build" becomes "everything except build"). v3 → v4:
+model, effort, permission mode, AI-review comment, refresh interval, notifications and sound leave the
+workspace; `parseWorkspace` returns them as `movedPrefs` (a config.json patch without invalid values and
+defaults), and `startConfigSync` writes them once with `config:update {ifUnset: true}` (keys config.json
+already sets win). Fixtures: `domain/fixtures/workspace-v0.json`, `workspace-v1.json`, `workspace-v3.json`.
 
 Adding a version: bump `WORKSPACE_VERSION`, add `MIGRATIONS[old]`, a fixture of the old format and a test.
 Never edit an existing step.
@@ -477,7 +493,7 @@ count comes from `data.stats.renovatePrs`, kept current by the refresher. A proj
 `kinds/ticket/`: own icon. *Change status…*: radio form of the project's statuses (`loadJiraStatuses` →
 `jira:statuses`; the mock's workflow when unknown; `statusOptions` in `model.ts`) → `jiraOps.transition`; Jira's
 rejection is shown inline, then `refreshTicket` writes the new status back. *Create worktree*: the project's flow,
-prefilled `<KEY>-<slug>`, sets `data.branch`, links `works on`. *Open in Jira*: `jiraUrl(key)`. *Mark done*
+prefilled from config.json `git.branchTemplate` (default `{key}-{slug}`), sets `data.branch`, links `works on`. *Open in Jira*: `jiraUrl(key)`. *Mark done*
 transitions to the workflow's done status (first of category done, e.g. "Fertig"), stepping through the flow if
 the direct move is rejected, else completes
 locally with a warning toast. Sidebar Details: fields, ADF description via `adfToMarkdown` + `Markdown`, linked
@@ -512,7 +528,7 @@ issues, comments + add comment, related canvas items including PRs of the ticket
   back; *Edit* toggles a `CodeEditor` (Ctrl+S; a disk change while editing offers to load it). The step count
   follows the file.
 - **Discovery** (`startRecordDiscovery()`, from `startSync`): per project with an absolute `baseDir`, lists
-  `<baseDir>/records/**/*.md` (branch folders may contain `/`), watches the folder (re-scan debounced; a
+  `<baseDir>/<records.dir>/**/*.md` (config.json, default `records`; branch folders may contain `/`), watches the folder (re-scan debounced; a
   missing folder is checked every 30 s) and applies `planDiscovery`: record type from the file name prefix
   (plan / brainstorm / grill / verif), key = normalised path (no duplicates), `ticketBranch` = folder, linked
   to the ticket (`data.branch`, or the key) and to the worktree whose branch equals the folder (`/` may be
@@ -699,7 +715,7 @@ What real acli does (captured in `src/main/services/__fixtures__/acli/`, replaye
   and Jira decides; *Mark done* targets the first status of category done and walks the flow if needed.
 - `create --label` (not `--labels`) adds labels; `edit --labels` sets them.
 
-When acli cannot be started and `CORTEX_JIRA_CLI` is not set, `initJira` switches to the mock and sets
+When acli cannot be started and no CLI was chosen on purpose (`CORTEX_JIRA_CLI`, or `"cli": "mock"` in config.json), `initJira` switches to the mock and sets
 `config.jira.note`; not logged in → a note too. Every `jira:*` handler waits for `initJira` first.
 
 The mock (`scripts/jira-mock/jira-mock.mjs`, plain ESM, no build) prints Jira Cloud REST v3 issue JSON (ADF
@@ -718,8 +734,9 @@ Main runs it as `<process.execPath> <app>/scripts/jira-mock/jira-mock.mjs` with 
 (no node on PATH needed). `exec:run` with `cmd: 'jira-mock'` maps to the same command. A packaged build
 must ship `scripts/jira-mock/` unpacked next to the app (packaging is not set up yet).
 
-Custom field ids (`JIRA_FIELDS`: story points `customfield_10016`, sprint `customfield_10020`) match the mock and
-are unverified on real sites (the demo's Kanban project has neither).
+Custom field ids come from config.json `jira.fields` (defaults `JIRA_FIELDS`: story points `customfield_10016`,
+sprint `customfield_10020`, which match the mock); they differ per site. The renderer passes them to
+`summarizeIssue` (ticket bubbles, sidebar, refresher).
 
 ### Claude Code
 
@@ -794,14 +811,47 @@ The user's command line, through the shell.
 | `tests:stop` / `tests:list` / `tests:log` | |
 | events `app:state`, `app:output`, `test:state`, `test:output` | output batched per id + stream every 100 ms and flushed before the exit / state |
 
-### Config knobs
+### Configuration
 
-Env, read once at start (`src/main/services/config.ts`): `CORTEX_JIRA_CLI=acli|mock` (default acli; smoke
-runs: mock), `CORTEX_JIRA_SITE`, `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`, `CORTEX_CLAUDE_BIN`,
-`CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, `CORTEX_USER_DATA`. `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_*` and
-`CORTEX_CLAUDE_BIN` are dev-only: a packaged build ignores them. Defaults in `shared/integrations/config.ts`;
-`integrations:config` returns the effective values once `initJira` is done (Settings shows the Jira CLI, site
+`<userData>/config.json` (`~/.cortex/config.json`): machine / user settings. Schema in `shared/userConfig.ts`
+(zod; every field and every section has a `.catch(default)`, so one bad value falls back to its own default and
+startup never fails on the file; unknown keys are ignored). Main loads it in `lib/userConfig.ts`
+(`UserConfigStore`): read once at start, the folder is watched (editors replace the file on save) and a change
+is pushed as `config:changed`; `config:update` merges a patch into the raw file (only the keys that were there
+plus the patch, so the defaults are not frozen into the file) and writes it atomically. A file that is not valid
+JSON is ignored (defaults, a problem in `config:get`) and not overwritten. First start: a starter file with only
+`"$schema": "./config.schema.json"` (never overwritten) and the JSON schema generated from zod (rewritten every
+start).
+
+| Key | Default | Used by |
+|---|---|---|
+| `editor.command`, `editor.args` | `code`, `["{path}"]` | `shell:openInEditor` (file-only) |
+| `claude.bin` | `claude` | `ClaudeSessions` (file-only; restart) |
+| `claude.model`, `.effort`, `.permissionMode` | `null`, `null`, `default` | new sessions (store mirror; gear dialog, chat box pickers) |
+| `claude.contextWindow` | `200000` | context % until a session reports its window (`usageView`, `mapClaudeState`) |
+| `github.aiReviewComment` | `@claude review` | *Request AI review*, `gh:prComment` without a body |
+| `github.aiReviewBot` | `claude[bot]` | tags its comments "AI review" in the PR sidebar (`isAiReviewer`) |
+| `github.renovate.app`, `.label` | `renovate`, `renovate` | `gh:renovatePrs` |
+| `jira.cli`, `jira.site` | `acli`, `""` | Jira CLI (restart); site for links (`""` = `acli jira auth status`) |
+| `jira.fields.storyPoints`, `.sprint` | `customfield_10016`, `customfield_10020` | `summarizeIssue` |
+| `git.branchTemplate` | `{key}-{slug}` | *New worktree* for a ticket (`branchForTicket`) |
+| `git.defaultBranch` | `main` | project form default, PR / build / worktree fallbacks |
+| `git.worktreesDir` | `../wt/{repo}` | default worktrees folder of a project (relative to the base checkout or absolute; `worktreesDirFor`) |
+| `records.dir` | `records` | record discovery and new records (relative to the base checkout, no `..`) |
+| `refresh.intervalSec` | `60` | background refresher |
+| `ui.notifications`, `ui.sound` | `false`, `true` | notices |
+
+Resolution (main, `services/config.ts` `resolveConfig`): `DEFAULT_CONFIG` ← config.json ← env. The env overrides
+are dev / test only (a packaged build strips them, `lib/devEnv.ts`): `CORTEX_JIRA_CLI=acli|mock` (smoke runs
+default to mock), `CORTEX_JIRA_SITE`, `CORTEX_CLAUDE_BIN`, `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, plus
+`CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`. `CORTEX_USER_DATA` always works (it locates the file).
+While running, GitHub settings and a set `jira.site` apply at once (`services.setUserConfig`); `claude.bin` and
+`jira.cli` need a restart; `records.dir` re-targets the record watches.
+`integrations:config` returns main's effective values once `initJira` is done (Settings shows the Jira CLI, site
 and `note`).
+
+Not yet configurable: exec / rebase / probe timeouts and output caps, refresher fast interval and parallelism,
+the GitHub host. Deferred: a per-repo `.cortex.json` for team settings (AUDIT §3.3 point 3).
 
 ## Smoke runs
 
@@ -829,6 +879,7 @@ smoke's temp folder) is added to the allowed roots.
 |---|---|
 | User data (`<userData>`) | `~/.cortex` (`lib/userData.ts`; `CORTEX_USER_DATA` overrides). Electron's `userData` path is set to it before the single-instance lock. First start after the move: when `~/.cortex/workspace.json` is missing and Electron's default folder (Windows `%APPDATA%\cortex`) has one, `workspace.json(.bak)`, `window-state.json`, `claude-sessions.json` and `jira-mock.json` are copied once |
 | Chromium data (cache, localStorage, webview logins) | Electron `sessionData`: Electron's default folder (`%APPDATA%\cortex`), or `<CORTEX_USER_DATA>/chromium`; kept out of `~/.cortex` |
+| Config | `<userData>/config.json` (+ `config.schema.json`, written by the app) |
 | Workspace file | `<userData>/workspace.json` (+ `.bak`) |
 | Window state | `<userData>/window-state.json` |
 | Jira mock data | `<userData>/jira-mock.json` (seeded on first use) |
