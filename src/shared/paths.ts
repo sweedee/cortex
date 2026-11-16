@@ -1,5 +1,5 @@
 /**
- * Path string helpers shared by main and renderer. They work on text only (no `node:path`): paths in the
+ * Path string helpers shared by the server and the renderer. They work on text only (no `node:path`): paths in the
  * workspace come from several OSes, so both slash styles are understood.
  */
 

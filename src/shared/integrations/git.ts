@@ -1,6 +1,6 @@
 /**
- * Git integration types (dependency free, shared by main and renderer) plus the pure
- * parsers for git's machine-readable output. Main runs the commands (`src/main/services/git.ts`).
+ * Git integration types (dependency free, shared by the server and the renderer) plus the pure
+ * parsers for git's machine-readable output. The server runs the commands (`src/server/services/git.ts`).
  */
 
 /** One entry of `git worktree list --porcelain`. */

@@ -1,13 +1,13 @@
 /**
  * The user / machine config: `<userData>/config.json` (`~/.cortex/config.json`). One zod schema for
- * main (loader, `config:*` channels) and the renderer (the settings it mirrors, pure helpers).
+ * the server (loader, `config:*` channels) and the renderer (the settings it mirrors, pure helpers).
  *
  * Every field has a `.catch(default)`, every object too: a bad value falls back to its own default
- * instead of failing the file (or startup), unknown keys are ignored. Resolution in main:
- * `DEFAULT_USER_CONFIG` ← `config.json` ← env (dev builds only, see `src/main/services/config.ts`).
+ * instead of failing the file (or startup), unknown keys are ignored. Resolution in the server:
+ * `DEFAULT_USER_CONFIG` ← `config.json` ← env (development only, see `src/server/services/config.ts`).
  *
  * Trust: the renderer may only change the keys in `RendererConfigPatchSchema` (`config:update`);
- * `editor.*` and `claude.bin` name programs main runs, so they come from the file only.
+ * `editor.*` and `claude.bin` name programs the server runs, so they come from the file only.
  */
 import { z } from 'zod';
 import { EFFORT_LEVELS, PERMISSION_MODES } from './integrations/claude';
@@ -236,7 +236,7 @@ export function userConfigJsonSchema(): Record<string, unknown> {
   return strip({ ...schema, title: 'Cortex config (~/.cortex/config.json)', properties: { $schema: { type: 'string' }, ...props }, additionalProperties: false }) as Record<string, unknown>;
 }
 
-// ---- templates (pure; used by main and the renderer) ---------------------------------------
+// ---- templates (pure; used by the server and the renderer) ---------------------------------------
 
 /** `{key}-{slug}` → `CTX-12-retry-backoff`. Empty parts and their stray separators are dropped. */
 export function renderBranchTemplate(template: string, vars: { key: string; slug: string }): string {

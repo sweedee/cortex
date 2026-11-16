@@ -200,7 +200,7 @@ function AppVersion() {
     <Menu.Group>
       <Menu.Label>
         Cortex {data.version}
-        {data.electron ? ` · Electron ${data.electron}` : ''} · {data.platform}
+        {data.node ? ` · Node ${data.node}` : ''} · {data.platform}
       </Menu.Label>
     </Menu.Group>
   );

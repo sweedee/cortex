@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeIpcError, encodeIpcError, ipcErrorCode, ipcErrorMessage } from './ipcError';
 
 describe('ipc errors', () => {
-  it("round-trips a payload, also through Electron's wrapper", () => {
+  it('round-trips a payload, also inside a wrapping message', () => {
     const p = { code: 'EXIT', message: 'gh pr view: nope', stderr: 'boom', exitCode: 4 } as const;
     const wrapped = new Error(`Error invoking remote method 'gh:prView': Error: ${encodeIpcError(p)}`);
     expect(decodeIpcError(wrapped)).toEqual(p);

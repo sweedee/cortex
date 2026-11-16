@@ -10,7 +10,7 @@ import { ipcErrorMessage } from '../../../shared/ipcError';
 import { native } from '../native';
 import { startProgressToast } from './progressToast';
 
-/** A readable message of a failed native call (strips Electron's "Error invoking remote method …"). */
+/** A readable message of a failed native call (the server error payload's message when there is one). */
 export const errorText = ipcErrorMessage;
 
 export interface TaskOptions<T> {

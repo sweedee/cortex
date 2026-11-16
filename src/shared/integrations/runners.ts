@@ -60,7 +60,7 @@ export interface TestState {
   error?: string;
 }
 
-/** batched output (main flushes every ~100 ms) */
+/** batched output (the server flushes every ~100 ms) */
 export interface RunnerOutputEvent {
   id: string;
   stream: 'stdout' | 'stderr';

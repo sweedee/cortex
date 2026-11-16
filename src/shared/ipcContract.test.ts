@@ -27,7 +27,7 @@ function exposure() {
 }
 
 describe('IPC contract', () => {
-  it('the schema map, the channel map and the preload bridge cover exactly the same invoke channels', () => {
+  it('the schema map, the channel map and the bridge cover exactly the same invoke channels', () => {
     const declared = sorted(Object.keys(invokeChannels));
     expect(sorted(INVOKE_CHANNELS)).toEqual(declared);
     expect(sorted(Object.keys(schemas))).toEqual(declared);
@@ -55,7 +55,7 @@ describe('IPC contract', () => {
   });
 
   it('all-optional and void requests accept a missing request', () => {
-    expect(schemas['dialog:pickDirectory'].parse(undefined)).toEqual({});
+    expect(schemas['dialog:listDir'].parse(undefined)).toEqual({});
     expect(schemas['app:info'].safeParse(undefined).success).toBe(true);
   });
 });

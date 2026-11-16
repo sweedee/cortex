@@ -3,7 +3,6 @@ import { Button } from '@dynatrace/strato-components/buttons';
 import { ProgressCircle } from '@dynatrace/strato-components/content';
 import { ArrowLeftIcon, ArrowRightIcon, DarkmodeIcon, ExternalLinkIcon, LightmodeIcon, RefreshIcon } from '@dynatrace/strato-icons';
 import { Tooltip } from '@dynatrace/strato-components/overlays';
-import { native } from '../../../native';
 import '../viewers.css';
 
 export type Viewport = 'desktop' | 'tablet' | 'mobile';
@@ -96,15 +95,8 @@ function WebPanelInner({
   }, [scheme]);
   const emulate = colorSchemeToggle && inElectron;
   /** push the effective scheme into the guest (it needs to be attached: dom-ready) */
-  const applyScheme = useCallback(() => {
-    const wv = ref.current;
-    if (!emulate || !wv) return;
-    try {
-      void native.webview.setColorScheme({ webContentsId: wv.getWebContentsId(), scheme: schemeRef.current }).catch(() => {});
-    } catch {
-      /* not attached yet: dom-ready calls again */
-    }
-  }, [emulate]);
+  // TODO(web): `webview:setColorScheme` (CDP emulation in an Electron guest) is gone; an iframe can't be told
+  const applyScheme = useCallback(() => {}, []);
   useEffect(applyScheme, [applyScheme, scheme]);
   const onNavigateRef = useRef(onNavigate);
   useEffect(() => {

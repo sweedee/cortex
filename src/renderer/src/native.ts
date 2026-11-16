@@ -1,29 +1,29 @@
 /**
- * The renderer's only door to native functionality. In the desktop app this is the
- * `window.cortex` bridge from the preload; in a plain browser (`npm run dev:web`, unit tests)
- * it is a fallback built from `browserFallbacks()`: exec / proc / fs reject with a clear error,
- * the workspace lives in localStorage and notifications use the Web Notification API.
+ * The renderer's only door to native functionality: the Cortex server (`src/server`), reached with
+ * `POST /api/invoke/<channel>` and one reconnecting WebSocket on `/api/events` (both authenticated by
+ * the HttpOnly cookie the server set when the page was opened with its token). A few things happen in
+ * the browser itself: opening URLs (`shell.openExternal`), desktop notifications (`notify.*`, Web
+ * Notification API) and the folder / file picker (`dialog.pickDirectory / pickFile`: a modal that
+ * browses the server's disk with `dialog:listDir`, see `setPicker`).
  *
- * Rule: nothing else in the renderer touches `window.cortex` (or node) directly.
+ * Without a `window` (vitest in node) `native` is a fallback built from `browserFallbacks()`: server
+ * channels reject with a clear error (lists resolve `[]`), workspace / config live in localStorage.
+ *
+ * Rule: nothing else in the renderer calls the server (or node) directly.
  */
-import type { CortexApi, EventChannel, EventChannels, InvokeChannel, NotifyClickedEvent, Req, Res, Unsubscribe } from '../../shared/ipc';
-import { buildBridge } from '../../shared/bridge';
+import type { CortexApi, DesktopNotification, EventChannel, EventChannels, InvokeChannel, NotifyClickedEvent, PickDirectoryRequest, PickFileRequest, Req, Res, Unsubscribe } from '../../shared/ipc';
+import { buildBridge, type BridgeInvoke, type BridgeOn } from '../../shared/bridge';
+import { encodeIpcError, type IpcErrorCode, type IpcErrorPayload } from '../../shared/ipcError';
 import { configProblems, mergePatch, parseUserConfig, RendererConfigPatchSchema, type UserConfigState } from '../../shared/userConfig';
-
-declare global {
-  interface Window {
-    cortex?: CortexApi;
-  }
-}
 
 export type { CortexApi } from '../../shared/ipc';
 
 const WORKSPACE_KEY = 'cortex.workspace';
 const CONFIG_KEY = 'cortex.config';
 
-/** Browser fallback marker: the channel rejects with "needs the Cortex desktop app". */
-export const DESKTOP_ONLY = 'desktop only';
-/** Browser fallback marker: the event never fires in the browser. */
+/** Fallback marker: the channel rejects with "needs the Cortex server". */
+export const DESKTOP_ONLY = 'server only';
+/** Fallback marker: the event never fires without the server. */
 export const NEVER_FIRES = 'never fires';
 
 type Fallback<C extends InvokeChannel> = ((req: Req<C>) => Res<C> | Promise<Res<C>>) | typeof DESKTOP_ONLY;
@@ -33,11 +33,11 @@ export interface BrowserFallbacks {
   events: { [E in EventChannel]: EventFallback<E> };
 }
 
-const needsDesktop = (channel: string) => new Error(`${channel} needs the Cortex desktop app (window.cortex is missing; running in a plain browser?)`);
-const notInBrowser = () => ({ ok: false, error: 'not available in the browser' });
+const needsServer = (channel: string) => new Error(`${channel} needs the Cortex server (not available in this test / fallback environment)`);
+const notInBrowser = () => ({ ok: false, error: 'not available without the Cortex server' });
 const empty = () => [];
 
-/** Listeners for an event the browser fallback fires itself. */
+/** Listeners for an event the renderer fires itself. */
 function emitter<T>() {
   const cbs = new Set<(payload: T) => void>();
   return {
@@ -60,11 +60,10 @@ function readConfig(): Record<string, unknown> {
 const configState = (r: Record<string, unknown>): UserConfigState => ({ config: parseUserConfig(r), path: `localStorage:${CONFIG_KEY}`, problems: configProblems(r) });
 
 /**
- * What every channel does without the desktop app: an implementation or `DESKTOP_ONLY` /
+ * What every channel does without the server (unit tests): an implementation or `DESKTOP_ONLY` /
  * `NEVER_FIRES`. Typed as a complete map, so a new channel doesn't compile until it says.
  */
 export function browserFallbacks(): BrowserFallbacks {
-  const clicked = emitter<NotifyClickedEvent>();
   const configChanged = emitter<UserConfigState>();
   return {
     invoke: {
@@ -72,21 +71,10 @@ export function browserFallbacks(): BrowserFallbacks {
       'proc:start': DESKTOP_ONLY,
       'proc:stop': DESKTOP_ONLY,
       'proc:list': empty,
-      'dialog:pickDirectory': () => null,
-      'dialog:pickFile': () => null,
-      'shell:openExternal': ({ url }) => void window.open(url, '_blank', 'noopener'),
+      'dialog:listDir': DESKTOP_ONLY,
+      'dialog:confirmPick': DESKTOP_ONLY,
       'shell:openPath': notInBrowser,
       'shell:openInEditor': notInBrowser,
-      'webview:setColorScheme': () => {},
-      'notify:desktop': ({ title, body, tag, itemId }) => {
-        if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-        const n = new Notification(title, { body, tag, icon: asset('brand/cortex-mark.svg') });
-        n.onclick = () => {
-          window.focus();
-          clicked.emit({ itemId });
-          n.close();
-        };
-      },
       'workspace:load': () => {
         try {
           const raw = localStorage.getItem(WORKSPACE_KEY);
@@ -111,7 +99,7 @@ export function browserFallbacks(): BrowserFallbacks {
       'fs:setRoots': empty,
       'app:info': () => ({ platform: 'browser', userData: '', version: 'dev' }),
 
-      // git / gh / jira / claude / apps / tests need the desktop app: lists are empty, actions reject
+      // git / gh / jira / claude / apps / tests need the server: lists are empty, actions reject
       'integrations:config': DESKTOP_ONLY,
       'git:isRepo': DESKTOP_ONLY,
       'git:currentBranch': DESKTOP_ONLY,
@@ -186,7 +174,6 @@ export function browserFallbacks(): BrowserFallbacks {
     events: {
       'proc:output': NEVER_FIRES,
       'proc:exit': NEVER_FIRES,
-      'notify:clicked': clicked.on,
       'fs:changed': NEVER_FIRES,
       'claude:event': NEVER_FIRES,
       'claude:state': NEVER_FIRES,
@@ -199,12 +186,12 @@ export function browserFallbacks(): BrowserFallbacks {
   };
 }
 
-/** The same `CortexApi` shape as the preload's, over `browserFallbacks()`. */
+/** The same `CortexApi` shape as the server transport's, over `browserFallbacks()`. */
 export function browserFallback(fallbacks: BrowserFallbacks = browserFallbacks()): CortexApi {
   return buildBridge(
     async (channel, req) => {
       const f = fallbacks.invoke[channel] as Fallback<InvokeChannel>;
-      if (f === DESKTOP_ONLY) throw needsDesktop(channel);
+      if (f === DESKTOP_ONLY) throw needsServer(channel);
       return f(req as never);
     },
     (channel, cb) => {
@@ -214,20 +201,213 @@ export function browserFallback(fallbacks: BrowserFallbacks = browserFallbacks()
   );
 }
 
-/** running inside the Electron shell? */
-export const isDesktop = typeof window !== 'undefined' && !!window.cortex;
+// ---- the server transport ------------------------------------------------------------------
 
-export const native: CortexApi = (typeof window !== 'undefined' && window.cortex) || browserFallback();
+const ERROR_CODES: readonly string[] = ['CLI_MISSING', 'TIMEOUT', 'EXIT', 'PARSE', 'VALIDATION', 'FORBIDDEN', 'UNKNOWN'];
 
-/** URL of a file in /public that works over http (dev) and file:// (packaged build). */
+/** The Error a failed call rejects with: its message is the encoded payload, as `shared/ipcError.ts` decodes it. */
+const callError = (p: IpcErrorPayload) => new Error(encodeIpcError(p));
+
+/** the server's `{ error }` body, or one made up from the HTTP status */
+function errorFrom(channel: string, status: number, body: unknown): IpcErrorPayload {
+  const e = (body as { error?: Partial<IpcErrorPayload> } | undefined)?.error;
+  if (e && typeof e.message === 'string' && typeof e.code === 'string' && ERROR_CODES.includes(e.code)) return e as IpcErrorPayload;
+  const code: IpcErrorCode = status === 401 || status === 403 ? 'FORBIDDEN' : status === 400 || status === 413 || status === 415 ? 'VALIDATION' : 'UNKNOWN';
+  const message = status === 401 ? 'Not signed in to the Cortex server: open the URL it printed when it started' : `${channel} failed (HTTP ${status})`;
+  return { code, message };
+}
+
+const randomId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `c${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`);
+
+/** Connection state of the event socket (for a status indicator). */
+export type ServerConnection = 'connecting' | 'open' | 'closed';
+
+/** The `CortexApi` over the server: fetch for calls, one reconnecting WebSocket for events (exported for tests). */
+export function serverTransport() {
+  // identifies this tab to the server: its fs watches close when this tab's socket is gone
+  const clientId = randomId();
+  const invoke: BridgeInvoke = async (channel, req) => {
+    let res: Response;
+    try {
+      res = await fetch(`/api/invoke/${encodeURIComponent(channel)}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Cortex-Client': clientId },
+        body: req === undefined ? undefined : JSON.stringify(req),
+      });
+    } catch (e) {
+      throw callError({ code: 'UNKNOWN', message: `Cortex server not reachable (${channel}): ${e instanceof Error ? e.message : String(e)}` });
+    }
+    if (res.status === 204) return undefined;
+    const text = await res.text();
+    let body: unknown;
+    try {
+      body = text ? JSON.parse(text) : undefined;
+    } catch {
+      body = undefined;
+    }
+    if (res.ok) return body;
+    throw callError(errorFrom(channel, res.status, body));
+  };
+
+  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  const status = emitter<ServerConnection>();
+  let state: ServerConnection = 'connecting';
+  const setState = (s: ServerConnection) => {
+    if (s === state) return;
+    state = s;
+    status.emit(s);
+  };
+  let delay = 500;
+  const connect = () => {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/api/events?client=${encodeURIComponent(clientId)}`);
+    ws.onopen = () => {
+      delay = 500;
+      setState('open');
+    };
+    ws.onmessage = (e) => {
+      let msg: { channel?: unknown; payload?: unknown };
+      try {
+        msg = JSON.parse(String(e.data)) as typeof msg;
+      } catch {
+        return;
+      }
+      if (typeof msg.channel !== 'string') return;
+      for (const cb of listeners.get(msg.channel) ?? []) {
+        try {
+          cb(msg.payload);
+        } catch (err) {
+          console.error(`[native] ${msg.channel} listener failed`, err);
+        }
+      }
+    };
+    // server restarted / laptop slept: keep trying, backing off to 5 s
+    ws.onclose = () => {
+      setState('closed');
+      setTimeout(connect, delay);
+      delay = Math.min(delay * 2, 5000);
+    };
+  };
+  connect();
+
+  const on: BridgeOn = (channel, cb) => {
+    let set = listeners.get(channel);
+    if (!set) listeners.set(channel, (set = new Set()));
+    const fn = cb as (payload: unknown) => void;
+    set.add(fn);
+    return () => void set.delete(fn);
+  };
+  return { api: buildBridge(invoke, on), onConnection: status.on, connection: () => state };
+}
+
+// ---- in the browser itself: URLs, notifications, the picker -----------------------------------
+
+/** What the picker modal is asked for. */
+export interface PickRequest {
+  kind: 'dir' | 'file';
+  title?: string;
+  defaultPath?: string;
+  /** file picks: which extensions to offer */
+  filters?: PickFileRequest['filters'];
+}
+
+/**
+ * The folder / file picker: shows a modal that browses with `native.dialog.listDir`, sends the
+ * user's choice through `native.dialog.confirmPick` (which validates it and allows it as a root) and
+ * resolves with the path that returned, or null when cancelled.
+ */
+export type Picker = (req: PickRequest) => Promise<string | null>;
+
+/** Stand-in until a picker modal is registered: ask for the path in a prompt. */
+const promptPicker: Picker = async (req) => {
+  const what = req.kind === 'dir' ? 'folder' : 'file';
+  const typed = window.prompt(`${req.title ?? `Choose a ${what}`}\n\nAbsolute path of the ${what}:`, req.defaultPath ?? '');
+  if (!typed?.trim()) return null;
+  return native.dialog.confirmPick({ path: typed.trim(), kind: req.kind });
+};
+
+let picker: Picker = promptPicker;
+
+/** The picker modal registers itself here (once, at startup); returns a function that unregisters it. */
+export function setPicker(p: Picker): () => void {
+  picker = p;
+  return () => {
+    if (picker === p) picker = promptPicker;
+  };
+}
+
+const clicked = emitter<NotifyClickedEvent>();
+
+/** Renderer-side helpers that look like channels: `native.dialog.pickDirectory`, `native.shell.openExternal`, `native.notify.*`. */
+export interface LocalApi {
+  dialog: {
+    pickDirectory(req?: PickDirectoryRequest): Promise<string | null>;
+    pickFile(req?: PickFileRequest): Promise<string | null>;
+  };
+  shell: { openExternal(req: { url: string }): Promise<void> };
+  notify: {
+    /** a Web Notification (permission must be granted); a click focuses the tab and fires `onClicked` */
+    desktop(n: DesktopNotification): Promise<void>;
+    onClicked(cb: (e: NotifyClickedEvent) => void): Unsubscribe;
+  };
+}
+
+export type NativeApi = Omit<CortexApi, 'dialog' | 'shell'> & {
+  dialog: CortexApi['dialog'] & LocalApi['dialog'];
+  shell: CortexApi['shell'] & LocalApi['shell'];
+  notify: LocalApi['notify'];
+};
+
+const local: LocalApi = {
+  dialog: {
+    pickDirectory: async (req = {}) => picker({ kind: 'dir', ...req }),
+    pickFile: async (req = {}) => picker({ kind: 'file', ...req }),
+  },
+  shell: {
+    async openExternal({ url }) {
+      const u = new URL(url);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('only http(s) URLs can be opened');
+      window.open(u.href, '_blank', 'noopener,noreferrer');
+    },
+  },
+  notify: {
+    async desktop({ title, body, tag, itemId }) {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+      const n = new Notification(title, { body, tag, icon: asset('brand/cortex-mark.svg') });
+      n.onclick = () => {
+        window.focus();
+        clicked.emit({ itemId });
+        n.close();
+      };
+    },
+    onClicked: clicked.on,
+  },
+};
+
+function withLocal(api: CortexApi): NativeApi {
+  return { ...api, dialog: { ...api.dialog, ...local.dialog }, shell: { ...api.shell, ...local.shell }, notify: local.notify };
+}
+
+/** the Cortex server is there (always in the app; false in unit tests, which use the fallback) */
+export const isDesktop = typeof window !== 'undefined' && typeof WebSocket !== 'undefined';
+
+const transport = isDesktop ? serverTransport() : null;
+
+export const native: NativeApi = withLocal(transport?.api ?? browserFallback());
+
+/** Event socket state changes ('connecting' → 'open' / 'closed'); no-op without the server. */
+export const onServerConnection = (cb: (s: ServerConnection) => void): Unsubscribe => transport?.onConnection(cb) ?? (() => {});
+export const serverConnection = (): ServerConnection => transport?.connection() ?? 'closed';
+
+/** URL of a file in /public. */
 export const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
 
-/** Can desktop notifications be shown right now (browser: permission granted)? */
-export const notifyPermitted = () => isDesktop || (typeof Notification !== 'undefined' && Notification.permission === 'granted');
+/** Can desktop notifications be shown right now (permission granted)? */
+export const notifyPermitted = () => typeof Notification !== 'undefined' && Notification.permission === 'granted';
 
-/** Ask for notification permission where needed (only the browser fallback asks). */
+/** Ask for notification permission where needed. */
 export async function requestNotifyPermission(): Promise<'granted' | 'denied' | 'unsupported'> {
-  if (isDesktop) return 'granted';
   if (typeof Notification === 'undefined') return 'unsupported';
   const p = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
   return p === 'granted' ? 'granted' : 'denied';

@@ -2,7 +2,7 @@
  * Claude Code headless sessions: the stream-json wire types (`claude -p --output-format stream-json
  * --input-format stream-json --verbose`, verified against Claude Code 2.1.323) and a pure reducer
  * that folds events into a session. Ported from the `prototype` branch's mapper. Dependency free:
- * the renderer can replay `claude:transcript` with the same reducer main uses.
+ * the renderer can replay `claude:transcript` with the same reducer the server uses.
  */
 
 export const ASK_TOOL = 'AskUserQuestion';
@@ -58,7 +58,7 @@ export interface AskQuestion {
 
 /**
  * One stdout line of stream-json (the subset Cortex reads; unknown types are kept in the
- * transcript and ignored by the reducer). `timestamp` is stamped by main on arrival.
+ * transcript and ignored by the reducer). `timestamp` is stamped by the server on arrival.
  */
 export type ClaudeEvent = { timestamp?: string } & (
   | { type: 'system'; subtype: 'init'; session_id: string; model: string; cwd?: string; permissionMode?: string; tools?: string[] }

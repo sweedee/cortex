@@ -1,6 +1,6 @@
 /**
  * Integration settings that are specific to one person's / company's setup. Defaults here;
- * main resolves overrides from the environment (`src/main/services/config.ts`).
+ * the server resolves overrides from the environment (`src/server/services/config.ts`).
  */
 
 export interface IntegrationConfig {

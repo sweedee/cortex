@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Electron build output
+# Build output (renderer + server bundle)
 out
 release
 

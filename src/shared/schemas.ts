@@ -1,7 +1,6 @@
 /**
- * zod schemas for every invoke channel's request. Main validates each incoming request
- * with these before doing anything; the renderer may import them too (Phase 0b) but the
- * preload must not (it is sandboxed and only bundles `ipc.ts`).
+ * zod schemas for every invoke channel's request. The server validates each incoming request
+ * with these before doing anything; the renderer may import them too.
  */
 import { z } from 'zod';
 import { EXEC_ALLOWLIST, type InvokeChannel, type Req } from './ipc';
@@ -47,34 +46,17 @@ export const procStartSchema = z.object({
   shell: z.boolean().optional(),
 });
 
-const httpUrl = z
-  .string()
-  .max(8192)
-  .refine((u) => {
-    try {
-      const p = new URL(u).protocol;
-      return p === 'http:' || p === 'https:';
-    } catch {
-      return false;
-    }
-  }, 'only http(s) URLs can be opened');
-
-const filters = z.array(z.object({ name: z.string(), extensions: z.array(z.string().regex(/^[\w*.-]+$/)) })).optional();
-
 /** Request schema per channel; `z.void()` for channels without a payload. */
 export const schemas = {
   'exec:run': execRunSchema,
   'proc:start': procStartSchema,
   'proc:stop': z.object({ id: z.string().min(1) }),
   'proc:list': z.undefined(),
-  // all-optional requests: `pickDirectory()` sends no request at all
-  'dialog:pickDirectory': z.object({ title: z.string().optional(), defaultPath: absPath.optional() }).default({}),
-  'dialog:pickFile': z.object({ title: z.string().optional(), defaultPath: absPath.optional(), filters }).default({}),
-  'shell:openExternal': z.object({ url: httpUrl }),
+  // all-optional requests: `listDir()` sends no request at all
+  'dialog:listDir': z.strictObject({ path: absPath.optional() }).default({}),
+  'dialog:confirmPick': z.strictObject({ path: absPath, kind: z.enum(['dir', 'file']) }),
   'shell:openPath': z.object({ path: absPath }),
   'shell:openInEditor': z.object({ path: absPath }),
-  'webview:setColorScheme': z.object({ webContentsId: z.number().int().nonnegative(), scheme: z.enum(['light', 'dark']).nullable() }),
-  'notify:desktop': z.object({ title: z.string().max(500), body: z.string().max(5000), tag: z.string().max(500).optional(), itemId: z.string().optional() }),
   'workspace:load': z.undefined(),
   'workspace:save': z.object({ data: z.unknown() }),
   'workspace:path': z.undefined(),

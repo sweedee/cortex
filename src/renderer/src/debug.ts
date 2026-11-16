@@ -1,8 +1,7 @@
 /**
- * Handle for the headless smoke probe (`CORTEX_SMOKE=1 CORTEX_SMOKE_E2E=1 npm run dev`,
- * src/main/smoke.ts): drives renderer flows (chat → agent, answering, forms, refreshing) without
- * clicks. Present in dev, and in a build only when main opened the page as `index.html#smoke`
- * (main does that only with CORTEX_SMOKE=1).
+ * `window.__cortexDebug`: a handle for browser-driven end-to-end tests (e.g. Playwright): drives
+ * renderer flows (chat → agent, answering, forms, refreshing) without clicks. Present in dev, and in a
+ * build only when the page is opened as `/#smoke`. (The Electron smoke harness that used it is gone.)
  */
 import { openAdd, sendPrompt } from './actions';
 import { chooseOption } from './kinds/agent/session';

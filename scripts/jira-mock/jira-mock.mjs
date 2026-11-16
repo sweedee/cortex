@@ -17,7 +17,7 @@
  * Like acli 1.3, `transition`, `edit` and `comment create` with --json print a bulk result
  * `{results: [{status: 'SUCCESS', message, id}], totalCount, successCount}`.
  * Exit codes: 0 ok, 1 error (not found, invalid transition, bad JQL), 2 usage error.
- * No dependencies; plain ESM so it runs with `node` (or Electron with ELECTRON_RUN_AS_NODE=1).
+ * No dependencies; plain ESM so it runs with `node`.
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

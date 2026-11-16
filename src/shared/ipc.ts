@@ -1,9 +1,10 @@
 /**
- * IPC contract between main, preload and renderer, declared once: `invokeChannels` /
- * `eventChannels` below. `CortexApi` (what the preload exposes as `window.cortex`) is derived
- * from them, and the preload's forwarders are generated from their keys (`./bridge.ts`).
- * This module must stay dependency free (types and plain values only): it is bundled into the
- * sandboxed preload. Runtime validation (zod) of every request lives in `./schemas.ts`, used by main.
+ * Contract between the server (`src/server`) and the renderer, declared once: `invokeChannels` /
+ * `eventChannels` below. Invoke channels are `POST /api/invoke/<channel>` (JSON request → JSON
+ * response, or an `IpcErrorPayload` with a non-2xx status), events arrive over the `/api/events`
+ * WebSocket as `{channel, payload}`. `CortexApi` is derived from the maps and built from their keys
+ * (`./bridge.ts`). Types and plain values only (no dependencies). Runtime validation (zod) of every
+ * request lives in `./schemas.ts`, used by the server.
  */
 
 import type {
@@ -27,7 +28,7 @@ import type { ConfigUpdateRequest, UserConfigState } from './userConfig';
 
 /**
  * Commands `exec.run` may spawn. Bare names only, resolved on PATH (no shell). No `node`: with
- * arbitrary args that is arbitrary code; main runs its own scripts (jira-mock) itself.
+ * arbitrary args that is arbitrary code; the server runs its own scripts (jira-mock) itself.
  */
 export const EXEC_ALLOWLIST = ['git', 'gh', 'claude', 'jira-mock'] as const;
 export type ExecCommand = (typeof EXEC_ALLOWLIST)[number];
@@ -97,7 +98,13 @@ export interface ProcExitEvent {
 }
 
 // ---- dialogs / shell ---------------------------------------------------------------------------
+//
+// There are no native dialogs: the renderer shows its own folder / file picker modal and browses the
+// server's disk with `dialog:listDir`; the user's choice is sent with `dialog:confirmPick`, which checks
+// that it exists and makes it an allowed root. `native.dialog.pickDirectory / pickFile` (renderer only,
+// `renderer/src/native.ts`) wrap that flow and keep the old `string | null` result.
 
+/** `native.dialog.pickDirectory(req)` (renderer helper, not a channel) */
 export interface PickDirectoryRequest {
   title?: string;
   defaultPath?: string;
@@ -108,10 +115,43 @@ export interface FileFilter {
   extensions: string[];
 }
 
+/** `native.dialog.pickFile(req)` (renderer helper, not a channel) */
 export interface PickFileRequest {
   title?: string;
   defaultPath?: string;
   filters?: FileFilter[];
+}
+
+export interface ListDirRequest {
+  /** absolute directory; default: the user's home folder */
+  path?: string;
+}
+
+export interface DirEntry {
+  /** the entry's name (not a path); hidden (dot) entries are never listed */
+  name: string;
+  /** a directory (symlinks to directories count) */
+  dir: boolean;
+}
+
+export interface DirListing {
+  /** the listed directory, absolute and normalized */
+  path: string;
+  /** its parent directory; null at a filesystem root */
+  parent: string | null;
+  /** directories first, then files, each sorted by name */
+  entries: DirEntry[];
+  /** more than `MAX_DIR_ENTRIES` entries: the rest was dropped */
+  truncated?: boolean;
+}
+
+/** at most this many entries per `dialog:listDir` */
+export const MAX_DIR_ENTRIES = 2000;
+
+export interface ConfirmPickRequest {
+  /** absolute path the user chose */
+  path: string;
+  kind: 'dir' | 'file';
 }
 
 export interface OpenResult {
@@ -119,7 +159,7 @@ export interface OpenResult {
   error?: string;
 }
 
-// ---- notifications --------------------------------------------------------------------------
+// ---- notifications (renderer only: Web Notification API, see renderer/src/native.ts) ----------
 
 export interface DesktopNotification {
   title: string;
@@ -161,17 +201,15 @@ export interface FsChangedEvent {
 // ---- app ----------------------------------------------------------------------------------
 
 export interface AppInfo {
-  /** `process.platform` (win32, darwin, linux), or `browser` without the desktop shell */
+  /** the server's `process.platform` (win32, darwin, linux), or `browser` in the unit-test fallback */
   platform: string;
   userData: string;
-  /** the user's home folder (`os.homedir()`; '' in the browser) */
+  /** the user's home folder (`os.homedir()`; '' in the fallback) */
   home?: string;
   version: string;
-  electron?: string;
+  /** the server's Node version (`process.versions.node`) */
+  node?: string;
 }
-
-/** `<webview partition>`s the app uses; main refuses to attach a webview with any other partition. */
-export const WEBVIEW_PARTITIONS = ['persist:github', 'persist:ci', 'persist:jira', 'persist:apps', 'persist:deployments', 'persist:gallery'] as const;
 
 export interface RefusedRoot {
   path: string;
@@ -247,24 +285,22 @@ const call = <Rq, Rs>() => 0 as unknown as [Rq, Rs];
 const event = <P>() => 0 as unknown as P;
 
 /**
- * Request / response channels (ipcRenderer.invoke ↔ ipcMain.handle), named `group:method`. The
+ * Request / response channels (`POST /api/invoke/<channel>`), named `group:method`. The
  * renderer calls `native.<group>.<method>(request)`. A channel here, its zod schema in `schemas.ts`
- * and its `handle()` in main are all a new call needs; the compiler and `ipcContract.test.ts`
- * point at whatever is missing (including the browser fallback in `renderer/src/native.ts`).
+ * and its `handle()` in the server are all a new call needs; the compiler and `ipcContract.test.ts`
+ * point at whatever is missing (including the test fallback in `renderer/src/native.ts`).
  */
 export const invokeChannels = {
   'exec:run': call<ExecRequest, ExecResult>(),
   'proc:start': call<ProcStartRequest, ProcInfo>(),
   'proc:stop': call<{ id: string }, boolean>(),
   'proc:list': call<void, ProcInfo[]>(),
-  'dialog:pickDirectory': call<PickDirectoryRequest, string | null>(),
-  'dialog:pickFile': call<PickFileRequest, string | null>(),
-  'shell:openExternal': call<{ url: string }, void>(),
+  /** browse the server's disk for the picker modal: names only, no hidden entries */
+  'dialog:listDir': call<ListDirRequest, DirListing>(),
+  /** the user chose `path` in the picker: checks it exists and is a `kind`, allows it as a root; returns the normalized path */
+  'dialog:confirmPick': call<ConfirmPickRequest, string>(),
   'shell:openPath': call<{ path: string }, OpenResult>(),
   'shell:openInEditor': call<{ path: string }, OpenResult>(),
-  /** make an embedded <webview> page see `prefers-color-scheme: light | dark` (null = stop emulating) */
-  'webview:setColorScheme': call<{ webContentsId: number; scheme: 'light' | 'dark' | null }, void>(),
-  'notify:desktop': call<DesktopNotification, void>(),
   'workspace:load': call<void, unknown | null>(),
   'workspace:save': call<{ data: unknown }, void>(),
   'workspace:path': call<void, string>(),
@@ -354,11 +390,10 @@ export const invokeChannels = {
   'config:update': call<ConfigUpdateRequest, UserConfigState>(),
 };
 
-/** Events main pushes to the renderer (webContents.send ↔ ipcRenderer.on); `proc:exit` → `native.proc.onExit(cb)`. */
+/** Events the server pushes over `/api/events` (`{channel, payload}`); `proc:exit` → `native.proc.onExit(cb)`. */
 export const eventChannels = {
   'proc:output': event<ProcOutputEvent>(),
   'proc:exit': event<ProcExitEvent>(),
-  'notify:clicked': event<NotifyClickedEvent>(),
   'fs:changed': event<FsChangedEvent>(),
   'claude:event': event<ClaudeEventMessage>(),
   'claude:state': event<ClaudeSessionSummary>(),
@@ -400,8 +435,8 @@ export type ApiGroup<G extends string> = {
 };
 
 /**
- * What the preload exposes as `window.cortex` (built by `./bridge.ts`): `gh:prEdit` →
- * `cortex.gh.prEdit(req)`, `proc:exit` → `cortex.proc.onExit(cb)`. The renderer only talks to it via `native.ts`.
+ * The server API (built by `./bridge.ts`): `gh:prEdit` → `api.gh.prEdit(req)`,
+ * `proc:exit` → `api.proc.onExit(cb)`. The renderer only talks to it via `native.ts`.
  */
 export type CortexApi = { [G in ApiGroupName]: ApiGroup<G> } & {
   /** typed subscription to any event channel; returns an unsubscribe function */

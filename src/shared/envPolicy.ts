@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Environment variables the renderer may set on a child process (`exec:run`, `proc:start`,
  * `apps:start`, `tests:run`). An allowlist, not a denylist: anything that changes how a program
  * loads code (NODE_OPTIONS, LD_PRELOAD, DYLD_*, GIT_SSH_COMMAND, GIT_EXEC_PATH, ELECTRON_*, PATH …)
- * is refused simply by not being listed. Used by both schema modules (not by the preload).
+ * is refused simply by not being listed. Used by both schema modules.
  * Main's own spawns (services, runners) are not limited by this.
  */
 export const RENDERER_ENV_KEYS = ['FORCE_COLOR', 'NO_COLOR', 'CI', 'NODE_ENV', 'PORT', 'HOST', 'BROWSER', 'DEBUG', 'TZ', 'LANG', 'LC_ALL'] as const;
