@@ -1,5 +1,5 @@
 /** The few fixed controls around the canvas edge. */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { Menu } from '@dynatrace/strato-components/navigation';
@@ -26,7 +26,7 @@ import { openSettings } from './settings';
 import { openShortcuts, ShortcutsHelp } from './Shortcuts';
 import { toggleDesktop, toggleSound } from '../desktop';
 import { camera } from '../layout';
-import { asset } from '../native';
+import { asset, onServerConnection, serverConnection } from '../native';
 import { STATUS_GROUPS, type Item } from '../domain';
 import { ArchiveIcon } from '../kinds/icons';
 import { KINDS, kindIcon, kindLabel, useViews } from '../kinds/registry';
@@ -36,6 +36,17 @@ import { ThemeSync } from '../theme';
 import { useReturnFocus } from '../ui/focus';
 import { shortcutHint } from '../ui/shortcuts';
 import { accentOf, useItemColors } from '../visual';
+
+/** Chip shown while the event socket to the Cortex server is down (it reconnects by itself). */
+function ConnectionChip() {
+  const state = useSyncExternalStore(onServerConnection, serverConnection);
+  if (state !== 'closed') return null;
+  return (
+    <div className="hud-conn" role="status">
+      Disconnected from Cortex server — reconnecting…
+    </div>
+  );
+}
 
 export function Hud() {
   // only what the toolbar shows: patches to items without a notice do not re-render it
@@ -56,6 +67,7 @@ export function Hud() {
       {/* app-wide singletons that live with the HUD: the theme, the shortcuts overlay */}
       <ThemeSync />
       <ShortcutsHelp />
+      <ConnectionChip />
       <div className="hud hud-brand">
         <img src={asset('brand/cortex-mark.svg')} alt="" width={22} height={22} />
         <div>

@@ -85,7 +85,7 @@ export function ViewerGallery() {
       <section>
         <h3>WebPanel</h3>
         <div style={{ height: 300 }}>
-          <WebPanel src={location.protocol.startsWith('http') ? location.origin : 'about:blank'} partition="persist:gallery" viewportSwitcher onOpenExternal={(u) => window.open(u)} />
+          <WebPanel src={location.protocol.startsWith('http') ? location.origin : 'about:blank'} viewportSwitcher onOpenExternal={(u) => window.open(u)} />
         </div>
       </section>
     </div>

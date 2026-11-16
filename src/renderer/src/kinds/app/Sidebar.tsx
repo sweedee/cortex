@@ -1,5 +1,5 @@
 /**
- * The app's sidebar: Preview (the running app in a webview, viewport switcher, reload) and Log
+ * The app's sidebar: Preview (the running app in an iframe, viewport switcher, reload) and Log
  * (the runner's output, following). Starting = spinner until a URL shows up; crashed = the last log
  * lines and a restart button. Design after `PreviewView` on the toolbox-projects branch.
  */
@@ -93,7 +93,7 @@ function Preview({ app }: { app: App }) {
   if (state === 'running' && url) {
     return (
       <div className="ap">
-        <WebPanel src={url} partition="persist:apps" viewportSwitcher colorSchemeToggle onOpenExternal={(u) => void openUrl(u)} />
+        <WebPanel src={url} viewportSwitcher onOpenExternal={(u) => void openUrl(u)} />
       </div>
     );
   }

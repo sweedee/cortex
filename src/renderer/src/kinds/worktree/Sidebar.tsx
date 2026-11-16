@@ -20,7 +20,7 @@ type Worktree = ItemOf<'worktree'>;
 /** Loading / error / content of a query, never a spinner that runs forever. */
 function Q<T>({ q, children }: { q: { isPending: boolean; error: unknown; data: T | undefined; fetchStatus: string }; children: (d: T) => ReactNode }) {
   if (q.error) return <div className="wt-error">{errorText(q.error)}</div>;
-  if (q.data === undefined) return <div className="wt-note">{q.isPending && q.fetchStatus !== 'idle' ? 'Loading…' : 'Not available outside the desktop app.'}</div>;
+  if (q.data === undefined) return <div className="wt-note">{q.isPending && q.fetchStatus !== 'idle' ? 'Loading…' : 'Not available without the Cortex server.'}</div>;
   return <>{children(q.data)}</>;
 }
 

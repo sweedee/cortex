@@ -150,7 +150,7 @@ function Harness({ agent }: { agent: Agent }) {
       <>
         <div className="ah-empty">
           <div className="ah-empty-title">No Claude Code session attached</div>
-          <div>{localId ? 'Sessions only run in the desktop app.' : 'This is a demo agent. Start a real one from the chat box: describe the task and @mention a worktree or project.'}</div>
+          <div>{localId ? 'Sessions need the Cortex server.' : 'This is a demo agent. Start a real one from the chat box: describe the task and @mention a worktree or project.'}</div>
         </div>
         {pendingQ && <QuestionCard agent={agent} questions={pendingQ.questions} />}
       </>

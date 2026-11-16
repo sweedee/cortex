@@ -137,7 +137,7 @@ function PullRequests({ item }: { item: Project }) {
   const renovateCount = renovate.data?.length ?? sum?.renovate;
   return (
     <SidebarSection label={sum ? `Open pull requests · ${sum.total}` : 'Open pull requests'}>
-      <QueryNote q={open} what="pull requests" offlineHint={repo ? 'Pull requests need the desktop app.' : 'Set the GitHub repo in Settings… to see its pull requests.'} />
+      <QueryNote q={open} what="pull requests" offlineHint={repo ? 'Pull requests need the Cortex server.' : 'Set the GitHub repo in Settings… to see its pull requests.'} />
       {sum && (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>

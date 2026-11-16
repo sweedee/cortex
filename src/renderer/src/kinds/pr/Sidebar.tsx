@@ -1,7 +1,6 @@
 /**
  * PR sidebar, "basically the GitHub PR view": Overview (state, reviews, mergeability, checks,
- * description, comments, stack) · Files (diff) · GitHub (the PR page in a webview, logged in
- * once via the `persist:github` partition).
+ * description, comments, stack) · Files (diff) · GitHub (the PR page: GitHub forbids framing, so a link to open it).
  */
 import { useEffect, useMemo } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
@@ -51,7 +50,7 @@ export function PrSidebar({ item, ctx }: SidebarProps<'pr'>) {
           id: 'github',
           label: 'GitHub',
           wide: true,
-          render: () => (real ? <WebPanel src={prUrl(item.data)} partition="persist:github" onOpenExternal={(u) => void openUrl(u)} /> : <NoRepo pr={item} />),
+          render: () => (real ? <WebPanel src={prUrl(item.data)} onOpenExternal={(u) => void openUrl(u)} /> : <NoRepo pr={item} />),
         },
       ]}
     />
@@ -81,7 +80,7 @@ function NoRepo({ pr }: { pr: Pr }) {
   return (
     <SidebarSection>
       <div className="pr-state">
-        {isDesktop ? `${pr.data.repo} is not a GitHub repository Cortex can reach (demo data?). Import the PR as owner/repo#123.` : 'GitHub data is only available in the desktop app.'}
+        {isDesktop ? `${pr.data.repo} is not a GitHub repository Cortex can reach (demo data?). Import the PR as owner/repo#123.` : 'GitHub data needs the Cortex server.'}
       </div>
     </SidebarSection>
   );

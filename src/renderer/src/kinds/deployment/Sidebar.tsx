@@ -98,7 +98,7 @@ export function DeploymentSidebar(props: SidebarProps<'deployment'>) {
           wide: true,
           render: () => (
             <div style={{ height: 'calc(100vh - 150px)', minHeight: 320 }}>
-              <WebPanel src={item.data.url} partition="persist:deployments" viewportSwitcher colorSchemeToggle onOpenExternal={(u) => void openUrl(u)} />
+              <WebPanel src={item.data.url} viewportSwitcher onOpenExternal={(u) => void openUrl(u)} />
             </div>
           ),
         },

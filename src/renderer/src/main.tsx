@@ -14,6 +14,7 @@ import { Hud } from './overlays/Hud';
 import { JiraBanner, Welcome } from './overlays/Welcome';
 import { Sidebar } from './overlays/Sidebar';
 import { FormHost } from './ui/form';
+import { PickerHost } from './ui/picker';
 import './desktop';
 import { loadWorkspace, startAutosave } from './persist';
 import { startSync } from './sync';
@@ -42,6 +43,7 @@ async function boot() {
           <ChatBox />
           <Dialogs />
           <FormHost />
+          <PickerHost />
           <ToastContainer />
         </AppRoot>
       </QueryClientProvider>

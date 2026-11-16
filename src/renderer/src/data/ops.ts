@@ -12,7 +12,7 @@ import { queryClient } from './queryClient';
 /** Invalidate (and refetch the active of) every query under these keys. */
 export const invalidate = (...keys: QueryKey[]) => Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey }))).then(() => undefined);
 
-/** A query may run: in the desktop app, with every param present. */
+/** A query may run: with the Cortex server, with every param present. */
 export const ready = (...params: unknown[]) => isDesktop && params.every((p) => p != null && p !== '' && p !== 0);
 
 /** A write op as a TanStack mutation: `const m = useOp(codeHost().prMerge); m.mutate([repo, n, 'squash'])`. */

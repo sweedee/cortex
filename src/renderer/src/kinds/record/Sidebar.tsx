@@ -62,7 +62,7 @@ function RecordView({ item, ctx }: SidebarProps<'record'>) {
   let body;
   if (!real) body = <div className="rec-note">{RECORD_HINT}</div>;
   else if (file.error) body = <div className="rec-note rec-error">{file.error}</div>;
-  else if (file.text === undefined) body = <div className="rec-note">{file.loading ? 'Loading…' : 'Not available outside the desktop app.'}</div>;
+  else if (file.text === undefined) body = <div className="rec-note">{file.loading ? 'Loading…' : 'Not available without the Cortex server.'}</div>;
   else if (editing)
     body = (
       <>

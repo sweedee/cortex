@@ -60,7 +60,7 @@ export function settingsPatch(v: FormValues): UserConfigPatch {
 }
 
 /** The config file line of the dialog: its path, and what in it was not usable. */
-export const configFileInfo = (s: UserConfigState | undefined) => (s ? [s.path, ...s.problems].join(' · ') : 'unknown (desktop app only)');
+export const configFileInfo = (s: UserConfigState | undefined) => (s ? [s.path, ...s.problems].join(' · ') : 'unknown (needs the Cortex server)');
 
 export const validRefresh = (v: unknown) => {
   const n = Number(v);
@@ -80,7 +80,7 @@ export async function openSettings() {
   const models = modelOptions(catalog, s.settings.model);
   const jira = config
     ? [config.jira.cli === 'mock' ? 'mock (scripts/jira-mock)' : 'Atlassian CLI (acli)', config.jira.site && `site ${config.jira.site}`, config.jira.note].filter(Boolean).join(' · ')
-    : 'unknown (desktop app only)';
+    : 'unknown (needs the Cortex server)';
   await openForm({
     title: 'Settings',
     description: 'Apply to new agent sessions and the whole canvas. Project paths and commands are in each project’s own settings.',
@@ -147,7 +147,7 @@ export async function openSettings() {
         hint: 'These settings are saved there. Editor, Claude binary, Jira custom fields, branch template, records folder and more are set in the file itself (they apply right away; claude.bin and jira.cli after a restart).',
       },
       { name: 'workspacePath', label: 'Workspace file', type: 'info', hint: 'The canvas: items, links, bubble colour, filter, sidebar width.' },
-      { name: 'userData', label: 'User data folder', type: 'info', hint: 'Config, window state, Jira mock data, Claude session list. Use CORTEX_USER_DATA=<dir> for a separate profile.' },
+      { name: 'userData', label: 'User data folder', type: 'info', hint: 'Config, Jira mock data, Claude session list. Use CORTEX_USER_DATA=<dir> for a separate profile.' },
       { name: 'jira', label: 'Jira', type: 'info' },
     ],
     onSubmit: async (v) => {

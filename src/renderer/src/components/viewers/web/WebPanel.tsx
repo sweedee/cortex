@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useState } from 'react';
 import { Button } from '@dynatrace/strato-components/buttons';
 import { ProgressCircle } from '@dynatrace/strato-components/content';
-import { ArrowLeftIcon, ArrowRightIcon, DarkmodeIcon, ExternalLinkIcon, LightmodeIcon, RefreshIcon } from '@dynatrace/strato-icons';
-import { Tooltip } from '@dynatrace/strato-components/overlays';
+import { ExternalLinkIcon, RefreshIcon } from '@dynatrace/strato-icons';
 import '../viewers.css';
 
 export type Viewport = 'desktop' | 'tablet' | 'mobile';
@@ -10,10 +9,7 @@ export const VIEWPORT_WIDTH: Record<Viewport, string> = { desktop: '100%', table
 
 export interface WebPanelProps {
   src: string;
-  /** Session partition, e.g. `persist:github` so logins survive restarts. Fixed for the element's lifetime. */
-  partition?: string;
-  onNavigate?: (url: string) => void;
-  /** Host opens the URL in the OS browser. The button is hidden without it. */
+  /** Host opens the URL in a new tab. For pages that cannot be framed this is the whole panel. */
   onOpenExternal?: (url: string) => void;
   /** Slim toolbar (default true). */
   toolbar?: boolean;
@@ -21,168 +17,66 @@ export interface WebPanelProps {
   viewport?: Viewport;
   /** Show desktop/tablet/mobile switch buttons in the toolbar; `viewport` is then the initial value. */
   viewportSwitcher?: boolean;
-  /**
-   * Light / dark toggle for the page (emulates `prefers-color-scheme` in the guest). Without a pick the
-   * page follows the app's theme. Desktop app only; the iframe fallback cannot emulate it.
-   */
-  colorSchemeToggle?: boolean;
   className?: string;
 }
 
-/** The subset of Electron's WebviewTag we use (kept local so the renderer needs no electron types). */
-interface WebviewEl extends HTMLElement {
-  goBack(): void;
-  goForward(): void;
-  reload(): void;
-  canGoBack(): boolean;
-  canGoForward(): boolean;
-  getURL(): string;
-  getWebContentsId(): number;
+/** Only apps running on this machine are framed; GitHub, Jira & co. forbid framing (X-Frame-Options / CSP). */
+export function isFrameable(src: string): boolean {
+  try {
+    const u = new URL(src);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && (u.hostname === 'localhost' || u.hostname === '127.0.0.1');
+  } catch {
+    return false;
+  }
 }
 
-export type Scheme = 'light' | 'dark';
-
-/** The app's colour scheme: Strato's AppRoot sets `data-theme` on <html>, else the OS preference. */
-export function appScheme(): Scheme {
-  const t = document.documentElement.getAttribute('data-theme');
-  if (t === 'light' || t === 'dark') return t;
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-}
-function subscribeScheme(cb: () => void) {
-  const obs = new MutationObserver(cb);
-  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  const mq = window.matchMedia?.('(prefers-color-scheme: light)');
-  mq?.addEventListener('change', cb);
-  return () => {
-    obs.disconnect();
-    mq?.removeEventListener('change', cb);
-  };
-}
-
-const inElectron = typeof navigator !== 'undefined' && /Electron\//.test(navigator.userAgent);
-
-/** Re-creates the inner panel (fresh webview + transient state) whenever the target or partition changes, or on retry. */
+/** Re-creates the inner panel (fresh iframe + transient state) whenever the target changes, or on reload. */
 export function WebPanel(props: WebPanelProps) {
-  const [retry, setRetry] = useState(0);
-  return <WebPanelInner key={`${props.partition ?? ''}|${props.src}|${retry}`} {...props} onRetry={() => setRetry((n) => n + 1)} />;
+  const [reload, setReload] = useState(0);
+  return isFrameable(props.src) ? <FramePanel key={`${props.src}|${reload}`} {...props} onReload={() => setReload((n) => n + 1)} /> : <LinkPanel {...props} />;
 }
 
-function WebPanelInner({
-  src,
-  partition,
-  onNavigate,
-  onOpenExternal,
-  toolbar = true,
-  viewport: viewportProp = 'desktop',
-  viewportSwitcher,
-  colorSchemeToggle,
-  className,
-  onRetry,
-}: WebPanelProps & { onRetry: () => void }) {
-  const ref = useRef<WebviewEl | null>(null);
-  const [url, setUrl] = useState(src);
+/** A page that cannot be embedded: its URL and a button that opens it in a new tab. */
+function LinkPanel({ src, onOpenExternal, className }: WebPanelProps) {
+  return (
+    <div className={`cxv-web${className ? ` ${className}` : ''}`}>
+      <div className="cxv-web-stage">
+        <div className="cxv-web-error">
+          <div className="cxv-web-error-title">This page opens in its own tab</div>
+          <div className="cxv-web-error-detail">The site does not allow being embedded.</div>
+          <div className="cxv-web-url" title={src} style={{ maxWidth: '90%', flex: 'none' }}>
+            {src}
+          </div>
+          {onOpenExternal && (
+            <Button variant="accent" onClick={() => onOpenExternal(src)}>
+              <Button.Prefix>
+                <ExternalLinkIcon />
+              </Button.Prefix>
+              Open in new tab
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FramePanel({ src, onOpenExternal, toolbar = true, viewport: viewportProp = 'desktop', viewportSwitcher, className, onReload }: WebPanelProps & { onReload: () => void }) {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [nav, setNav] = useState({ back: false, forward: false });
   const [viewportPick, setViewport] = useState<Viewport | null>(null);
   const viewport = viewportPick ?? viewportProp;
-  const [schemePick, setSchemePick] = useState<Scheme | null>(null);
-  const app = useSyncExternalStore(subscribeScheme, appScheme);
-  const scheme = schemePick ?? app;
-  const schemeRef = useRef(scheme);
-  useEffect(() => {
-    schemeRef.current = scheme;
-  }, [scheme]);
-  const emulate = colorSchemeToggle && inElectron;
-  /** push the effective scheme into the guest (it needs to be attached: dom-ready) */
-  // TODO(web): `webview:setColorScheme` (CDP emulation in an Electron guest) is gone; an iframe can't be told
-  const applyScheme = useCallback(() => {}, []);
-  useEffect(applyScheme, [applyScheme, scheme]);
-  const onNavigateRef = useRef(onNavigate);
-  useEffect(() => {
-    onNavigateRef.current = onNavigate;
-  }, [onNavigate]);
-
-  useEffect(() => {
-    const wv = ref.current;
-    if (!wv || !inElectron) return;
-    const sync = () => {
-      try {
-        setNav({ back: wv.canGoBack(), forward: wv.canGoForward() });
-        const u = wv.getURL();
-        if (u) {
-          setUrl(u);
-          onNavigateRef.current?.(u);
-        }
-      } catch {
-        /* not attached yet */
-      }
-    };
-    const start = () => {
-      setLoading(true);
-      setError(null);
-    };
-    const stop = () => {
-      setLoading(false);
-      sync();
-    };
-    const fail = (e: Event) => {
-      const ev = e as Event & { errorCode: number; errorDescription: string; isMainFrame: boolean };
-      // -3 = aborted (superseded navigation), not a real failure
-      if (ev.isMainFrame === false || ev.errorCode === -3) return;
-      setLoading(false);
-      setError(ev.errorDescription || 'Load failed');
-    };
-    wv.addEventListener('did-start-loading', start);
-    wv.addEventListener('did-stop-loading', stop);
-    wv.addEventListener('did-navigate', sync);
-    wv.addEventListener('did-navigate-in-page', sync);
-    wv.addEventListener('did-fail-load', fail);
-    wv.addEventListener('dom-ready', applyScheme);
-    wv.addEventListener('did-navigate', applyScheme);
-    return () => {
-      wv.removeEventListener('dom-ready', applyScheme);
-      wv.removeEventListener('did-navigate', applyScheme);
-      wv.removeEventListener('did-start-loading', start);
-      wv.removeEventListener('did-stop-loading', stop);
-      wv.removeEventListener('did-navigate', sync);
-      wv.removeEventListener('did-navigate-in-page', sync);
-      wv.removeEventListener('did-fail-load', fail);
-    };
-  }, [applyScheme]);
-
-  const reload = useCallback(() => {
-    if (error || !inElectron) onRetry();
-    else ref.current?.reload();
-  }, [error, onRetry]);
-
-  const width = VIEWPORT_WIDTH[viewport];
 
   return (
     <div className={`cxv-web${className ? ` ${className}` : ''}`}>
       {toolbar && (
         <div className="cxv-web-bar">
-          {inElectron && (
-            <>
-              <Button size="condensed" variant="default" disabled={!nav.back} aria-label="Back" onClick={() => ref.current?.goBack()}>
-                <Button.Prefix>
-                  <ArrowLeftIcon />
-                </Button.Prefix>
-              </Button>
-              <Button size="condensed" variant="default" disabled={!nav.forward} aria-label="Forward" onClick={() => ref.current?.goForward()}>
-                <Button.Prefix>
-                  <ArrowRightIcon />
-                </Button.Prefix>
-              </Button>
-            </>
-          )}
-          <Button size="condensed" variant="default" aria-label="Reload" onClick={reload}>
+          <Button size="condensed" variant="default" aria-label="Reload" onClick={onReload}>
             <Button.Prefix>
               <RefreshIcon />
             </Button.Prefix>
           </Button>
-          <div className="cxv-web-url" title={url}>
-            {url}
+          <div className="cxv-web-url" title={src}>
+            {src}
           </div>
           {loading && <ProgressCircle size="small" aria-label="Loading" />}
           {viewportSwitcher &&
@@ -191,20 +85,8 @@ function WebPanelInner({
                 {v.charAt(0).toUpperCase() + v.slice(1)}
               </Button>
             ))}
-          {emulate && (
-            <Tooltip text={`Previewing in ${scheme} mode${schemePick ? '' : ' (follows the app)'}. Switch to ${scheme === 'dark' ? 'light' : 'dark'}.`}>
-              <Button
-                size="condensed"
-                variant={schemePick ? 'emphasized' : 'default'}
-                aria-label={`Preview color scheme: ${scheme}`}
-                onClick={() => setSchemePick(scheme === 'dark' ? 'light' : 'dark')}
-              >
-                <Button.Prefix>{scheme === 'dark' ? <DarkmodeIcon /> : <LightmodeIcon />}</Button.Prefix>
-              </Button>
-            </Tooltip>
-          )}
           {onOpenExternal && (
-            <Button size="condensed" variant="default" aria-label="Open externally" onClick={() => onOpenExternal(url)}>
+            <Button size="condensed" variant="default" aria-label="Open in new tab" onClick={() => onOpenExternal(src)}>
               <Button.Prefix>
                 <ExternalLinkIcon />
               </Button.Prefix>
@@ -212,25 +94,9 @@ function WebPanelInner({
           )}
         </div>
       )}
-      {!inElectron && <div className="cxv-web-notice">Embedded in an iframe: some sites block embedding. Use “open externally” if the page stays blank.</div>}
       <div className="cxv-web-stage">
-        {error && (
-          <div className="cxv-web-error" role="alert">
-            <div className="cxv-web-error-title">Couldn’t load — is the app running?</div>
-            <div className="cxv-web-error-detail">
-              {url} · {error}
-            </div>
-            <Button size="condensed" onClick={onRetry}>
-              Retry
-            </Button>
-          </div>
-        )}
-        <div className="cxv-web-frame" style={{ width, visibility: error ? 'hidden' : 'visible' }}>
-          {inElectron ? (
-            <webview ref={ref as never} src={src} partition={partition} className="cxv-web-view" />
-          ) : (
-            <iframe src={src} title="Web preview" className="cxv-web-view" onLoad={() => setLoading(false)} />
-          )}
+        <div className="cxv-web-frame" style={{ width: VIEWPORT_WIDTH[viewport] }}>
+          <iframe src={src} title="Web preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" className="cxv-web-view" onLoad={() => setLoading(false)} />
         </div>
       </div>
     </div>

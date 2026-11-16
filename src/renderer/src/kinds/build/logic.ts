@@ -45,17 +45,15 @@ export interface CiProvider {
   name: string;
   /** jobs / steps, rerun through the app */
   integrated: boolean;
-  /** webview partition of its details page (logins are kept per partition) */
-  partition: 'persist:github' | 'persist:ci';
 }
 
 const isActionsRun = (d: Pick<BuildData, 'runId' | 'repo'>) => !!d.runId && /^\d+$/.test(d.runId) && /^[\w.-]+\/[\w.-]+$/.test(d.repo);
 
 export function ciProvider(d: Pick<BuildData, 'runId' | 'repo' | 'url'>): CiProvider {
-  if (isActionsRun(d) || /github\.com\/.+\/actions\/runs\/\d+/i.test(d.url ?? '')) return { id: 'github-actions', name: 'GitHub Actions', integrated: isActionsRun(d), partition: 'persist:github' };
-  if (isJenkinsUrl(d.url)) return { id: 'jenkins', name: 'Jenkins', integrated: false, partition: 'persist:ci' };
+  if (isActionsRun(d) || /github\.com\/.+\/actions\/runs\/\d+/i.test(d.url ?? '')) return { id: 'github-actions', name: 'GitHub Actions', integrated: isActionsRun(d) };
+  if (isJenkinsUrl(d.url)) return { id: 'jenkins', name: 'Jenkins', integrated: false };
   const host = d.url ? hostOf(d.url)?.hostname : undefined;
-  return { id: 'other', name: host && !/github\.com$/i.test(host) ? host : 'CI', integrated: false, partition: /github\.com$/i.test(host ?? '') ? 'persist:github' : 'persist:ci' };
+  return { id: 'other', name: host && !/github\.com$/i.test(host) ? host : 'CI', integrated: false };
 }
 
 /** Label of the "open the details page" action: names the provider when it is known. */

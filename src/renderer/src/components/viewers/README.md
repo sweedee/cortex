@@ -12,7 +12,7 @@ the app theme. Styles: `viewers.css`.
 | `<DiffViewer>` | `diff` (unified text), `mode?: 'unified' \| 'split'`, `largeFileLines?` (default 800: bigger files start behind "Show anyway"), `className?`. Per-file collapse, summary list with +/- counts, binary note. diff2html is used for parsing only; rendering is React. |
 | `parseDiffStats(diff)` | `{ files: [{path, oldPath?, additions, deletions, status: 'added'\|'deleted'\|'renamed'\|'modified', binary}], additions, deletions }`. Dependency-free, safe to import eagerly. |
 | `<CodeEditor>` | `value`, `onChange?`, `language?: 'markdown' \| 'json' \| 'text'`, `readOnly?`, `placeholder?`, `onSave?(value)` (Ctrl/Cmd+S), `minHeight?`, `lineNumbers?`. CodeMirror 6, controlled by `value`. |
-| `<WebPanel>` | `src`, `partition?` (e.g. `persist:github`), `onNavigate?(url)`, `onOpenExternal?(url)`, `toolbar?` (default true), `viewport?: 'desktop' \| 'tablet' \| 'mobile'`, `viewportSwitcher?`. Electron `<webview>` with back/forward/reload/URL/loading/error+retry; falls back to an `<iframe>` (with a notice) outside Electron. Changing `src` or `partition` recreates the view. Type for `<webview>` is declared in `web/webview.d.ts`. |
+| `<WebPanel>` | `src`, `onOpenExternal?(url)`, `toolbar?` (default true), `viewport?: 'desktop' \| 'tablet' \| 'mobile'`, `viewportSwitcher?`. Running apps (`http(s)://localhost` / `127.0.0.1`) are shown in a sandboxed `<iframe>` with reload / URL / loading. Every other URL (GitHub, Jira, CI: they forbid framing) renders a panel with the URL and an "Open in new tab" button. Changing `src` recreates the frame. `isFrameable(src)` tells which case applies. |
 | `<LogView>` | `lines?: string[]` or `text?`, `follow?` (default true; scrolling up pauses, "Jump to latest" resumes), `maxLines?` (default 2000), `aria-label?`. ANSI colours via `anser`; bare `\r` progress rewrites collapse to the last frame. |
 | `ViewerGallery` (`Gallery.tsx`) | Demo of all of the above with sample data. Mounted only by the smoke harness (`CORTEX_SMOKE_GALLERY=1`, `showGallery()` in `debug.ts`) to check rendering under the CSP. |
 
@@ -22,5 +22,5 @@ Pure helpers (tested in `viewers.test.ts`): `parseDiffStats`, `toggleTask`, `fin
 ```tsx
 <Markdown source={record} onLinkClick={(h) => native.openExternal(h)} onToggleTask={(i, c) => save(toggleTask(record, i, c))} />
 <DiffViewer diff={worktreeDiff} mode="split" />
-<WebPanel src={app.url} partition="persist:preview" viewportSwitcher onOpenExternal={native.openExternal} />
+<WebPanel src={app.url} viewportSwitcher onOpenExternal={native.openExternal} />
 ```

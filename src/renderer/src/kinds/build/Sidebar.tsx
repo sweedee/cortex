@@ -1,6 +1,6 @@
 /**
  * Build sidebar: Overview (state, branch, PR, trigger, timing, stage, URL; jobs and steps of a
- * GitHub Actions run, polled while it runs) · Details (the CI page in a webview).
+ * GitHub Actions run, polled while it runs) · Details (the CI page, opened in a new tab).
  */
 import { useEffect } from 'react';
 import { Chip, ProgressCircle } from '@dynatrace/strato-components/content';
@@ -33,7 +33,7 @@ export function BuildSidebar({ item, ctx }: SidebarProps<'build'>) {
           wide: true,
           render: () =>
             item.data.url ? (
-              <WebPanel src={/^https?:\/\//i.test(item.data.url) ? item.data.url : `https://${item.data.url}`} partition={ciProvider(item.data).partition} onOpenExternal={(u) => void openUrl(u)} />
+              <WebPanel src={/^https?:\/\//i.test(item.data.url) ? item.data.url : `https://${item.data.url}`} onOpenExternal={(u) => void openUrl(u)} />
             ) : (
               <SidebarSection>
                 <div className="build-state">No details URL known for this build.</div>
@@ -46,7 +46,14 @@ export function BuildSidebar({ item, ctx }: SidebarProps<'build'>) {
 }
 
 const STATE_COLOR = { queued: 'neutral', in_progress: 'primary', completed: 'neutral' } as const;
-const CONCLUSION_COLOR: Record<string, 'success' | 'critical' | 'neutral' | 'warning'> = { success: 'success', failure: 'critical', timed_out: 'critical', cancelled: 'warning', skipped: 'neutral', neutral: 'neutral' };
+const CONCLUSION_COLOR: Record<string, 'success' | 'critical' | 'neutral' | 'warning'> = {
+  success: 'success',
+  failure: 'critical',
+  timed_out: 'critical',
+  cancelled: 'warning',
+  skipped: 'neutral',
+  neutral: 'neutral',
+};
 
 function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
   const d = b.data;
@@ -122,7 +129,7 @@ function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
       {actions ? (
         <SidebarSection label={run ? `Jobs · ${run.jobs.length}` : 'Jobs'}>
           {!isDesktop ? (
-            <div className="build-state">Run details are only available in the desktop app.</div>
+            <div className="build-state">Run details are only available with the Cortex server.</div>
           ) : q.isLoading ? (
             <div className="build-state">
               <ProgressCircle size="small" aria-label="Loading the run" /> Loading the run…
@@ -137,7 +144,11 @@ function Overview({ build: b, ctx }: { build: Build; ctx: KindCtx }) {
         </SidebarSection>
       ) : (
         <SidebarSection label="Jobs">
-          <div className="build-state">{ciProvider(d).id === 'other' ? 'Jobs and logs of this CI are on its details page (Details tab).' : `${ciProvider(d).name} jobs and logs are on its details page (${ciProvider(d).name} tab).`}</div>
+          <div className="build-state">
+            {ciProvider(d).id === 'other'
+              ? 'Jobs and logs of this CI are on its details page (Details tab).'
+              : `${ciProvider(d).name} jobs and logs are on its details page (${ciProvider(d).name} tab).`}
+          </div>
         </SidebarSection>
       )}
       <ConnectionsSection item={b} ctx={ctx} />

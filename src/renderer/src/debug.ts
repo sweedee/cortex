@@ -1,7 +1,7 @@
 /**
  * `window.__cortexDebug`: a handle for browser-driven end-to-end tests (e.g. Playwright): drives
  * renderer flows (chat → agent, answering, forms, refreshing) without clicks. Present in dev, and in a
- * build only when the page is opened as `/#smoke`. (The Electron smoke harness that used it is gone.)
+ * build only when the page is opened as `/#smoke`.
  */
 import { openAdd, sendPrompt } from './actions';
 import { chooseOption } from './kinds/agent/session';

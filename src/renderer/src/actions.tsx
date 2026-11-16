@@ -107,7 +107,7 @@ export async function sendPrompt(text: string, mentioned: string[]): Promise<str
   const ctx = ctxOf();
   const items = mentioned.map((id) => ctx.get(id)).filter((i): i is Item => !!i);
   if (!isDesktop) {
-    toast('Agents need the desktop app', 'Start Cortex with npm run dev to use Claude Code.', 'warning');
+    toast('Agents need the Cortex server', 'Start Cortex with npm start (or npm run dev) to use Claude Code.', 'warning');
     return null;
   }
 

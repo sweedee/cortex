@@ -201,7 +201,7 @@ export function TicketSidebar(props: SidebarProps<'ticket'>) {
           wide: true,
           render: () => (
             <div style={{ height: 'calc(100vh - 150px)', minHeight: 320 }}>
-              <WebPanel src={url} partition="persist:jira" onOpenExternal={(u) => void openUrl(u)} />
+              <WebPanel src={url} onOpenExternal={(u) => void openUrl(u)} />
             </div>
           ),
         },

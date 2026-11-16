@@ -41,9 +41,9 @@ describe('build: CI providers', () => {
     expect(isJenkinsUrl('https://github.com/o/r/actions/runs/1')).toBe(false);
     expect(isJenkinsUrl('https://circleci.com/gh/o/r/1')).toBe(false);
     expect(isJenkinsUrl('')).toBe(false);
-    expect(ciProvider({ repo: 'o/r', runId: '7', url: 'https://github.com/o/r/actions/runs/7/job/9' })).toMatchObject({ id: 'github-actions', integrated: true, partition: 'persist:github' });
+    expect(ciProvider({ repo: 'o/r', runId: '7', url: 'https://github.com/o/r/actions/runs/7/job/9' })).toMatchObject({ id: 'github-actions', integrated: true });
     expect(ciProvider({ repo: 'unknown/x', url: 'https://github.com/o/r/actions/runs/7' })).toMatchObject({ id: 'github-actions', integrated: false });
-    expect(ciProvider({ repo: 'o/r', url: 'https://jenkins.acme.io/job/x/12/' })).toMatchObject({ id: 'jenkins', name: 'Jenkins', partition: 'persist:ci' });
+    expect(ciProvider({ repo: 'o/r', url: 'https://jenkins.acme.io/job/x/12/' })).toMatchObject({ id: 'jenkins', name: 'Jenkins' });
     expect(ciProvider({ repo: 'o/r', url: 'https://app.circleci.com/pipelines/1' })).toMatchObject({ id: 'other', name: 'app.circleci.com' });
     expect(ciProvider({ repo: 'o/r', url: '' })).toMatchObject({ id: 'other', name: 'CI' });
     expect(externalLabel({ repo: 'o/r', url: 'https://jenkins.acme.io/job/x' })).toBe('Open in Jenkins');

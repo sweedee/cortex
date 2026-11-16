@@ -40,7 +40,7 @@ export function QueryNote({ q, what, offlineHint }: { q: { isLoading: boolean; i
         Could not load {what}: {errorText(q.error)}
       </Note>
     );
-  if (q.data === undefined && q.fetchStatus === 'idle') return <Note>{offlineHint ?? `${what} needs the desktop app and a configured project.`}</Note>;
+  if (q.data === undefined && q.fetchStatus === 'idle') return <Note>{offlineHint ?? `${what} needs the Cortex server and a configured project.`}</Note>;
   return null;
 }
 
