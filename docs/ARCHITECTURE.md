@@ -1,165 +1,179 @@
 # Architecture
 
-Cortex is an Electron app built with electron-vite. Three processes, one window.
+Cortex is a local web app. A Node server (`src/server`) runs on the user's machine and does the real work
+(git, gh, the Jira CLI, the Claude Code CLI, processes); the React UI runs in the browser and talks to the
+server over HTTP and one WebSocket. Two processes, one port (`127.0.0.1:4317` by default).
 
 ```
-┌──────────── main (Node) ────────────┐   ipcMain.handle / webContents.send
-│ src/main/index.ts   lifecycle        │◄──────────────────────────────────┐
-│ src/main/window.ts  BrowserWindow    │                                   │
-│ src/main/ipc/*      handlers (zod)   │                                   │
-│ src/main/services/* git gh jira …    │                                   │
-│ src/main/lib/*      node helpers     │                                   │
-└──────────────────────────────────────┘                                   │
-┌──── preload (sandboxed, CJS) ────┐  contextBridge: window.cortex          │
-│ src/preload/index.ts             │────────────────────────────────────────┘
-└──────────────────────────────────┘
-┌──────────── renderer (Chromium, no Node) ─────────────┐
-│ src/renderer/src/native.ts  ← the only door to native  │
-│ everything else: React UI, store, layout               │
-└────────────────────────────────────────────────────────┘
+┌──────────── server (Node, 127.0.0.1 only) ───────────┐
+│ src/server/index.ts     entry: port, token, static    │
+│ src/server/http/*       HTTP + WebSocket transport,   │  POST /api/invoke/<channel>  (JSON in, JSON out)
+│                         Host / Origin / token, CSP    │◄──────────────────────────────────────────────┐
+│ src/server/ipc/*        handlers (zod-validated)      │                                               │
+│ src/server/services/*   git gh jira claude …          │  /api/events  (WebSocket, {channel, payload}) ─┤
+│ src/server/lib/*        node helpers                  │                                               │
+└───────────────────────────────────────────────────────┘                                               │
+┌──────────── renderer (browser, no Node) ──────────────────────────────────────────────────────────────┘
+│ src/renderer/src/native.ts  ← the only door to the server (fetch + one reconnecting WebSocket)
+│ everything else: React UI, store, layout
+└──────────────────────────────────────────
 src/shared/ipc.ts      contract: invokeChannels / eventChannels maps (declared once), payload types;
                        CortexApi is derived from them
-src/shared/bridge.ts   builds the api object from the channel keys (preload + browser fallback)
-src/shared/schemas.ts  zod schema per invoke channel (used by main)
+src/shared/bridge.ts   builds the api object from the channel keys (used by native.ts)
+src/shared/schemas.ts  zod schema per invoke channel (used by the server)
 src/shared/integrations/*  tool DTOs and pure mappers both sides may import
 ```
 
 ## Rules
 
-1. **The renderer never touches Node or `window.cortex` directly.** All native access goes through
-   `src/renderer/src/native.ts`, which also provides a browser fallback (`npm run dev:web`, unit tests):
-   exec / proc / fs / integrations reject with a clear error (lists resolve `[]`), the workspace lives in
-   localStorage, notifications use the Web Notification API.
-2. **Every invoke channel is declared once, in `invokeChannels` in `src/shared/ipc.ts`, and validated in
-   main** with its schema in `src/shared/schemas.ts` / `integrationSchemas.ts` (compile-time checks keep the
-   schema map and the channel map identical, `ipcContract.test.ts` checks the bridge too).
-   Handlers are registered with `handle()` (`src/main/ipc/handle.ts`), which also rejects callers other
-   than the app window.
-3. **The preload only forwards.** It is sandboxed, so it may only import `electron` and the dependency-free
-   `shared/ipc.ts` / `shared/bridge.ts`. Its forwarders are generated from the channel keys
-   (`buildBridge`), so only declared channels are reachable. Never expose `ipcRenderer` itself.
+1. **The renderer never touches Node or the machine directly.** All server access goes through
+   `src/renderer/src/native.ts`. A few things happen in the browser itself: opening URLs (`window.open`),
+   desktop notifications (Web Notification API) and the folder picker (a modal that browses the server's disk
+   through `dialog:listDir`). Without a `window` (unit tests) `native` is a fallback: server channels reject with
+   a clear error, lists resolve `[]`, the workspace and config live in localStorage.
+2. **Every invoke channel is declared once, in `invokeChannels` in `src/shared/ipc.ts`, and validated on the
+   server** with its schema in `src/shared/schemas.ts` / `integrationSchemas.ts` (compile-time checks keep the
+   schema map and the channel map identical, `ipcContract.test.ts` checks the bridge too). Handlers are
+   registered with `handle()` (`src/server/ipc/handle.ts`), which also records the calling tab's client id.
+3. **The transport only forwards.** `src/server/http/app.ts` maps `POST /api/invoke/<channel>` to the registered
+   handler and nothing else; unknown channels get a 404. The renderer's forwarders are generated from the channel
+   keys (`buildBridge`), so only declared channels are reachable.
 4. **No shell for programmatic commands.** `exec.run` and the services spawn via `cross-spawn` (resolves
    Windows `.cmd` shims, escapes args) with `shell: false` and an allowlist. Only the user's own command
    lines (a project's start / test command) run through a shell.
-5. **Logic that can live outside Electron does** (`src/main/lib/*`, `src/main/services/*` with an
-   injectable runner, `src/shared/integrations/*`): it is unit-tested in node without an Electron runtime.
+5. **Logic that can live outside the server does** (`src/server/lib/*`, `src/server/services/*` with an
+   injectable runner, `src/shared/integrations/*`): it is unit-tested in node.
 
-## Window
+## Server and browser
 
-Dark background (`#07080f`), `contextIsolation`, `sandbox`, no `nodeIntegration`, `webviewTag: true`
-(GitHub, Jira, running apps and deployments are embedded as `<webview>` guests). Bounds are saved to
-`<userData>/window-state.json`. `window.open` / `target=_blank` and navigations away from the app open in
-the OS browser (http/https only; URLs are parsed and compared by origin, `lib/urlPolicy.ts`). Single-instance lock.
+`src/server/index.ts` listens on `127.0.0.1:PORT` (default 4317; `PORT` must be a port number) and prints
+`http://127.0.0.1:PORT/?token=…`. Only the token holder can use it. The routes are in `src/server/http/app.ts`:
 
-**Embedded pages** (`window.ts`, `webSecurity.ts`): a `<webview>` attaches only with an http(s) `src` and one of
-`WEBVIEW_PARTITIONS` (`shared/ipc.ts`: `persist:github`, `persist:ci`, `persist:jira`, `persist:apps`,
-`persist:deployments`, `persist:gallery`); it is stripped of preload / node and forced into the sandbox. Guests
-may only navigate / redirect to http(s), their popups go to the OS browser. Every session (the default one,
-each partition, any later one) denies web permissions (camera, mic, location, notifications, …; only a
-sanitized clipboard write is allowed) and cancels downloads (http(s) downloads are handed to the OS browser).
-IPC handlers accept calls only from the app window's main frame (`handle.ts`).
+| Request | Answer |
+|---|---|
+| `POST /api/invoke/<channel>` | JSON body → 200 JSON (204 for none), or `{error}` with 400 / 401 / 403 / 404 / 405 / 413 / 415 / 500 |
+| `GET /api/events` | WebSocket; the server pushes `{channel, payload}` text frames to every connected tab. The tab's `?client=` id ties its watchers to it: when a tab is gone and does not come back within a grace period, its file watches are closed (`onClientGone`) |
+| `GET /?token=…` | sets the auth cookie (HttpOnly, `SameSite=Strict`, per port) and redirects to the same URL without the token |
+| anything else | the built renderer (`out/renderer`) in production; 404 in development, where Vite serves the page |
+
+Every request passes the checks in `security.ts` first (Host, Origin, token; see [Trust model](#trust-model)).
+
+**Development** (`npm run dev`, `scripts/dev.mjs`): `tsx watch` runs the server with `CORTEX_DEV_ORIGIN` and
+`CORTEX_DEV_URL`, and Vite serves the renderer on `127.0.0.1:5173`, proxying `/api` (HTTP and the WebSocket) to the
+server. The cookie is per host, so the browser signs in on the server's URL first; that redirects to Vite.
+
+**Embedded pages**: a running app on `localhost` / `127.0.0.1` is shown in an iframe (the CSP's `frame-src`
+allows it). GitHub, Jira, CI details and deployments open in a new browser tab.
 
 ## Trust model
 
-The renderer shows untrusted content (PR bodies, Jira descriptions, LLM output) and embeds GitHub / Jira
-pages, so main treats it as *partly* trusted: a renderer bug must not turn into "read my SSH keys" or "run
-any program". What main enforces:
+The renderer shows untrusted content (PR bodies, Jira descriptions, LLM output) and embeds localhost apps, so
+the server treats it as *partly* trusted: a renderer bug must not turn into "read my SSH keys" or "run any
+program". What the server enforces:
 
+- **Access to the server** (`security.ts`, applied to every request): the server listens on `127.0.0.1` only;
+  `Host` must name it (`127.0.0.1:PORT` or `localhost:PORT`, so a DNS-rebinding name is refused); `Origin` must be
+  absent or one of the server's own origins (plus the Vite origin in dev); and the request must carry the per-start
+  token, as the auth cookie or as `Authorization: Bearer`. The token is random per start unless `CORTEX_TOKEN` (16+
+  characters) fixes it; it is printed in the URL and kept out of the log file. The comparison is constant-time.
 - **Files** (`fs:*`, `shell:openPath`, `shell:openInEditor`) and the **cwd** of `proc:start`, `apps:start`,
-  `tests:run` must lie inside an allowed root (`lib/pathPolicy.ts`): Cortex's data folder (`~/.cortex`),
-  folders / files the user picked in a native dialog this run, and the roots the renderer registers with
+  `tests:run` must lie inside an allowed root (`lib/pathPolicy.ts`): Cortex's data folder (`~/.cortex`), folders
+  the user picked in the folder browser (`dialog:confirmPick`) this run, and the roots the renderer registers with
   `fs:setRoots` (`sync/roots.ts`: every kind's `cwdOf` and `paths`, i.e. project base checkouts and worktrees
-  folders, worktrees, app / test / agent cwds, record files; re-sent whenever items change). Registration is renderer-controlled, so main also
-  refuses, regardless of roots: filesystem roots, the home folder and its parents as roots, home dot-entries
-  (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.gitconfig`, … except `~/.cortex`), the Start menu / Startup folders,
-  PowerShell profiles, `LaunchAgents`, `/etc`. Paths are compared after `path.resolve` (case-insensitive on
-  Windows / macOS); symlinks inside a root are not resolved.
+  folders, worktrees, app / test / agent cwds, record files; re-sent whenever items change). Registration is
+  renderer-controlled, so the server also refuses, regardless of roots: filesystem roots, the home folder and its
+  parents as roots, home dot-entries (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.gitconfig`, … except `~/.cortex`), the
+  Start menu / Startup folders, PowerShell profiles, `LaunchAgents`, `/etc`. Paths are compared after
+  `path.resolve` (case-insensitive on Windows / macOS); symlinks inside a root are not resolved.
 - **`shell:openPath`** never opens executables or scripts (`.exe .bat .cmd .lnk .ps1 .vbs .js .msi .scr .app
   .sh …`, trailing dots and NTFS streams included).
 - **Child process env** from the renderer: allowlisted keys only (`shared/envPolicy.ts`: `FORCE_COLOR`,
   `NO_COLOR`, `CI`, `NODE_ENV`, `PORT`, `HOST`, `BROWSER`, `DEBUG`, `TZ`, `LANG`, `LC_ALL`); `NODE_OPTIONS`,
-  `LD_PRELOAD`, `DYLD_*`, `GIT_SSH_COMMAND`, `ELECTRON_*`, `PATH`, … are rejected by the schema.
-- **`exec:run`**: no `node` in the allowlist, and the channel refuses in a packaged build (no UI flow uses it;
-  git / gh / claude with free-form args can run code). Main runs its own scripts (the Jira mock) itself with
-  Electron's binary and `ELECTRON_RUN_AS_NODE`.
+  `LD_PRELOAD`, `DYLD_*`, `GIT_SSH_COMMAND`, `PATH`, … are rejected by the schema.
+- **`exec:run`**: no `node` in the allowlist, and the channel refuses in a production build (no UI flow uses it;
+  git / gh / claude with free-form args can run code). The server runs its own scripts (the Jira mock) itself with
+  `process.execPath`.
 - **Claude permission modes** `bypassPermissions` / `dontAsk` from the renderer (`claude:start`,
-  `claude:configure`) need a native confirmation in main, once per mode per run (`lib/modeGate.ts`).
-- **Dev overrides are ignored in a packaged build** (`lib/devEnv.ts`, applied to `process.env` first thing):
-  `CORTEX_CLAUDE_BIN`, `CORTEX_JIRA_MOCK_SCRIPT`, `CORTEX_SMOKE*`, `ELECTRON_RENDERER_URL`, `JIRA_MOCK_*`, and the
-  config.json overrides `CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`.
-  Only `CORTEX_USER_DATA` stays. The smoke harness is only imported when the app is not packaged.
-- **config.json names programs main runs** (`editor.command` / `editor.args` for `shell:openInEditor`,
+  `claude:configure`) are refused unless the server was started with `CORTEX_ALLOW_UNATTENDED` naming them
+  (`bypassPermissions,dontAsk`, or `all`), and then need the one-time confirmation of that mode per run
+  (`lib/modeGate.ts`). The server has no dialog of its own, so the person who starts it decides.
+- **Production and dev overrides** (`lib/runtime.ts`, `lib/devEnv.ts`): a production build is the bundled server
+  (`npm run build` → `out/server/index.js`) or `NODE_ENV=production`. There, the dev-only variables are removed from
+  `process.env` first thing: `CORTEX_CLAUDE_BIN`, `CORTEX_JIRA_MOCK_SCRIPT`, `CORTEX_DEV_ORIGIN`, `CORTEX_DEV_URL`,
+  `JIRA_MOCK_*`, and the config.json overrides `CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_AI_REVIEW_COMMENT`,
+  `CORTEX_RENOVATE_APP`. `PORT`, `CORTEX_TOKEN`, `CORTEX_USER_DATA` and `CORTEX_ALLOW_UNATTENDED` stay.
+- **config.json names programs the server runs** (`editor.command` / `editor.args` for `shell:openInEditor`,
   `claude.bin`), so those keys are **file-only**: the file belongs to the user, the renderer can't set them.
   `config:update` validates its patch with a strict schema (`RendererConfigPatchSchema`, `shared/userConfig.ts`)
-  that only has the gear-dialog keys (Claude model / effort / permission mode, AI-review comment, refresh
+  that only has the settings-dialog keys (Claude model / effort / permission mode, AI-review comment, refresh
   interval, notifications, sound); anything else (`editor`, `claude.bin`, Jira, git, records) is rejected.
   `fs:writeText` refuses `<userData>/config.json` and `config.schema.json` although `~/.cortex` is a root. The
   editor runs without a shell (cross-spawn, `shell: false`), the program may not start with `-`, and the path
   (inside the roots) is substituted for `{path}` as one argument. A default permission mode from the file is
-  only what the renderer sends with `claude:start`, so `bypassPermissions` / `dontAsk` still need the native
-  confirmation. This is defense in depth: a renderer that can run shell commands (below) could also edit the
-  file through them.
+  only what the renderer sends with `claude:start`, so `bypassPermissions` / `dontAsk` still need the
+  `CORTEX_ALLOW_UNATTENDED` gate. This is defense in depth: a renderer that can run shell commands (below) could
+  also edit the file through them.
 
 What it does *not* stop: `apps:start` / `tests:run` / `proc:start` run a command line through the shell (the
 user's own start / test commands need one), so a compromised renderer can still run commands in a project
 folder. The roots make that, and file access, at least stay in the user's project folders.
 
 **Secrets in child processes.** Every child (git, gh, claude, the Jira CLI, and user dev servers / test runs
-started with `apps:start` / `tests:run`) inherits Cortex's own environment, including `GH_TOKEN`,
-`ANTHROPIC_API_KEY` and anything else the app was started with. That is intended (gh and claude need them),
+started with `apps:start` / `tests:run`) inherits the server's own environment, including `GH_TOKEN`,
+`ANTHROPIC_API_KEY` and anything else the server was started with. That is intended (gh and claude need them),
 but a dev server sees them too.
 
-**Content-Security-Policy**: a `<meta>` tag injected by the `cortex-csp` Vite plugin
-(`electron.vite.config.ts`). The build (file://) allows only the app's own scripts (`script-src 'self'`, no
-remote code, no eval), inline styles (Strato, CodeMirror, mermaid), `data:` / `blob:` images, fonts and
-workers, and Strato's fonts from `dt-cdn.net`; `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`.
-Dev additionally allows the Vite dev server and its HMR socket on localhost and react-refresh's inline
-preamble. Webview guests are separate pages and keep their own policies. `CORTEX_SMOKE_GALLERY=1` checks
-that mermaid, CodeMirror and the diff viewer render under it (see [Smoke runs](#smoke-runs)).
+**Content-Security-Policy** (`http/csp.ts`): in production the server sends it as an HTTP header on the page
+(`cspProd`); in development a `<meta>` tag is injected by the `cortex-dev-csp` Vite plugin (`vite.config.ts`).
+It allows only the app's own scripts (`script-src 'self'`, no remote code, no eval), inline styles (Strato,
+CodeMirror, mermaid), `data:` / `blob:` images, fonts and workers, Strato's fonts from `dt-cdn.net`, and frames
+from `localhost` / `127.0.0.1` (running apps); `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`,
+`frame-ancestors 'none'` (headers only). Dev additionally allows the Vite dev server and its HMR socket on localhost
+and react-refresh's inline preamble.
 
 ## IPC channels
 
+Every channel is a `POST /api/invoke/<channel>` call with a JSON request and a JSON response. The table lists the
+groups; the names and payload types are in `invokeChannels` (`src/shared/ipc.ts`), the schemas in `src/shared/schemas.ts`
+and `integrationSchemas.ts`.
+
 | Channel | Request → response | Notes |
 |---|---|---|
-| `exec:run` | `{cmd, args, cwd, env?, timeoutMs?, stdin?}` → `{code, stdout, stderr, timedOut}` | `cmd` ∈ `git gh claude jira-mock` (`jira-mock` → the configured Jira CLI); no shell; tree-killed on timeout (default 120 s); development builds only (smoke harness) |
-| `proc:start` | `{id, cmd, args, cwd, env?, shell?}` → `ProcInfo` | long-running; output via `proc:output`, end via `proc:exit`; `cwd` inside the roots |
-| `proc:stop` | `{id}` → `boolean` | kills the whole tree (Windows `taskkill /T /F`, POSIX process group) |
-| `proc:list` | → `ProcInfo[]` | running processes; all are killed on app quit |
-| `dialog:pickDirectory` | `{title?, defaultPath?}` → `string \| null` | |
-| `dialog:pickFile` | `{title?, defaultPath?, filters?}` → `string \| null` | |
-| `shell:openExternal` | `{url}` | http(s) only |
-| `shell:openPath` | `{path}` → `{ok, error?}` | folder / file in the OS; inside the roots, never an executable |
+| `exec:run` | `{cmd, args, cwd, env?, timeoutMs?, stdin?}` → `{code, stdout, stderr, timedOut}` | `cmd` ∈ `git gh claude jira-mock` (`jira-mock` → the configured Jira CLI); no shell; tree-killed on timeout (default 120 s); refused in a production build |
+| `proc:start` / `proc:stop` / `proc:list` | `{id, cmd, args, cwd, env?, shell?}` → `ProcInfo` / `{id}` → `boolean` / → `ProcInfo[]` | long-running; `cwd` inside the roots; stop kills the whole tree (Windows `taskkill /T /F`, POSIX process group); all are killed on server shutdown |
+| `dialog:listDir` | `{path?}` → `{path, parent, entries}` | browses the server's disk for the folder picker: names only, no hidden entries, at most `MAX_DIR_ENTRIES` (2000) per call |
+| `dialog:confirmPick` | `{path, kind}` → `string` | the user chose `path` in the picker: checks it exists and is of that kind, allows it as a root, returns the normalized path |
+| `shell:openPath` | `{path}` → `{ok, error?}` | folder / file in the OS (`open` / `explorer` / `xdg-open`, no shell); inside the roots, never an executable |
 | `shell:openInEditor` | `{path}` → `{ok, error?}` | config.json `editor` (default `code <path>`; `{path}` in `args`), no shell; falls back to `openPath`; inside the roots |
-| `webview:setColorScheme` | `{webContentsId, scheme: "light" or "dark" or null}` | CDP `Emulation.setEmulatedMedia` (`prefers-color-scheme`) on an embedded webview guest only; used by the preview light / dark toggle (`WebPanel` `colorSchemeToggle`: app + deployment previews; default = the app theme) |
-| `notify:desktop` | `{title, body, tag?, itemId?}` | Electron `Notification`; click focuses the window and sends `notify:clicked` |
-| `workspace:load` | → `unknown \| null` | `<userData>/workspace.json`, falls back to `.bak` |
-| `workspace:save` | `{data}` | atomic (tmp + rename), serialized (last write wins), previous version kept as `.bak` |
-| `workspace:path` | → `string` | |
-| `fs:setRoots` | `{roots}` → `{path, reason}[]` (refused) | replaces the renderer's roots (see [Trust model](#trust-model)); picked dialog paths and `~/.cortex` are always allowed |
-| `fs:readText` / `fs:writeText` | `{path}` / `{path, text}` | absolute paths inside the roots (also `fs:list`, `fs:watch`); writes are atomic |
-| `fs:list` | `{dir, options?: {glob?}}` → `FsEntry[]` | `*`, `?`, `**`, `{a,b}`; skips `node_modules` / `.git` when recursing |
-| `fs:watch` / `fs:unwatch` | `{dir}` → `watchId` / `{watchId}` | recursive `fs.watch`, events via `fs:changed`; all watches close on reload |
-| `app:info` | → `{platform, userData, home, version, electron}` | |
-| `config:get` | → `{config, path, problems}` | `<userData>/config.json`, every field resolved (see [Configuration](#configuration)) |
-| `config:update` | `{patch, ifUnset?}` → `{config, path, problems}` | only the gear-dialog keys (strict schema; `editor`, `claude.bin`, … are file-only); `null` removes a key; `ifUnset` only fills keys the file doesn't set; refused while the file is invalid JSON |
+| `workspace:load` / `workspace:save` / `workspace:path` | → `unknown \| null` / `{data}` / → `string` | `<userData>/workspace.json`, falls back to `.bak`; save is atomic (tmp + rename), serialized (last write wins), previous version kept as `.bak` |
+| `fs:setRoots` | `{roots}` → `{path, reason}[]` (refused) | replaces the renderer's roots (see [Trust model](#trust-model)); picked folders and `~/.cortex` are always allowed |
+| `fs:readText` / `fs:writeText` / `fs:list` | `{path}` / `{path, text}` / `{dir, options?: {glob?}}` → `FsEntry[]` | absolute paths inside the roots; writes are atomic; `fs:list` takes `*`, `?`, `**`, `{a,b}` and skips `node_modules` / `.git` when recursing |
+| `fs:watch` / `fs:unwatch` | `{dir}` → `watchId` / `{watchId}` | recursive `fs.watch`, events via `fs:changed`; a tab's watches close when the tab is gone |
+| `app:info` | → `{platform, userData, home?, version, node?}` | |
+| `integrations:config` | → effective Jira / CLI settings | Settings → Jira shows the CLI, the site and any problem |
+| `config:get` / `config:update` | → `{config, path, problems}` / `{patch, ifUnset?}` → same | `<userData>/config.json`, every field resolved (see [Configuration](#configuration)); update takes only the settings-dialog keys (strict schema; `editor`, `claude.bin`, … are file-only); `null` removes a key; `ifUnset` only fills keys the file doesn't set; refused while the file is invalid JSON |
+| `git:*` | `{dir}` / `{repoDir, …}` → git results | `isRepo`, `currentBranch`, `remoteRepo`, `worktreeList` / `Add` / `Remove`, `status`, `diff`, `diffStat`, `log`, `fetch`, `rebase`, `rebaseAbort`, `push` |
+| `gh:*` | → GitHub results | PRs (`prList`, `prView`, `prCreate`, `prMerge`, `prComment`, `prUpdateBranch`, `prEdit`, `prDiff`, `prChecks`), Actions runs (`runView`, `runRerun`), `renovatePrs` |
+| `jira:*` | → Jira results | `search`, `view`, `transition`, `create`, `comment`, `edit`, `statuses` |
+| `claude:*` | → session results | `start`, `send`, `answer`, `permission`, `interrupt`, `stop`, `remove`, `list`, `transcript`, `session`, `configure`, `catalog` |
+| `apps:*` / `tests:*` | → runner results | `apps:start` / `stop` / `restart` / `list` / `log` / `remove`; `tests:run` / `stop` / `list` / `log` |
 
-Events (main → renderer): `proc:output {id, stream, chunk}`, `proc:exit {id, code, signal, error?}`,
-`notify:clicked {itemId?}`, `fs:changed {watchId, dir, event, path}`, `config:changed {config, path, problems}`
-(config.json changed: an update or an edit of the file). Subscribe through `native.<group>.on<Event>(cb)`
-(`proc:exit` → `native.proc.onExit`) or `native.on(channel, cb)`,
-which returns an unsubscribe function. Output events are batched (one per process and stream every
-100 ms). The integration channels (`git:*`, `gh:*`, `jira:*`, `claude:*`, `apps:*`, `tests:*`) are listed
-under [Integrations](#integrations).
+Events (server → browser) arrive over `/api/events` as `{channel, payload}` frames, sent to every connected tab:
+`proc:output {id, stream, chunk}`, `proc:exit {id, code, signal, error?}`, `fs:changed {watchId, dir, event, path}`,
+`claude:event`, `claude:state`, `app:state`, `app:output`, `test:state`, `test:output`, and `config:changed
+{config, path, problems}` (config.json changed: an update or an edit of the file). Subscribe through
+`native.<group>.on<Event>(cb)` (`proc:exit` → `native.proc.onExit`) or `native.on(channel, cb)`, which returns an
+unsubscribe function. Output events are batched (one per process and stream every 100 ms).
 
 ### Adding a channel
 
 1. Add `'group:method': call<Request, Response>()` to `invokeChannels` in `src/shared/ipc.ts` (request /
-   response types next to it). `CortexApi` gets `native.group.method(req)` from it, and the preload forwards
+   response types next to it). `CortexApi` gets `native.group.method(req)` from it, and `buildBridge` forwards
    it, without further edits. Events: `'group:name': event<Payload>()` in `eventChannels` gives
    `native.group.onName(cb)`.
 2. Add its request schema to `schemas` in `src/shared/schemas.ts` (or `integrationSchemas.ts`); typecheck
    fails until it exists and matches.
-3. Register a handler with `handle(ctx, 'group:method', fn)` in `src/main/ipc/*` (logic in a service or `lib/`).
+3. Register a handler with `handle(ctx, 'group:method', fn)` in `src/server/ipc/*` (logic in a service or `lib/`).
 4. Say what it does in the browser in `browserFallbacks()` in `native.ts`: an implementation or
    `DESKTOP_ONLY` (typecheck fails until you do).
 5. Wrap it in the renderer's `data/<service>.ts`: a query hook for reads, an op that invalidates what it
@@ -191,7 +205,7 @@ src/renderer/src/
   layout.ts    d3-force simulation; positions live here, not in the store
   actions.tsx  selection-level actions, chat send (sendPrompt)
   desktop.ts, sound.ts  OS notifications and chimes for new notices
-  debug.ts     the smoke harness's handle (dev, or a build opened as #smoke)
+  debug.ts     `window.__cortexDebug`, the handle for browser-driven tests (dev, or a build opened as `#smoke`)
   visual.ts    group colours; tones.ts: tone → colour maps, "x min ago"
   canvas/      canvas, bubbles, links, backdrop, hover card, inline actions
 ```
@@ -221,7 +235,7 @@ layout cluster), `archived?`, `notice? {text, tone, at, read?}`, `createdAt`, `u
 | worktree | `path`, `branch`, `baseBranch`, `ticketKey?`, `git? {ahead, behind, dirty, changedFiles, checkedAt?}` |
 | record | `recordType` (plan / brainstorm / grill / verification), `path` (`<baseDir>/<records.dir>/<ticket-branch>/<name>.md`), `ticketBranch?`, `ticketKey?`, `status` (draft / approved / done), `steps? {done, total}`, `author?` |
 | pr | `repo`, `number`, `headBranch`, `baseBranch`, `state` (open / closed / merged), `isDraft`, `author?`, `reviewDecision?`, `reviews? {approved, requested}`, `mergeable?`, `mergeStateStatus?` (GitHub's; `DIRTY` = conflicts), `checks? {state, passed?, failed?, pending?}`, `additions?`, `deletions?`, `stackedOn?` (PR item id) |
-| agent | `sessionId?`, `localId?` (session in main; unset = demo), `cwd`, `model?`, `status` (running / waiting / idle / done / failed), `skill?`, `pendingQuestion? {toolUseId, questions[{question, header?, options[{label, description?}], multiSelect?}]}`, `pendingPermissions? [{requestId, toolName, summary?}]`, `error?`, `lastActivity?`, `startedAt?`, `endedAt?`, `usage? {contextPct, costUsd, turns}` |
+| agent | `sessionId?`, `localId?` (session on the server; unset = demo), `cwd`, `model?`, `status` (running / waiting / idle / done / failed), `skill?`, `pendingQuestion? {toolUseId, questions[{question, header?, options[{label, description?}], multiSelect?}]}`, `pendingPermissions? [{requestId, toolName, summary?}]`, `error?`, `lastActivity?`, `startedAt?`, `endedAt?`, `usage? {contextPct, costUsd, turns}` |
 | app | `command`, `cwd`, `url?`, `port?`, `procId?`, `state` (starting / running / stopped / crashed), `worktreeId?` |
 | build | `repo`, `name`, `url`, `runId?`, `number?`, `state` (queued / in_progress / completed), `conclusion?`, `prNumber?`, `branch`, `stage?`, `trigger?`, `durationSec?` |
 | deployment | `url`, `stage` (dev / staging / prod / custom), `stageLabel?`, `health?` (mocked), `version?` |
@@ -330,7 +344,7 @@ it is loaded).
   skip it and nothing touches disk or network). *Reset workspace* loads the empty world again. The old fake
   world lives on as `testing/fakeWorld.ts` for unit tests only.
 - A file that is not a workspace, or comes from a newer app version: the first-run world, a copy is written as
-  `workspace.invalid-<time>.json`, warning toast. Unreadable JSON: main falls back to `.bak` first.
+  `workspace.invalid-<time>.json`, warning toast. Unreadable JSON: the server falls back to `.bak` first.
 - A migrated file is saved right away (the old one becomes `.bak`).
 - Autosave: 500 ms after a change of items, links or prefs, and on unload.
 
@@ -384,12 +398,12 @@ Keys (`data/queryKeys.ts`) nest so prefixes invalidate groups: `qk.gh.pr(repo, n
 `qk.gh.prs(repo)` every PR list, `qk.git.dir(dir)` status / diff / log of one checkout, `qk.jira.searches()`
 every search, `qk.claude.session(id)` its transcript.
 
-Ids: an agent's session id in main is `data.localId` (the chat box uses the item id); apps and test runs use the
+Ids: an agent's session id on the server is `data.localId` (the chat box uses the item id); apps and test runs use the
 item id as runner id and store it as `data.procId`. Live sync matches events by these.
 
 ### Live sync, reconciliation, background refresh (`sync/`)
 
-`startSync()` (main.tsx, desktop only):
+`startSync()` (main.tsx):
 
 - **Live events** (`sync/live.ts` starts each kind's `live` hook; handlers in `kinds/{agent,app,testrun}/live.ts`): `claude:state` → the agent with that `localId` (status, `pendingQuestion`,
   `pendingPermissions`, activity, usage, error); `app:state` / `test:state` → the app / test run with that
@@ -399,8 +413,8 @@ item id as runner id and store it as `data.procId`. Live sync matches events by 
   the transcript / log caches; the session query is refetched (debounced) on state changes.
   Agent status mapping: claude `idle` (turn done, process alive) → `done`, interrupted → `idle`; process gone
   mid-turn → `idle`.
-- **Reconcile** at start: items that were really started (`localId` / `procId`) and say they run, but main does
-  not know them (the app restarted), become idle / stopped; known ones take main's state, without notices.
+- **Reconcile** at start: items that were really started (`localId` / `procId`) and say they run, but the server does
+  not know them (the app restarted), become idle / stopped; known ones take the server's state, without notices.
   Demo items (no ids) are left alone.
 - **Refresher** (`sync/refresher.ts` runs the jobs of each kind's `sync` hook, `kinds/<kind>/sync.ts`; a job id
   shared by several items, like `checks:<repo>#<n>`, runs once): every `settings.refreshSec` (default 60 s; 15 s for open PRs with
@@ -454,7 +468,7 @@ openForm({
 }): Promise<FormValues | null>                          // null = cancelled
 // FormValues = Record<string, string | boolean>; str(values, name) reads a string.
 // directory / file fields have a "Browse…" button (native pickers); 'info' is a read-only line.
-// Validation runs on submit, then live. formDriver (fill / submit the open form) is for the smoke harness.
+// Validation runs on submit, then live. formDriver (fill / submit the open form) is for browser-driven tests.
 
 // ui/task.tsx
 runTask(label, promiseOrFn, { success?, message?, quiet? }): Promise<T | undefined>
@@ -470,7 +484,7 @@ toast(title, message?, type?) · archive(items, verb?, before?)   // archive sho
 // sidebar/index.tsx
 <SidebarTabs rememberAs="pr" initial="details" tabs={[{ id, label, render: () => node, wide?: boolean, badge? }]} />
 <SidebarSection label="Changed files" actions={<Button …/>}>…</SidebarSection>   // actions sit right of the label
-useSidebarLayout() → { wide, setWide(boolean), width }   // a webview / diff tab can go wide
+useSidebarLayout() → { wide, setWide(boolean), width }   // a diff / web tab can go wide
 SummarySection, FactsSection, ConnectionsSection, DefaultSidebar
 
 // kinds/project: openProjectSettings(project?, at?) → the project's real paths / commands
@@ -494,13 +508,13 @@ One folder per kind in `kinds/`. The table is the overview; the sections below l
 | Kind | Actions (besides Mark done / Archive) | Sidebar |
 |---|---|---|
 | project | Create ticket (AI), Review Renovate PRs (AI), New worktree…, Open repo / folder / in editor, Settings… | repository setup, tickets, open PRs, worktrees on disk vs canvas, deployments |
-| ticket | Plan / Brainstorm (AI), Change status…, Create worktree…, Open in Jira; Mark done walks the workflow | Details (fields, description, links, comments) · Jira (webview) |
+| ticket | Plan / Brainstorm (AI), Change status…, Create worktree…, Open in Jira; Mark done walks the workflow | Details (fields, description, links, comments) · Jira (page) |
 | worktree | Create PR…, Rebase (AI), Launch app, Run tests, Review (AI), Open in editor / folder, Remove worktree… | Changes (diff) · Stats |
 | record | plan → Grill, brainstorm → Plan, grill → Implement (AI), Approve, Open in editor / folder | live markdown with task boxes, editor |
 | pr | Retarget onto … (stacked child of a merged parent), Merge…, Rebase, Request AI review…, Address review / Review PR / Write description (AI), Open on GitHub | Overview · Files · GitHub |
 | agent | one per question option, Allow / Deny per permission, Interrupt, Stop, Send follow-up, Continue / Fork (AI), folder actions | Session (harness) · Details |
 | app | Open in browser, Preview, Restart / Stop / Start, Show log, Open folder | Preview · Log · Details |
-| build | Re-run… (GitHub Actions) or open the CI's details page (provider-aware label), Fix CI / Explain failure (AI) | Overview (jobs, steps) · details webview named after the CI provider |
+| build | Re-run… (GitHub Actions) or open the CI's details page (provider-aware label), Fix CI / Explain failure (AI) | Overview (jobs, steps) · details page named after the CI provider |
 | deployment | Open, Edit… | Details (mocked status) · Preview |
 | todo | Edit, Mark done | title, markdown editor / preview |
 | testrun | Re-run, Stop, View output, Fix failing tests (AI) | summary, failing tests, live log |
@@ -525,7 +539,7 @@ transitions to the workflow's done status (first of category done, e.g. "Fertig"
 the direct move is rejected, else completes
 locally with a warning toast. Sidebar Details: fields, ADF description via `adfToMarkdown` + `Markdown`, linked
 issues, comments + add comment, related canvas items including PRs of the ticket's worktrees; Jira tab:
-`WebPanel` with `partition="persist:jira"`.
+`WebPanel`.
 
 ### worktree
 
@@ -580,7 +594,7 @@ issues, comments + add comment, related canvas items including PRs of the ticket
   `codeHost().prEdit({base})` (`gh pr edit --base`).
 - **Sidebar**: *Overview* (state, author, base ← head, mergeable / mergeStateStatus, files, reviews, checks
   from `usePrChecks`, description, last comments, stack, connections; `usePr` results are written back with
-  `prPatch`), *Files* (wide diff), *GitHub* (`WebPanel`, `partition="persist:github"`).
+  `prPatch`), *Files* (wide diff), *GitHub* (`WebPanel`).
 - **Builds from checks**: the Checks section keeps build bubbles of the PR in step (deduped by repo + name +
   PR number) and offers *Add N to canvas* for missing ones; the refresher keeps them current afterwards.
 
@@ -590,12 +604,11 @@ issues, comments + add comment, related canvas items including PRs of the ticket
 **CI providers** (`ciProvider(data)`): `github-actions` (numeric `runId` + `owner/name` repo, or an
 `…/actions/runs/<id>` URL) is integrated: jobs / steps via `gh run view`, re-run via `gh run rerun`;
 `jenkins` (Jenkins-looking URL) and `other` (any other CI reporting through the GitHub checks API; named by its
-host) only have their details page. Each has a display name and a webview partition (`persist:github` /
-`persist:ci`). A new integrated provider adds an id there plus its data hook and rerun op.
+host) only have their details page. Each has a display name. A new integrated provider adds an id there plus its data hook and rerun op.
 *Re-run…* for Actions: form with "only the failed jobs" → `codeHost().runRerun`, item back to queued; for others
 the details page opens. The open action (id `open`) is *Open in GitHub Actions* / *Open in Jenkins* / *Open
 details*. Sidebar: state, conclusion, provider, branch, PR, trigger, duration, stage; for Actions runs the jobs
-from `useRun` (polls while running, failed jobs with their steps), written back to the item; a details webview
+from `useRun` (polls while running, failed jobs with their steps), written back to the item; a details page
 tab named after the provider.
 
 ### testrun
@@ -608,7 +621,7 @@ deduped) with *Fix with Claude*, and a live `LogView`.
 
 ### agent
 
-`kinds/agent/`: `ring.ts`, `actions.tsx`, `session.tsx` (talking to main), `transcript.ts` (pure view model),
+`kinds/agent/`: `ring.ts`, `actions.tsx`, `session.tsx` (talking to the server), `transcript.ts` (pure view model),
 `Sidebar.tsx` + `agent.css` (the harness).
 
 - **Actions**: one per option of the first open question (a single plain question answers directly;
@@ -634,8 +647,8 @@ deduped) with *Fix with Claude*, and a live `LogView`.
 
 `kinds/app/`: `ops.ts` (start / stop / restart), `Sidebar.tsx` + `app.css`. Runner id = item id
 (`apps:start {id, cwd, command}`), stored as `data.procId`; state via `app:state`. Ring: starting → running,
-running → success, crashed → critical, stopped → neutral. Restart falls back to a fresh start when main no
-longer knows the app. Sidebar: *Preview* (`WebPanel` on the detected URL, `persist:apps`, viewport switcher;
+running → success, crashed → critical, stopped → neutral. Restart falls back to a fresh start when the server no
+longer knows the app. Sidebar: *Preview* (`WebPanel` on the detected URL, viewport switcher;
 starting = spinner + last output, crashed = last log lines + Restart), *Log* (`LogView`, follow), *Details*.
 
 ### deployment
@@ -652,13 +665,13 @@ form (title, notes, project) and opens the sidebar.
 
 ## Integrations
 
-Real tools, called from main, never through a shell (except the user's own app / test command lines).
+Real tools, called from the server, never through a shell (except the user's own app / test command lines).
 
 | | |
 |---|---|
 | `src/shared/integrations/*.ts` | dependency-free types the renderer may import: tool-shaped DTOs (gh JSON, Jira REST v3, Claude stream-json), pure parsers / mappers (`summarizePr`, `rollupChecks`, `summarizeIssue`, `adfToMarkdown`, `jiraBrowseUrl`, the Claude reducer `applyClaudeEvent`, `parseTestSummary`, `detectLocalUrl`), `DEFAULT_CONFIG` |
-| `src/main/services/*.ts` | `GitService`, `GhService`, `JiraService`, `ClaudeSessions`, `AppRunner` / `TestRunner`; each takes an injectable `Runner` (tests) and throws `CliError` (`"<cmd> <subcommand>: <stderr>"`) |
-| `src/main/ipc/integrations.ts` | the handlers; `src/shared/integrationSchemas.ts` the zod schemas |
+| `src/server/services/*.ts` | `GitService`, `GhService`, `JiraService`, `ClaudeSessions`, `AppRunner` / `TestRunner`; each takes an injectable `Runner` (tests) and throws `CliError` (`"<cmd> <subcommand>: <stderr>"`) |
+| `src/server/ipc/integrations.ts` | the handlers; `src/shared/integrationSchemas.ts` the zod schemas |
 | `src/shared/codeHost.ts` | the `CodeHost` interface; the optional `provider` on project / pr / build data picks the implementation (absent = github) |
 
 Renderer: `native.git.status({dir})`, `codeHost(provider).prView(repo, n)`, … and `native.on('claude:state', cb)` (typed,
@@ -706,7 +719,7 @@ password).
 | `gh:renovatePrs {repo}` → `GhPrListItem[]` | `gh pr list --app renovate` ∪ `--label renovate` |
 
 Field lists live in `shared/integrations/github.ts` (verified against gh 2.102). Live read-only test:
-`CORTEX_LIVE_GH=1 npx vitest run src/main/services/gh.test.ts`.
+`CORTEX_LIVE_GH=1 npx vitest run src/server/services/gh.test.ts`.
 
 ### Jira
 
@@ -723,7 +736,7 @@ company-managed Kanban project) or `scripts/jira-mock` with the same surface.
 | `jira:comment {key, body}` → `JiraComment \| null` | `comment create --key K --body … --json` (acli: `null`, it prints no comment) |
 | `jira:edit {key, summary?, description?, assignee?, labels?}` | `edit --key K [--summary …] [--description …] --yes --json` |
 
-What real acli does (captured in `src/main/services/__fixtures__/acli/`, replayed by `jira.acli.test.ts`):
+What real acli does (captured in `src/server/services/__fixtures__/acli/`, replayed by `jira.acli.test.ts`):
 
 - `view` / `create` print REST v3 issue JSON (ADF, `status.statusCategory`, `parent`, `comment.comments`), but
   `self` URLs point at Atlassian's API gateway (`https://jira-prod-….atl-paas.net/rest/api/3/…`), not the site.
@@ -742,7 +755,7 @@ What real acli does (captured in `src/main/services/__fixtures__/acli/`, replaye
   and Jira decides; *Mark done* targets the first status of category done and walks the flow if needed.
 - `create --label` (not `--labels`) adds labels; `edit --labels` sets them.
 
-`config.jira.note`; not logged in → `unavailable` + a note. In a packaged build (`ServicePaths.isPackaged`) there is no automatic mock fallback: `config.jira.unavailable` is set with the note "Jira not configured: install acli and run `acli jira auth login`, or set jira.cli in config.json", and `overlays/Welcome.tsx` (`JiraBanner`) shows it when tickets are on the canvas. Every `jira:*` handler waits for `initJira` first.
+`config.jira.note`; not logged in → `unavailable` + a note. In a production build (`isProduction()`, `lib/runtime.ts`) there is no automatic mock fallback: `config.jira.unavailable` is set with the note "Jira not configured: install acli and run `acli jira auth login`, or set jira.cli in config.json", and `overlays/Welcome.tsx` (`JiraBanner`) shows it when tickets are on the canvas. Every `jira:*` handler waits for `initJira` first.
 `config.jira.note`; not logged in → a note too. Every `jira:*` handler waits for `initJira` first.
 
 The mock (`scripts/jira-mock/jira-mock.mjs`, plain ESM, no build) prints Jira Cloud REST v3 issue JSON (ADF
@@ -754,12 +767,12 @@ statusCategory, key, type, priority, labels, parent, summary, text, sprint (`ope
 ignored (sorted by `updated`); `OR` is rejected. Workflow: To Do → In Progress → In Review → Done, back
 steps, Blocked from / to the open states, Done → To Do. Errors go to stderr with exit 1 (usage: 2). Like acli,
 `transition` / `edit` / `comment create --json` print bulk results, and `jira auth status` prints a `Site:` line.
-Data: `JIRA_MOCK_DB` (main passes `<userData>/jira-mock.json`), seeded with made-up CTX-48xx tickets (used by
-tests and smoke runs).
+Data: `JIRA_MOCK_DB` (the server passes `<userData>/jira-mock.json`), seeded with made-up CTX-48xx tickets (used by
+tests).
 
-Main runs it as `<process.execPath> <app>/scripts/jira-mock/jira-mock.mjs` with `ELECTRON_RUN_AS_NODE=1`
-(no node on PATH needed). `exec:run` with `cmd: 'jira-mock'` maps to the same command. A packaged build
-must ship `scripts/jira-mock/` unpacked next to the app (packaging is not set up yet).
+The server runs it as `<process.execPath> <app>/scripts/jira-mock/jira-mock.mjs`
+(no node on PATH needed). `exec:run` with `cmd: 'jira-mock'` maps to the same command. A production build
+ships `scripts/jira-mock/` next to the bundle (`npm start` finds it from the package root).
 
 Custom field ids come from config.json `jira.fields` (defaults `JIRA_FIELDS`: story points `customfield_10016`,
 sprint `customfield_10020`, which match the mock); they differ per site. The renderer passes them to
@@ -793,7 +806,7 @@ replies `{type: 'control_response', response: {subtype: 'success', request_id, r
 'allow', updatedInput: {...input, answers: {"<question>": "<label>"}}}}}` (multi-select joined with
 ", "). The CLI then runs the tool with those answers and emits its `tool_result` itself, exactly as with the
 Agent SDK's `canUseTool`. The protocol was read from the installed CLI's own schemas; it is exercised
-end-to-end with the fake CLI (`src/main/services/__fixtures__/fake-claude.mjs`), not a paid session. Fallback
+end-to-end with the fake CLI (`src/server/services/__fixtures__/fake-claude.mjs`), not a paid session. Fallback
 when no request was parked for that tool use: the answers are sent as the next user message. A typed `send()`
 while a question is open denies the question first. Other tools' prompts appear in `pendingPermissions`
 (depends on `--permission-mode`; `acceptEdits` / `bypassPermissions` reduce them). Other host requests (hooks,
@@ -821,8 +834,7 @@ Permission modes (the Settings select and the pickers): CLI default (no flag), `
 `auto`, `dontAsk`, `bypassPermissions`. Effort: `low · medium · high · xhigh · max`. Cost: `total_cost_usd` is
 cumulative per process, so each result adds its delta. Session metadata (`localId`, Claude `session_id`, cwd, title, model, chosen model, effort, permission mode, cost,
 context window) is stored in
-`<userData>/claude-sessions.json`. Binary: `CORTEX_CLAUDE_BIN`; a `.js` / `.mjs` path runs with Electron's
-node, e.g. `CORTEX_CLAUDE_BIN=src/main/services/__fixtures__/fake-claude.mjs` for a free end-to-end run (it answers the
+`<userData>/claude-sessions.json`. Binary: `CORTEX_CLAUDE_BIN`; a `.js` / `.mjs` path runs with node, e.g. `CORTEX_CLAUDE_BIN=src/server/services/__fixtures__/fake-claude.mjs` for a free end-to-end run (it answers the
 control requests above, reports growing usage with cache reads and a 200k window; `agent …` spawns a subagent,
 `full …` fills the context to 93 %).
 
@@ -842,7 +854,7 @@ The user's command line, through the shell.
 
 `<userData>/config.json` (`~/.cortex/config.json`): machine / user settings. Schema in `shared/userConfig.ts`
 (zod; every field and every section has a `.catch(default)`, so one bad value falls back to its own default and
-startup never fails on the file; unknown keys are ignored). Main loads it in `lib/userConfig.ts`
+startup never fails on the file; unknown keys are ignored). The server loads it in `lib/userConfig.ts`
 (`UserConfigStore`): read once at start, the folder is watched (editors replace the file on save) and a change
 is pushed as `config:changed`; `config:update` merges a patch into the raw file (only the keys that were there
 plus the patch, so the defaults are not frozen into the file) and writes it atomically. A file that is not valid
@@ -872,48 +884,32 @@ start).
 | `ui.notifications`, `ui.sound` | `false`, `true` | notices |
 | `ui.theme`, `ui.animations` | `system`, `true` | `useThemePref()`; `animations: false` adds `no-animations` to `<html>` (no backdrop particles, no bubble float) |
 
-Resolution (main, `services/config.ts` `resolveConfig`): `DEFAULT_CONFIG` ← config.json ← env. The env overrides
-are dev / test only (a packaged build strips them, `lib/devEnv.ts`): `CORTEX_JIRA_CLI=acli|mock` (smoke runs
-default to mock), `CORTEX_JIRA_SITE`, `CORTEX_CLAUDE_BIN`, `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, plus
+Resolution (the server, `services/config.ts` `resolveConfig`): `DEFAULT_CONFIG` ← config.json ← env. The env overrides
+are dev / test only (a production build strips them, `lib/devEnv.ts`): `CORTEX_JIRA_CLI=acli|mock` (tests default to mock), `CORTEX_JIRA_SITE`, `CORTEX_CLAUDE_BIN`, `CORTEX_AI_REVIEW_COMMENT`, `CORTEX_RENOVATE_APP`, plus
 `CORTEX_JIRA_MOCK_SCRIPT`, `JIRA_MOCK_DB`, `JIRA_MOCK_SITE`. `CORTEX_USER_DATA` always works (it locates the file).
 While running, GitHub settings and a set `jira.site` apply at once (`services.setUserConfig`); `claude.bin` and
 `jira.cli` need a restart; `records.dir` re-targets the record watches.
-`integrations:config` returns main's effective values once `initJira` is done (Settings shows the Jira CLI, site
+`integrations:config` returns the server's effective values once `initJira` is done (Settings shows the Jira CLI, site
 and `note`).
 
 Not yet configurable: probe timeouts. Deferred: a per-repo `.cortex.json` for team settings (AUDIT §3.3 point 3).
 
-## Smoke runs
+## End-to-end tests
 
-`CORTEX_SMOKE=1 npm run dev` (or `npx electron-vite preview` for the build) loads the app, runs a probe from
-inside the page and quits. Main opens the page as `index.html#smoke`, which exposes `window.__cortexDebug`
-(`debug.ts`: store access, `runAction(id, actionId)`, `forms` = `formDriver`, `sendPrompt`, `chooseOption`,
-`openAdd`, `replaceWorld`, `resetToDemo`, `refreshDue`, `showGallery`). Use a throw-away profile
-(`CORTEX_USER_DATA=<tmp>`). Smoke runs use the Jira mock unless `CORTEX_JIRA_CLI` is set. Not in a packaged
-build: `CORTEX_SMOKE*` is ignored there and the harness isn't loaded. The probe's checkout (and the repo
-smoke's temp folder) is added to the allowed roots.
-
-| Variable | What it adds |
-|---|---|
-| (none) | bridge calls (app info, workspace, exec allowlist, git / jira-mock / claude list, a test run) |
-| `CORTEX_SMOKE_SHOT=<png>` | a screenshot at the end |
-| `CORTEX_SMOKE_GH_REPO=owner/name` | a read-only `gh pr list` |
-| `CORTEX_SMOKE_E2E=1` | a project on this repo + forced refresh; with `CORTEX_CLAUDE_BIN=<fake-claude.mjs>` chat → agent → question → answer and the agent harness via the DOM; an app with a tiny HTTP server (URL, preview, restart, stop, crash). `CORTEX_SMOKE_FINAL=app \| agent \| <item id>` picks the final view |
-| `CORTEX_SMOKE_GALLERY=1` | the viewer gallery: mermaid, CodeMirror, diff rendering and CSP violations |
-| `CORTEX_SMOKE_WORLD=1` | loads the demo world (`loadDemoWorld`), one forced refresh, then prints what each bubble shows and every warning logged meanwhile. |
-| `CORTEX_SMOKE_REPO=1` | the real-repo click-through (`smokeRepo.ts`): a temp repo with a local bare `origin`, then project via Add, new worktree, launch app, run tests, commit → diff, record file → record bubble, todo add / edit, create PR up to the push, Jira status change, agent question (fake CLI), settings, worktree removal. Checklist on stdout, screenshots in `CORTEX_SMOKE_OUT` (default `<tmp>/cortex-smoke-*`). Start it with `GH_HOST=smoke.invalid` so gh never contacts GitHub |
+There is no browser end-to-end suite yet; one may be added later. The hook for it is `window.__cortexDebug`
+(`src/renderer/src/debug.ts`), which drives renderer flows (chat → agent, answering, forms, refreshing) without
+clicks. Unit tests (`npm test`) cover the server, the shared contract and the renderer's pure logic.
 
 ## Where things live
 
 | | |
 |---|---|
-| User data (`<userData>`) | `~/.cortex` (`lib/userData.ts`; `CORTEX_USER_DATA` overrides). Electron's `userData` path is set to it before the single-instance lock. First start after the move: when `~/.cortex/workspace.json` is missing and Electron's default folder (Windows `%APPDATA%\cortex`) has one, `workspace.json(.bak)`, `window-state.json`, `claude-sessions.json` and `jira-mock.json` are copied once |
-| Chromium data (cache, localStorage, webview logins) | Electron `sessionData`: Electron's default folder (`%APPDATA%\cortex`), or `<CORTEX_USER_DATA>/chromium`; kept out of `~/.cortex` |
-| Config | `<userData>/config.json` (+ `config.schema.json`, written by the app) |
+| Server data (`<userData>`) | `~/.cortex` (`lib/userData.ts`; `CORTEX_USER_DATA` overrides) |
+| Logs | `<userData>/logs` (`lib/log.ts`; the token is never logged) |
+| Config | `<userData>/config.json` (+ `config.schema.json`, written by the server) |
 | Workspace file | `<userData>/workspace.json` (+ `.bak`) |
-| Window state | `<userData>/window-state.json` |
 | Jira mock data | `<userData>/jira-mock.json` (seeded on first use) |
 | Claude session metadata | `<userData>/claude-sessions.json` |
-| Build output | `out/main`, `out/preload/index.cjs`, `out/renderer` |
-| Static assets | `public/` (renderer `publicDir`); reference them with `asset('brand/…')` from `native.ts`, not `/brand/…`, so they resolve under `file://` too |
+| Build output | `out/renderer` (the page), `out/server/index.js` (+ `.map`, the server bundle) |
+| Static assets | `public/`, served at the site root (`/favicon.svg`, `/brand/…`) |
 | Separate profile | `CORTEX_USER_DATA=<dir>` |

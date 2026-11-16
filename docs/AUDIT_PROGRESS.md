@@ -1,5 +1,7 @@
 # Audit implementation progress
 
+> **Note:** the app was migrated from Electron to a web app (2026-11-16; a Node server in `src/server`, the UI in the browser). Item notes and commit references describe the earlier Electron layout and are kept as history.
+
 Tracks the work on [AUDIT.md](AUDIT.md) §11. Item numbers match §11. Branch `app`; work starts from `971679f`.
 
 Status: ⬜ open · 🔄 in progress · ✅ done · ⏸ deferred (needs a decision or outside access)

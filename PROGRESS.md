@@ -1,5 +1,7 @@
 # Cortex → usable app · progress log
 
+> **Migrated to a web app (2026-11-16).** Cortex is no longer an Electron app: a Node server (`src/server`, HTTP + WebSocket on 127.0.0.1) runs the tools and the React UI runs in the browser. Entries below that mention Electron, `src/main`, `src/preload`, the smoke harness or the installers describe the earlier state and are kept as history. See [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 Single source of truth for the "take the canvas prototype to a usable app" effort.
 Read this first when resuming. Updated by the orchestrator after every phase / agent run.
 

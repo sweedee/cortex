@@ -5,28 +5,27 @@ file holds the rules.
 
 ## Setup
 
-- `npm install` (if npm crashes with `reading 'edgesOut'`, use `npx npm@11.21.2 install`). In a fresh clone or
-  worktree after `npm ci`: `node node_modules/electron/install.js`.
+- `npm install` (if npm crashes with `reading 'edgesOut'`, use `npx npm@11.21.2 install`).
 - New dependencies only when really needed: exact version pins, versions at least two weeks old.
-- Before a commit: `npm run typecheck`, `npm run lint`, `npm run format:check` (`npm run format` fixes), `npm test`, `npm run build` must pass.
+- Before a commit: `npm run typecheck`, `npm run lint`, `npm run format:check` (`npm run format` fixes), `npm test`, `npm run build` must pass. CI runs the same steps.
 - Formatting is Prettier (`.prettierrc.json`); `git config blame.ignoreRevsFile .git-blame-ignore-revs` hides the bulk format commit in blame.
 - `noUncheckedIndexedAccess` is on: `arr[i]` and regex groups may be `undefined`; guard them (tests use `testing/must.ts`).
 
 ## Layering
 
-- **Main** (`src/main`) owns every side effect: processes, files, git, gh, Jira, Claude. Logic goes into
-  `lib/` or `services/` with an injectable runner so it is testable in node.
-- **Shared** (`src/shared`) is dependency-free: the IPC contract, request schemas, tool DTOs and pure mappers.
-- **Preload** only forwards (sandboxed: `electron`, `shared/ipc.ts` and `shared/bridge.ts` only); its
-  forwarders are generated from the channel map, never written by hand.
-- **Renderer** reaches native only through `native.ts`, and integrations through `data/*` (hooks for reads,
-  `*Ops` for writes that invalidate their queries). Import direction: `domain` ← `store` ← `kinds/common`,
+- **Server** (`src/server`) owns every side effect: processes, files, git, gh, Jira, Claude. `http/` is the
+  transport only (HTTP `POST /api/invoke/<channel>`, the `/api/events` WebSocket, Host / Origin / token checks,
+  CSP, static files). Logic goes into `lib/` or `services/` with an injectable runner so it is testable in node.
+- **Shared** (`src/shared`) is dependency-free: the channel contract, request schemas, tool DTOs and pure mappers.
+  Both the server and the renderer import it.
+- **Renderer** (`src/renderer`) reaches the server only through `native.ts`, and integrations through `data/*`
+  (hooks for reads, `*Ops` for writes that invalidate their queries). Import direction: `domain` ← `store` ← `kinds/common`,
   `sidebar` ← `kinds/<kind>` ← `kinds/registry` ← UI. Kind modules never import the registry or another kind
   (use `ctx.kind(k)`); kinds may import the pure `sync/mapping.ts` and `sync/checks.ts`. The store gets its kind
   info from `installKindInfo()` (main.tsx), never by importing the registry.
-- A new IPC channel is one line in `invokeChannels` (`shared/ipc.ts`), its zod schema, its `handle()` in
-  main, its browser-fallback entry in `native.ts` and usually a `data/*` hook or op. The preload and
-  `CortexApi` follow by themselves; the compiler and `ipcContract.test.ts` flag anything missing. See
+- A new channel is one line in `invokeChannels` (`shared/ipc.ts`), its zod schema, its `handle()` in
+  `src/server/ipc/*`, its browser-fallback entry in `native.ts` and usually a `data/*` hook or op. `CortexApi`
+  and the transport follow by themselves; the compiler and `ipcContract.test.ts` flag anything missing. See
   "Adding a channel" in ARCHITECTURE.md; `gh:prEdit` is a compact example.
 - Code-host calls (PRs, checks, runs, repo links) go through `codeHost(item.data.provider)`
   (`data/codehost.ts`), not `native.gh` or hard-coded GitHub URLs.
@@ -37,7 +36,7 @@ Shared files that many features touch. Keep changes there small and additive, id
 
 `domain/schemas.ts`, `domain/migrations.ts`, `kinds/{types,registry,common,icons}`, `store.ts`,
 `sidebar/index.tsx`, `data/*`, `sync/*`, `ui/*`, `seed.ts`, `index.css`, `chat/ChatBox.tsx`,
-`src/shared/**`, `src/main/ipc/**`, `native.ts`, `debug.ts`, `src/main/smoke*.ts`.
+`src/shared/**`, `src/server/ipc/**`, `src/server/http/**`, `native.ts`, `debug.ts`.
 
 - An **optional** field on a kind's data schema needs no migration. A required or incompatible change needs a
   workspace version bump, a `MIGRATIONS` step, a fixture of the old format and a test. Never edit an old step.
@@ -47,7 +46,7 @@ Shared files that many features touch. Keep changes there small and additive, id
 ## Kinds and actions
 
 - A kind lives entirely in `kinds/<kind>/`: `index.tsx` (module), `actions.tsx`, `Sidebar.tsx`, pure helpers
-  (`logic.ts` / `model.ts`, unit-tested), `sync.ts` (background refresh jobs) and `live.ts` (process push
+  (`logic.ts` / `model.ts`, unit-tested), `sync.ts` (background refresh jobs) and `live.ts` (server push
   events) when it has them. Generic code never names a kind: what differs per kind is a `KindModule` hook
   (`describe`, `cwdOf`, `sync`, `live`, `multiActions`, `projectSection`, `addable.linkLabel`, …).
 - **Adding a kind** touches its own folder plus two shared lines:
@@ -71,7 +70,7 @@ Shared files that many features touch. Keep changes there small and additive, id
   focusable things need a label and a visible `:focus-visible` style.
 - UI style: flat, dark-first, small radii, no glass or gradients, colours from Strato tokens. Check Strato
   props in `node_modules/@dynatrace/strato-components/**/*.d.ts`. Reuse the `sidebar/` sections
-  (`SidebarSection` with `actions`, `SidebarTabs` with `wide: true` for webviews and diffs) and
+  (`SidebarSection` with `actions`, `SidebarTabs` with `wide: true` for diffs and embedded apps) and
   `components/viewers`.
 
 ## Testing without side effects
@@ -80,37 +79,14 @@ Shared files that many features touch. Keep changes there small and additive, id
   services with a fake runner. `npm test`.
 - **Never cause real-world side effects while testing**: no real PR create / merge / comment, no push to a
   real remote, no real Jira, no real (paid) Claude session. Read-only `gh` / `git` calls are fine.
-  - Claude: `CORTEX_CLAUDE_BIN=<abs path>/src/main/services/__fixtures__/fake-claude.mjs`.
-  - Jira: the app uses the real `acli` by default. Unit tests build `JiraService` with the mock
-    (`CORTEX_JIRA_CLI: 'mock'`) or a replaying runner over `__fixtures__/acli/`; smoke runs use the mock unless
-    `CORTEX_JIRA_CLI` is set. Never construct services with the default config in a test.
-  - git push: point `origin` at a local bare repo (the repo smoke does this).
+  - Claude: `CORTEX_CLAUDE_BIN=<abs path>/src/server/services/__fixtures__/fake-claude.mjs`.
+  - Jira: the server uses the real `acli` by default. Unit tests build `JiraService` with the mock
+    (`CORTEX_JIRA_CLI: 'mock'`) or a replaying runner over `__fixtures__/acli/`. Never construct services with the default config in a test.
+  - git push: point `origin` at a local bare repo.
   - gh: `GH_HOST=smoke.invalid` makes every gh call fail locally instead of reaching GitHub.
 - Always use a throw-away profile: `CORTEX_USER_DATA=<temp dir>`.
-
-## Smoke harness
-
-Headless runs that load the real app, drive it and quit (details and all variables in ARCHITECTURE.md →
-Smoke runs):
-
-```
-# bridge probe + screenshot
-CORTEX_SMOKE=1 CORTEX_USER_DATA=<tmp> CORTEX_SMOKE_SHOT=<tmp>/shot.png npm run dev
-
-# agent harness + app flows (fake Claude)
-CORTEX_SMOKE=1 CORTEX_SMOKE_E2E=1 CORTEX_CLAUDE_BIN=<abs>/src/main/services/__fixtures__/fake-claude.mjs CORTEX_USER_DATA=<tmp> npm run dev
-
-# the real-repo click-through: checklist + screenshots
-GH_HOST=smoke.invalid CORTEX_SMOKE=1 CORTEX_SMOKE_REPO=1 CORTEX_SMOKE_OUT=<tmp>/run \
-  CORTEX_CLAUDE_BIN=<abs>/src/main/services/__fixtures__/fake-claude.mjs CORTEX_USER_DATA=<tmp>/profile npm run dev
-
-# the built app: viewers under the production CSP
-npm run build && CORTEX_SMOKE=1 CORTEX_SMOKE_GALLERY=1 CORTEX_USER_DATA=<tmp> npx electron-vite preview
-```
-
-Look at the screenshots, not only at the checklist. To drive a new flow, extend `src/main/smokeRepo.ts`: run
-actions with `d.runAction(itemId, actionId)`, fill and submit forms with `d.forms.submit(values, title)`
-(returns the validation / submit error or null), and read sidebars from the DOM.
+- **End-to-end tests** (browser-driven) are not set up yet and may be added later. The hook for them is
+  `window.__cortexDebug` (`src/renderer/src/debug.ts`), which drives renderer flows without clicks.
 
 ## Commits
 

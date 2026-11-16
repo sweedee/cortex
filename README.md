@@ -7,8 +7,9 @@ your processes), its actions do the real thing (create the worktree, push and op
 tests, merge), and one chat box at the bottom starts and steers Claude Code agents with the bubbles you
 @mention as context.
 
-It is an Electron desktop app (electron-vite, React 18, Dynatrace Strato UI) that drives the real tools:
-`git`, `gh`, the `claude` CLI and the Atlassian CLI `acli` for Jira (a local mock for development).
+It is a local web app: a Node server (`src/server`) runs on your machine and drives the real tools
+(`git`, `gh`, the `claude` CLI and the Atlassian CLI `acli` for Jira, or a local mock for development), and
+the React UI (Dynatrace Strato) runs in your browser. It was migrated from an Electron desktop app.
 
 ## Requirements
 
@@ -18,38 +19,57 @@ It is an Electron desktop app (electron-vite, React 18, Dynatrace Strato UI) tha
 - **Claude Code CLI** `claude` on `PATH`, logged in: agent sessions (each session is one
   `claude -p --input-format stream-json …` process)
 - **Atlassian CLI** `acli` on `PATH`, logged in (`acli jira auth login`): Jira work items. Without it Jira is
-  shown as "not configured" in an installed app (development runs fall back to the bundled mock, see [Jira](#jira-acli-or-the-mock))
+  shown as "not configured" in a production run (development runs fall back to the bundled mock, see [Jira](#jira-acli-or-the-mock))
+- A modern desktop browser (Chromium, Firefox or Safari) for the UI
 
 ## Install, run, build
 
 ```
 npm install          # if it fails with "reading 'edgesOut'": npx npm@11.21.2 install
-npm run dev          # the app with hot reload (main, preload and renderer)
-npm run build        # typecheck + bundle to out/
-npm run preview      # run the built app
-npm run typecheck    # tsc for the node (main / preload) and web (renderer) projects
+npm run dev          # the server (restarts on changes) + the Vite renderer (hot reload)
+npm run build        # typecheck, then bundle the renderer to out/renderer and the server to out/server/index.js
+npm start            # run the built app: node out/server/index.js
+npm run typecheck    # tsc for the server / shared code and the renderer
 npm run lint         # oxlint
+npm run format:check # prettier --check (npm run format writes)
 npm test             # vitest
-npm run dev:web      # renderer only in a browser (native calls use the fallback in native.ts)
 ```
 
-After `npm ci` in a fresh clone or worktree, run `node node_modules/electron/install.js` if Electron
-complains that it failed to install.
+`npm run dev` prints the Cortex URL (`http://127.0.0.1:4317/?token=…`): open that one, not the Vite address.
+It signs the browser in on the server and then redirects to the Vite dev server on `127.0.0.1:5173`.
+`npm start` prints the same kind of URL. The server listens on `127.0.0.1` only; the port is `PORT`
+(default `4317`). To run a built app elsewhere, ship `out/` and `package.json`, run `npm install --omit=dev`
+there and `npm start`.
 
-Cortex keeps its files in `~/.cortex` (config, workspace, window state, Claude session list, Jira mock data);
-`CORTEX_USER_DATA=<dir>` runs with a separate profile. Chromium's caches and the logins of the embedded GitHub /
-Jira pages stay in Electron's own folder (Windows `%APPDATA%\cortex`), not in `~/.cortex`. On the first start
-after the move, an existing `workspace.json` (and its siblings) is copied over from that old folder once.
+Cortex keeps its files in `~/.cortex` (config, workspace, Claude session list, Jira mock data, logs);
+`CORTEX_USER_DATA=<dir>` runs with a separate profile.
+
+## Security
+
+Cortex runs `git`, `gh`, `claude` and your own dev / test commands as you, so the server is built to be
+reachable only by the browser you opened it in:
+
+- **Localhost only.** The server binds `127.0.0.1`, never `0.0.0.0`. Do not put it behind a reverse proxy or
+  a tunnel: there is no multi-user model.
+- **Token.** Each start generates a random token and prints it in the URL. Opening the URL sets an HttpOnly,
+  `SameSite=Strict` cookie that every request then carries; the API also accepts `Authorization: Bearer <token>`.
+  The token is not written to the log file. Anyone holding the URL can run commands on your machine, so do not
+  share it. Set `CORTEX_TOKEN` (16+ characters) to keep the same token across restarts; `npm run dev` does this.
+- **Host and Origin checks.** Requests must name `127.0.0.1:PORT` or `localhost:PORT` in `Host` (no DNS
+  rebinding) and carry no `Origin` or an allowed local one (no cross-site requests from other pages).
+- **Unattended Claude modes.** `bypassPermissions` and `dontAsk` (agents that never ask before acting) are
+  refused until the server is started with `CORTEX_ALLOW_UNATTENDED=bypassPermissions,dontAsk` (or `all`).
+- **Content Security Policy.** The page allows only the app's own scripts; no remote code, no `eval`.
 
 ## First run
 
 A new install starts with an **empty canvas** and a welcome panel with two buttons: **Add a project** (opens
 the add-project form, see step 1) and an optional **Load demo world**, a small made-up world (project
-`unknown/demo`, three tickets, two PRs, a todo) that never touches your disk or the network. To work on your own repo:
-Without that checkout the canvas starts empty with a welcome todo. To work on your own repo:
+`unknown/demo`, three tickets, two PRs, a todo) that never touches your disk or the network. Without a
+checkout the canvas starts empty with a welcome todo. To work on your own repo:
 
 1. Right-click the canvas → *Add to canvas* → **Add project…**. Pick the repo's main clone as **Base checkout** with the
-   folder picker: the GitHub repo (`owner/name` from `origin`), the default branch, a worktrees folder next
+   folder browser: the GitHub repo (`owner/name` from `origin`), the default branch, a worktrees folder next
    to it and the `dev` / `test` npm scripts are filled in. Adjust and save.
 2. Select the project: **New worktree…** creates a branch + `git worktree` (optionally for a ticket),
    **Create ticket** / **Review Renovate PRs** hand the work to Claude.
@@ -62,11 +82,12 @@ Without that checkout the canvas starts empty with a welcome todo. To work on yo
 
 The **gear** (top right) opens the global settings: Claude model, effort and permission mode for new
 sessions, the AI-review comment, the refresh interval, notifications and sound. They are saved in
-`~/.cortex/config.json` (see [Configuration](#configuration)). Right-click the canvas → *Reset workspace to
+`~/.cortex/config.json` (see [Configuration](#configuration)). Notifications use the browser's Notification
+API, so the browser asks for permission once. Right-click the canvas → *Reset workspace to
 demo data* to start over (an empty canvas, as on the first run; the settings stay).
 
 The workspace (bubbles, links, bubble colour, filter, sidebar width) is saved to `~/.cortex/workspace.json`
-(previous version in `.bak`; versioned and migrated on load).
+(previous version in `.bak`; versioned and migrated on load). The server saves the canvas, so reloading the tab keeps it.
 
 ## Configuration
 
@@ -96,8 +117,10 @@ default (Settings → *Config file* lists them); a file that is not valid JSON i
 - `editor.*` and `claude.bin` name programs Cortex runs, so the app itself never writes them: they are set in the
   file only.
 
-The `CORTEX_*` environment variables (`CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_CLAUDE_BIN`, …) are
-development / test overrides on top of config.json; an installed app ignores them (except `CORTEX_USER_DATA`).
+Environment variables: `PORT` (default `4317`), `CORTEX_TOKEN` (fixed token), `CORTEX_USER_DATA` (profile
+folder) and `CORTEX_ALLOW_UNATTENDED` (see [Security](#security)). The `CORTEX_*` overrides used in development
+and tests (`CORTEX_JIRA_CLI`, `CORTEX_JIRA_SITE`, `CORTEX_CLAUDE_BIN`, …) are layered on top of config.json; a
+production run (`npm start`) ignores them.
 
 ## Jira: acli or the mock
 
@@ -107,14 +130,14 @@ edit`, verified with acli 1.3.40). Log in once with `acli jira auth login`; Cort
 list a workflow's transitions; the names are the site's, e.g. localized ones like *In Arbeit*), and Jira
 decides which moves are allowed. Settings → Jira shows the CLI, the site and any problem.
 
-Without a working `acli` (not installed, or not logged in) an **installed** build never shows the mock's fake
+Without a working `acli` (not installed, or not logged in) a **production** run never shows the mock's fake
 data: Jira is marked *not configured*, a banner on the canvas says "Jira not configured: install acli and run
 `acli jira auth login`, or set jira.cli in config.json", and Settings → Jira repeats it.
 
 The **mock** (`scripts/jira-mock`) has the same commands, prints the same JSON and keeps its data in
 `~/.cortex/jira-mock.json`, seeded with made-up CTX-48xx tickets and a To Do → In Progress → In Review → Done
 workflow. It is used with `"jira": { "cli": "mock" }` in config.json (or `CORTEX_JIRA_CLI=mock`
-in development), in development runs when `acli` is not on `PATH`, and in smoke runs (they never touch a real Jira unless started with `CORTEX_JIRA_CLI=acli`).
+in development), and in development runs when `acli` is not on `PATH`.
 `jira.site` in config.json (`CORTEX_JIRA_SITE=<url>` in development) overrides the site.
 
 ## CI
@@ -122,6 +145,9 @@ in development), in development runs when `acli` is not on `PATH`, and in smoke 
 Builds are GitHub Actions jobs (from `gh pr checks` / `gh run view`; re-run with `gh run rerun`). Other CI
 systems that report to GitHub through the checks API (Jenkins, Buildkite, …) show up as builds too; for them
 Cortex opens the details page (*Open in Jenkins* / *Open details*) instead of re-running.
+
+Running apps (*Launch app*) on `localhost` show in an iframe in the sidebar. Other pages (GitHub, Jira, CI
+details, deployments) open in a new browser tab, since they cannot be embedded.
 
 ## Interactions
 
@@ -151,22 +177,26 @@ bubble = notification. A chip under a bubble = its stage (deployments).
 
 ## Code map
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the processes, IPC channels, the domain model, the
-kinds and the integrations; [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) the rules for changing it and the
-smoke harness.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the server, the HTTP / WebSocket transport, the domain
+model, the kinds and the integrations; [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) the rules for changing it.
 
-- `src/main/` — Electron main: window, IPC handlers (`ipc/*`), integrations (`services/*`: git, gh, Jira,
-  Claude sessions, app / test runners), node helpers (`lib/*`), smoke harness (`smoke.ts`, `smokeRepo.ts`)
-- `src/preload/` — exposes the typed bridge as `window.cortex`
-- `src/shared/` — IPC contract (`ipc.ts`), request schemas, tool DTOs and pure mappers (`integrations/*`)
-- `src/renderer/src/` — the UI
-  - `native.ts` — the only way to native functionality (with a browser fallback)
+- `src/server/` — the Node server: `index.ts` (entry: port, token, static files), `http/` (the HTTP + WebSocket
+  API, Host / Origin / token checks, CSP), `ipc/` (channel handlers, zod-validated), `services/` (git, gh, Jira,
+  Claude sessions, app / test runners), `lib/` (node helpers: path policy, processes, file watching, workspace
+  file, user config)
+- `src/shared/` — the channel contract (`ipc.ts`), request schemas (`schemas.ts`, `integrationSchemas.ts`),
+  tool DTOs and pure mappers (`integrations/*`), both sides import it
+- `src/renderer/` — the browser UI (`index.html`, `src/`)
+  - `native.ts` — the only way to the server (`POST /api/invoke/<channel>`, one WebSocket for events), with
+    the browser-side pieces (open URL, notifications, folder picker) and a fallback for unit tests
   - `domain/` — zod schemas of the items (typed `data` per kind), workspace migrations
   - `kinds/` — one folder per kind: icon, ring, actions, sidebar
   - `sidebar/`, `components/viewers/` — sidebar sections; markdown (+ mermaid), diff, editor, log, web viewers
   - `data/` — TanStack Query hooks and write ops per integration
-  - `sync/` — live events from main, startup reconciliation, background refresh
+  - `sync/` — live events from the server, startup reconciliation, background refresh
   - `ui/` — `openForm`, `runTask`, open-URL / folder helpers
   - `chat/`, `canvas/`, `overlays/` — chat box, canvas, HUD / sidebar shell / settings
   - `store.ts`, `persist.ts`, `layout.ts` — zustand store, workspace load / autosave, d3-force layout
-- `scripts/jira-mock/` — the Jira CLI mock
+- `scripts/dev.mjs` — `npm run dev` (server with `tsx watch` + Vite); `scripts/jira-mock/` — the Jira CLI mock
+- `public/` — static assets (favicon, brand marks), served as they are
+- `out/` — build output (`out/renderer`, `out/server`), not committed

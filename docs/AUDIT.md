@@ -1,5 +1,7 @@
 # Cortex production-readiness audit
 
+> **Note:** the app was migrated from Electron to a web app (2026-11-16; a Node server in `src/server`, the UI in the browser). Paths such as `src/main/…`, `R/…` and the Electron-specific findings describe the code at the time of this audit and are not updated.
+
 *2026-11-15 · branch `app` at `c6bcba3` · read-only review*
 
 Paths are relative to the repo root; `R/` stands for `src/renderer/src/`. A finding marked **✔** was

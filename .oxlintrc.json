@@ -3,7 +3,7 @@
   "plugins": ["typescript", "unicorn", "oxc", "react", "import", "vitest"],
   "categories": { "correctness": "error" },
   "env": { "browser": true, "node": true, "es2024": true },
-  "ignorePatterns": ["out/**", "dist/**", "release/**", "node_modules/**"],
+  "ignorePatterns": ["out/**", "node_modules/**"],
   "rules": {
     "react/react-in-jsx-scope": "off",
     "no-unused-expressions": "off",
